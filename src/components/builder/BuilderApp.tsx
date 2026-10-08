@@ -100,7 +100,18 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
       const response = await fetch("/api/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: current, format }),
+        body: JSON.stringify({
+          project: current,
+          format,
+          reportOptions: {
+            sections: reportSections,
+            includeNotes: true,
+            includeGanttDependencyArrows: true,
+            ganttScale: "day",
+            theme: "print",
+            author: current.meta.manager,
+          },
+        }),
       });
       if (!response.ok) {
         let message = "خروجی فایل با خطا مواجه شد.";
@@ -334,7 +345,7 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
           {step === 1 ? <StepActivities project={current} analysis={analysis} api={api} /> : null}
           {step === 2 ? <StepResources project={current} analysis={analysis} api={api} /> : null}
           {step === 3 ? <StepCalendar project={current} api={api} /> : null}
-          {step === 4 ? <StepMilestonesRisks project={current} api={api} /> : null}
+          {step === 4 ? <StepMilestonesRisks project={current} analysis={analysis} api={api} /> : null}
           {step === 5 ? (
             <StepOutput
               reportSections={reportSections}

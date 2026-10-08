@@ -35,12 +35,12 @@ function buildSheet(sheet: Sheet, index: number): string {
   const rows: string[] = [];
 
   rows.push(
-    `<Row r="1">${sheet.headers
+    `<row r="1">${sheet.headers
       .map(
         (header, i) =>
           `<c r="${columnName(i)}1" s="1" t="inlineStr"><is><t xml:space="preserve">${xml(header)}</t></is></c>`,
       )
-      .join("")}</Row>`,
+      .join("")}</row>`,
   );
 
   sheet.rows.forEach((row, rowIndex) => {
@@ -54,7 +54,7 @@ function buildSheet(sheet: Sheet, index: number): string {
         return `<c r="${ref}" s="2" t="inlineStr"><is><t xml:space="preserve">${xml(String(cell ?? ""))}</t></is></c>`;
       })
       .join("");
-    rows.push(`<Row r="${r}">${cells}</Row>`);
+    rows.push(`<row r="${r}">${cells}</row>`);
   });
 
   const cols = Array.from({ length: columns }, (_, i) => {
@@ -66,6 +66,7 @@ function buildSheet(sheet: Sheet, index: number): string {
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:${columnName(columns - 1)}${sheet.rows.length + 1}"/>
   <sheetViews><sheetView rightToLeft="1" tabSelected="${index === 0 ? 1 : 0}" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
   <sheetFormatPr defaultRowHeight="19" baseColWidth="12"/>
   <cols>${cols}</cols>
@@ -137,7 +138,7 @@ export function buildXlsx(sheets: Sheet[]): Uint8Array {
     content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <workbookPr date1904="0"/>
-  <bookViews><workbookView rightToLeft="1" xWindow="0" yWindow="0" windowWidth="24000" windowHeight="14000"/></bookViews>
+  <bookViews><workbookView xWindow="0" yWindow="0" windowWidth="24000" windowHeight="14000"/></bookViews>
   <sheets>
     ${names
       .map((name, i) => `<sheet name="${xml(name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)

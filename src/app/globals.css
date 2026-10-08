@@ -598,3 +598,124 @@ input[inputmode="numeric"] {
     border-radius: 14px;
   }
 }
+
+@media screen and (max-width: 640px) {
+  .report-root {
+    padding: 12px 8px;
+    font-size: 12px;
+  }
+
+  .report-sheet {
+    padding: 16px 12px 24px;
+  }
+
+  .report-watermark {
+    font-size: 42px;
+  }
+
+  .rpt-section-title {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .rpt-table {
+    display: block;
+    width: 100%;
+    overflow: visible;
+  }
+
+  .rpt-table thead {
+    display: none;
+  }
+
+  .rpt-table tbody {
+    display: grid;
+    gap: 8px;
+  }
+
+  .rpt-table tbody tr {
+    display: block;
+    overflow: hidden;
+    border: 1px solid #d7dee6;
+    border-radius: 10px;
+    break-inside: avoid;
+  }
+
+  .rpt-table tbody td {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    overflow-wrap: anywhere;
+    border: 0;
+    border-top: 1px solid #edf0f3;
+    padding: 7px 9px;
+    text-align: start;
+  }
+
+  .rpt-table tbody td:first-child {
+    border-top: 0;
+  }
+
+  .rpt-table tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 36%;
+    color: #526273;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .rpt-table tbody td[colspan] {
+    display: block;
+    text-align: center;
+  }
+
+  .rpt-table tbody td[colspan]::before {
+    display: none;
+  }
+
+  .rpt-table tfoot {
+    display: block;
+    margin-top: 8px;
+  }
+
+  .rpt-table tfoot tr {
+    display: block;
+    overflow: hidden;
+    border: 1px solid #c8d3de;
+    border-radius: 10px;
+  }
+
+  .rpt-table tfoot td {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 9px;
+    overflow-wrap: anywhere;
+  }
+
+  .rpt-table tfoot td:empty {
+    display: none;
+  }
+
+  .rpt-table tfoot td::before {
+    content: attr(data-label);
+    flex: 0 0 36%;
+    color: #526273;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .rpt-table tfoot td[data-label=""]::before {
+    display: none;
+  }
+
+  .rpt-kv {
+    font-size: 11px;
+  }
+
+  .rpt-kv td.k {
+    width: 38%;
+  }
+}

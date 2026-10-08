@@ -224,21 +224,23 @@ export function buildSheets(analysis: ProjectAnalysis, input: ProjectInput): She
   return sheets;
 }
 
-/** neutralises spreadsheet formula injection (=, +, -, @, tab, CR) in untrusted cells */
-function csvSafe(value: string): string {
-  // Excel/Calc treat a leading =, +, -, @, tab or CR as a formula trigger
-  // (DDE payloads like `=cmd|'/c calc'!A1` included) — prefix with an
-  // apostrophe to force text interpretation.
-  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+/** Neutralizes spreadsheet formula injection in untrusted text while keeping numbers numeric. */
+function csvSafe(value: string | number): string {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  const text = String(value ?? "");
+  // Spreadsheet apps may ignore leading whitespace/control characters before
+  // a formula prefix. Numeric cells are returned above, so a leading minus in
+  // user-provided text remains protected without changing legitimate negatives.
+  return /^[\s\uFEFF]*[=+\-@]/.test(text) ? `'${text}` : text;
 }
 
 export function buildCsv(sheet: Sheet): string {
-  const lines = [sheet.headers.map((h) => csvSafe(String(h ?? ""))).join(",")];
+  const lines = [sheet.headers.map((header) => csvSafe(header)).join(",")];
   for (const row of sheet.rows) {
     lines.push(
       row
         .map((cell) => {
-          const value = csvSafe(String(cell ?? ""));
+          const value = csvSafe(cell ?? "");
           return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
         })
         .join(","),

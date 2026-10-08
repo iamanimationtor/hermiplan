@@ -4,11 +4,13 @@ import { buildXlsx } from "./xlsx";
 import { buildMsProjectXml } from "./msproject";
 import { buildReportHtml } from "./html";
 import type { ProjectAnalysis, ProjectInput } from "@/lib/engine/types";
+import type { ReportOptions } from "@/lib/validation";
 
 export interface DeliveryOptions {
   ganttSvg: string;
   reportUrl: string;
   author?: string;
+  reportOptions?: Partial<ReportOptions>;
 }
 
 function readMe(project: ProjectInput, analysis: ProjectAnalysis, options: DeliveryOptions): string {
@@ -60,7 +62,7 @@ export function buildDeliveryPackage(
   const sheets: Sheet[] = buildSheets(analysis, project);
   const entries: ZipEntry[] = [
     { name: "README.txt", content: readMe(project, analysis, options) },
-    { name: "Report.html", content: buildReportHtml(project, analysis, options.ganttSvg) },
+    { name: "Report.html", content: buildReportHtml(project, analysis, options.ganttSvg, { ...options.reportOptions, author: options.author }) },
     {
       name: "Data.xlsx",
       content: buildXlsx(sheets),

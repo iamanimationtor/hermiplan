@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BarChart, GanttChart, HealthGauge, NetworkDiagram, ResourceHistogram } from "@/components/charts";
 import { Badge, Button } from "@/components/ui";
-import { EXPORT_FORMATS, REPORT_SECTIONS, type ReportOptions } from "@/lib/validation";
+import { DEFAULT_REPORT_SECTIONS, EXPORT_FORMATS, REPORT_SECTIONS, type ReportOptions } from "@/lib/validation";
 import { Modal } from "@/components/ui";
 import { Logo, LogoMark, CREATOR_CREDIT_FULL } from "@/components/Logo";
 import type { ProjectAnalysis, ProjectInput } from "@/lib/engine/types";
@@ -72,7 +72,7 @@ function DataTable({ headers, rows, footer }: { headers: string[]; rows: (string
       <thead>
         <tr>
           {headers.map((h) => (
-            <th key={h}>{h}</th>
+            <th key={h} scope="col">{h}</th>
           ))}
         </tr>
       </thead>
@@ -80,7 +80,7 @@ function DataTable({ headers, rows, footer }: { headers: string[]; rows: (string
         {rows.map((row, i) => (
           <tr key={i}>
             {row.map((cell, j) => (
-              <td key={j}>{cell}</td>
+              <td key={j} data-label={headers[j] ?? ""}>{cell}</td>
             ))}
           </tr>
         ))}
@@ -96,7 +96,7 @@ function DataTable({ headers, rows, footer }: { headers: string[]; rows: (string
         <tfoot>
           <tr>
             {footer.map((cell, j) => (
-              <td key={j}>{cell}</td>
+              <td key={j} data-label={j === 0 ? "" : headers[j] ?? ""}>{cell}</td>
             ))}
           </tr>
         </tfoot>
@@ -184,6 +184,14 @@ export function ReportView({
           project,
           format: formatId,
           reportUrl: typeof window !== "undefined" ? window.location.href : "",
+          reportOptions: {
+            sections,
+            includeNotes: options.includeNotes,
+            includeGanttDependencyArrows: options.includeGanttDependencyArrows,
+            ganttScale: options.ganttScale,
+            theme: options.theme,
+            author: options.author,
+          },
         }),
       });
       if (!response.ok) {
@@ -199,17 +207,6 @@ export function ReportView({
       }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      if (formatId === "pdf") {
-        const win = window.open(url, "_blank");
-        window.setTimeout(() => {
-          try {
-            win?.print();
-          } catch {
-            /* popup blocked — user can print manually */
-          }
-        }, 1200);
-        return;
-      }
       const format = EXPORT_FORMATS.find((f) => f.id === formatId);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -246,7 +243,16 @@ export function ReportView({
     ),
   );
 
-  const totalSheets = 5;
+  const reportSheets = [
+    { id: "cover", keys: ["cover"] },
+    { id: "overview", keys: ["executive", "info", "kpis"] },
+    { id: "planning", keys: ["wbs", "activities", "schedule", "gantt", "critical", "milestones", "network"] },
+    { id: "monitoring", keys: ["progress", "resources", "costs", "pricing", "risks", "delays", "baseline", "status"] },
+    { id: "approval", keys: ["standards", "signature"] },
+  ].filter((sheet) => sheet.keys.some((key) => has(key)));
+  const sheetIndex = new Map(reportSheets.map((sheet, index) => [sheet.id, index + 1]));
+  const pageNumber = (id: string) => toPersianDigits(sheetIndex.get(id) ?? 0);
+  const totalSheets = reportSheets.length;
 
   const statusText = a.health.status === "good" ? "در وضعیت مطلوب" : a.health.status === "watch" ? "نیازمند پایش" : "در وضعیت بحرانی";
 
@@ -317,6 +323,14 @@ export function ReportView({
           })}
         </div>
       </div>
+      {!ordered.length ? (
+        <div className="no-print mx-auto mt-3 flex max-w-[1180px] flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">
+          <span>هیچ بخشی برای گزارش انتخاب نشده است؛ پیش‌نمایش و چاپ خالی خواهد بود.</span>
+          <Button variant="secondary" size="sm" onClick={() => setSections(DEFAULT_REPORT_SECTIONS)}>
+            بازگرداندن بخش‌های پیش‌فرض
+          </Button>
+        </div>
+      ) : null}
 
       {/* -------------------------- download center -------------------------- */}
       {actionError ? (
@@ -375,6 +389,7 @@ export function ReportView({
       {/* ---------------------------- report ---------------------------- */}
       <div id="report-main" className="report-root px-3 py-6 print:p-0" dir="rtl">
         {/* ------------------------- SHEET 1: cover ------------------------ */}
+        {has("cover") ? (
         <section className="report-sheet">
           <div className="report-watermark">HERMIPLAN</div>
           <div className="flex h-full flex-col">
@@ -443,12 +458,14 @@ export function ReportView({
             </div>
           </div>
           <div className="rpt-sheet-number">
-            <span>صفحه ۱ از {toPersianDigits(totalSheets)}</span>
+            <span>صفحه {pageNumber("cover")} از {toPersianDigits(totalSheets)}</span>
             <span>{project.meta.name}</span>
           </div>
         </section>
+        ) : null}
 
         {/* -------------------- SHEET 2: summary & info -------------------- */}
+        {sheetIndex.has("overview") ? (
         <section className="report-sheet">
           {has("executive") ? (
             <div className="rpt-section mb-6">
@@ -548,12 +565,14 @@ export function ReportView({
             </div>
           ) : null}
           <div className="rpt-sheet-number">
-            <span>صفحه ۲ از {toPersianDigits(totalSheets)}</span>
+            <span>صفحه {pageNumber("overview")} از {toPersianDigits(totalSheets)}</span>
             <span>خلاصه مدیریتی و مشخصات پروژه</span>
           </div>
         </section>
+        ) : null}
 
         {/* -------------------- SHEET 3: planning -------------------- */}
+        {sheetIndex.has("planning") ? (
         <section className="report-sheet">
           {has("wbs") ? (
             <div className="rpt-section mb-6">
@@ -574,27 +593,23 @@ export function ReportView({
                   {a.wbs.map((phase) => (
                     [
                       <tr key={phase.id} style={{ background: "#e8eef4", fontWeight: 700 }}>
-                        <td>
-                          <strong>{phase.wbs}</strong>
-                        </td>
-                        <td>
-                          <strong>{phase.name}</strong>
-                        </td>
-                        <td>{toPersianDigits(phase.duration ?? 0)}</td>
-                        <td>{formatJalali(phase.startDate ?? a.schedule.startDate, { withMonthName: false })}</td>
-                        <td>{formatJalali(phase.finishDate ?? a.schedule.finishDate, { withMonthName: false })}</td>
-                        <td>{formatPercent(phase.progress ?? 0, 0)}</td>
-                        <td>{number(phase.budget ?? 0)}</td>
+                        <td data-label="کد WBS"><strong>{phase.wbs}</strong></td>
+                        <td data-label="شرح"><strong>{phase.name}</strong></td>
+                        <td data-label="مدت (روز)">{toPersianDigits(phase.duration ?? 0)}</td>
+                        <td data-label="شروع">{formatJalali(phase.startDate ?? a.schedule.startDate, { withMonthName: false })}</td>
+                        <td data-label="پایان">{formatJalali(phase.finishDate ?? a.schedule.finishDate, { withMonthName: false })}</td>
+                        <td data-label="پیشرفت">{formatPercent(phase.progress ?? 0, 0)}</td>
+                        <td data-label="بودجه">{number(phase.budget ?? 0)}</td>
                       </tr>,
                       ...phase.children.map((child) => (
                         <tr key={child.id}>
-                          <td style={{ paddingInlineStart: "22px" }}>{child.wbs}</td>
-                          <td style={{ paddingInlineStart: "22px" }}>{child.name}</td>
-                          <td>{toPersianDigits(child.duration ?? 0)}</td>
-                          <td>{formatJalali(child.startDate ?? "", { withMonthName: false })}</td>
-                          <td>{formatJalali(child.finishDate ?? "", { withMonthName: false })}</td>
-                          <td>{formatPercent(child.progress ?? 0, 0)}</td>
-                          <td>{number(child.budget ?? 0)}</td>
+                          <td data-label="کد WBS" style={{ paddingInlineStart: "22px" }}>{child.wbs}</td>
+                          <td data-label="شرح" style={{ paddingInlineStart: "22px" }}>{child.name}</td>
+                          <td data-label="مدت (روز)">{toPersianDigits(child.duration ?? 0)}</td>
+                          <td data-label="شروع">{formatJalali(child.startDate ?? "", { withMonthName: false })}</td>
+                          <td data-label="پایان">{formatJalali(child.finishDate ?? "", { withMonthName: false })}</td>
+                          <td data-label="پیشرفت">{formatPercent(child.progress ?? 0, 0)}</td>
+                          <td data-label="بودجه">{number(child.budget ?? 0)}</td>
                         </tr>
                       )),
                     ]
@@ -743,12 +758,14 @@ export function ReportView({
             </div>
           ) : null}
           <div className="rpt-sheet-number">
-            <span>صفحه ۳ از {toPersianDigits(totalSheets)}</span>
+            <span>صفحه {pageNumber("planning")} از {toPersianDigits(totalSheets)}</span>
             <span>برنامه‌ریزی و زمان‌بندی پروژه</span>
           </div>
         </section>
+        ) : null}
 
         {/* -------------------- SHEET 4: monitoring -------------------- */}
+        {sheetIndex.has("monitoring") ? (
         <section className="report-sheet">
           {has("progress") ? (
             <div className="rpt-section mb-6">
@@ -1078,13 +1095,14 @@ export function ReportView({
             </div>
           ) : null}
           <div className="rpt-sheet-number">
-            <span>صفحه ۴ از {toPersianDigits(totalSheets)}</span>
+            <span>صفحه {pageNumber("monitoring")} از {toPersianDigits(totalSheets)}</span>
             <span>پایش، کنترل و تحلیل پروژه</span>
           </div>
         </section>
+        ) : null}
 
         {/* -------------------- SHEET 5: signature -------------------- */}
-        {has("signature") ? (
+        {sheetIndex.has("approval") ? (
           <section className="report-sheet">
             {has("standards") ? (
               <div className="rpt-section mb-6">
@@ -1103,6 +1121,8 @@ export function ReportView({
                 </p>
               </div>
             ) : null}
+            {has("signature") ? (
+              <>
             <SectionTitle index={sectionIndex.get("signature") ?? 0} title="تأیید و امضا (Approval)" />
             <p className="mb-4 text-[10.5px] leading-6 text-slate-600">
               این گزارش بر اساس اطلاعات ثبت‌شده در پلتفرم HERMIPLAN و محاسبات استاندارد مدیریت پروژه (CPM و EVM) تهیه شده است. صحت داده‌های ورودی بر عهده تهیه‌کننده گزارش است.
@@ -1124,12 +1144,12 @@ export function ReportView({
                   ["کارفرما", project.meta.client ?? ""],
                 ].map(([role, name]) => (
                   <tr key={role}>
-                    <td>
+                    <td data-label="سمت">
                       <strong>{role}</strong>
                     </td>
-                    <td>{name || "—"}</td>
-                    <td style={{ height: 34 }} />
-                    <td />
+                    <td data-label="نام و نام خانوادگی">{name || "—"}</td>
+                    <td data-label="امضا" style={{ height: 34 }} />
+                    <td data-label="تاریخ" />
                   </tr>
                 ))}
               </tbody>
@@ -1149,9 +1169,11 @@ export function ReportView({
                 </span>
               </div>
             </div>
+              </>
+            ) : null}
             <div className="rpt-sheet-number">
-              <span>صفحه ۵ از {toPersianDigits(totalSheets)}</span>
-              <span>تأیید و امضا</span>
+              <span>صفحه {pageNumber("approval")} از {toPersianDigits(totalSheets)}</span>
+              <span>{has("signature") ? "تأیید و امضا" : "استانداردها و متدها"}</span>
             </div>
           </section>
         ) : null}

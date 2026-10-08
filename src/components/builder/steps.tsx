@@ -84,12 +84,21 @@ export function StepBasics({ project, api }: { project: ProjectInput; api: Proje
   const [pendingTemplate, setPendingTemplate] = useState<{ id: string; title: string } | null>(null);
 
   const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase();
     const list = TEMPLATES.filter((template) => {
       if (domain !== "all" && template.domain !== domain) return false;
       if (complexity !== "all" && template.complexity !== complexity) return false;
-      if (query.trim()) {
-        const haystack = `${template.title} ${template.tagline} ${template.phases.join(" ")}`;
-        if (!haystack.includes(query.trim())) return false;
+      if (normalizedQuery) {
+        const searchable = [
+          template.title,
+          template.tagline,
+          template.phases.join(" "),
+          template.audience.join(" "),
+          template.activities.map((activity) => `${activity.code} ${activity.name} ${activity.phase}`).join(" "),
+          template.resources.map((resource) => `${resource.name} ${resource.type} ${resource.unit ?? ""}`).join(" "),
+          template.risks.map((risk) => `${risk.title} ${risk.category}`).join(" "),
+        ].join(" ").toLocaleLowerCase();
+        if (!searchable.includes(normalizedQuery)) return false;
       }
       return true;
     });
@@ -316,6 +325,22 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
   const [feed, setFeed] = useState<MarketFeed | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogCategory, setCatalogCategory] = useState("all");
+  const [catalogSort, setCatalogSort] = useState<"name" | "official" | "market">("name");
+  const filteredCatalog = useMemo(() => {
+    const normalizedQuery = catalogQuery.trim().toLocaleLowerCase();
+    const items = CATALOG.filter((item) => {
+      if (catalogCategory !== "all" && item.category !== catalogCategory) return false;
+      const searchable = `${item.name} ${item.key} ${item.unit} ${item.category}`.toLocaleLowerCase();
+      return !normalizedQuery || searchable.includes(normalizedQuery);
+    });
+    return items.sort((left, right) => {
+      if (catalogSort === "official") return (right.official1405 ?? 0) - (left.official1405 ?? 0);
+      if (catalogSort === "market") return right.market - left.market;
+      return left.name.localeCompare(right.name, "fa");
+    });
+  }, [catalogCategory, catalogQuery, catalogSort]);
   const pricing: ProjectPricing = { ...{ series: "official-1405", region: "tehran", indexFactor: 100, escalationEnabled: true, escalationRatePerMonth: 3, overheadPercent: 17, profitPercent: 10, contingencyPercent: 5 }, ...project.pricing };
 
   async function refresh() {
@@ -439,8 +464,8 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
             <div className="border-b border-slate-100 px-4 py-2.5 text-[12.5px] font-bold text-ink-900">
               جدول تعدیل بر پایه کارکرد ماهانه
             </div>
-            <div className="thin-scroll max-h-[240px] overflow-y-auto">
-              <table className="w-full text-[12px]">
+            <div className="thin-scroll hidden max-h-[240px] overflow-x-auto overflow-y-auto md:block">
+              <table className="w-full min-w-[580px] text-[12px]">
                 <thead className="sticky top-0 bg-slate-50 text-slate-500">
                   <tr>
                     {["ماه", "روز کاری", "هزینه برنامه‌ای", "ضریب", "مبلغ تعدیل"].map((h) => (
@@ -461,6 +486,21 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
                 </tbody>
               </table>
             </div>
+            <div className="thin-scroll max-h-[420px] space-y-2 overflow-y-auto p-3 md:hidden">
+              {p.escalation.months.map((month) => (
+                <article key={month.key} className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-[12px] font-bold text-ink-900">{month.label}</h4>
+                    <Badge tone="warn">تعدیل {formatCompact(month.escalation)}</Badge>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[10.5px]">
+                    <div><span className="text-slate-500">روز کاری: </span><b>{toPersianDigits(month.workingDays)}</b></div>
+                    <div><span className="text-slate-500">ضریب: </span><b>{toPersianDigits(month.factor)}</b></div>
+                    <div className="col-span-2"><span className="text-slate-500">هزینه برنامه‌ای: </span><b>{formatCompact(month.plannedValue)}</b></div>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -476,8 +516,23 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
             <div className="border-b border-slate-100 px-4 py-2.5 text-[12.5px] font-bold text-ink-900">
               فهرست نرخ بازار ایران — {feed?.asOfJalali ?? "نسخه مرجع"}
             </div>
-            <div className="thin-scroll max-h-[300px] overflow-y-auto p-3">
-              <table className="w-full text-[11.5px]">
+            <div className="grid gap-2 border-b border-slate-100 p-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(140px,1fr)_minmax(150px,1fr)]">
+              <Input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="جستجوی شرح یا واحد نرخ…" aria-label="جستجو در فهرست نرخ بازار" className="h-10 py-2" />
+              <Select value={catalogCategory} onChange={(event) => setCatalogCategory(event.target.value)} aria-label="فیلتر دسته نرخ" className="h-10 py-2">
+                <option value="all">همه دسته‌ها</option>
+                <option value="labor">نیروی انسانی</option>
+                <option value="equipment">ماشین‌آلات</option>
+                <option value="material">مصالح</option>
+              </Select>
+              <Select value={catalogSort} onChange={(event) => setCatalogSort(event.target.value as typeof catalogSort)} aria-label="مرتب‌سازی نرخ‌ها" className="h-10 py-2">
+                <option value="name">مرتب‌سازی: نام</option>
+                <option value="official">بالاترین نرخ مصوب</option>
+                <option value="market">بالاترین نرخ بازار</option>
+              </Select>
+            </div>
+            <p className="px-3 pt-2 text-[10.5px] text-slate-500">نمایش {toPersianDigits(filteredCatalog.length)} ردیف نرخ</p>
+            <div className="thin-scroll hidden max-h-[300px] overflow-x-auto overflow-y-auto p-3 md:block">
+              <table className="w-full min-w-[580px] text-[11.5px]">
                 <thead className="bg-slate-50 text-slate-500">
                   <tr>
                     {["شرح", "دسته", "واحد", "مصوب ۱۴۰۵", "بازار آزاد"].map((h) => (
@@ -486,7 +541,7 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
                   </tr>
                 </thead>
                 <tbody>
-                  {CATALOG.map((item) => (
+                  {filteredCatalog.map((item) => (
                     <tr key={item.key} className="border-t border-slate-100">
                       <td className="px-2.5 py-1.5">{item.name}</td>
                       <td className="px-2.5 py-1.5 text-slate-500">
@@ -497,8 +552,25 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
                       <td className="px-2.5 py-1.5 font-semibold">{formatCompact(item.market)}</td>
                     </tr>
                   ))}
+                  {!filteredCatalog.length ? <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">نرخی با این فیلترها پیدا نشد.</td></tr> : null}
                 </tbody>
               </table>
+            </div>
+            <div className="thin-scroll max-h-[360px] space-y-2 overflow-y-auto p-3 md:hidden">
+              {filteredCatalog.map((item) => (
+                <article key={item.key} className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="text-[12px] font-bold text-ink-900">{item.name}</h4>
+                    <Badge tone="info">{item.category === "labor" ? "نیروی انسانی" : item.category === "equipment" ? "ماشین‌آلات" : "مصالح"}</Badge>
+                  </div>
+                  <p className="mt-1 text-[10.5px] text-slate-500">واحد: {item.unit}</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[10.5px]">
+                    <div className="rounded-lg bg-slate-50 p-2"><p className="text-slate-500">مصوب ۱۴۰۵</p><b>{item.official1405 ? formatCompact(item.official1405) : "—"}</b></div>
+                    <div className="rounded-lg bg-brand-50 p-2"><p className="text-slate-500">بازار آزاد</p><b>{formatCompact(item.market)}</b></div>
+                  </div>
+                </article>
+              ))}
+              {!filteredCatalog.length ? <p className="py-5 text-center text-[11px] text-slate-500">نرخی با این فیلترها پیدا نشد.</p> : null}
             </div>
             <p className="border-t border-slate-100 px-4 py-2 text-[11px] leading-6 text-slate-500">
               منابع: {feed?.sources?.join(" • ") ?? "مصوبه شورای عالی کار، فهرست‌بهای واحد پایه، میانگین بازار مصالح"}
@@ -575,6 +647,40 @@ export function StepActivities({ project, analysis, api }: { project: ProjectInp
 /* ----------------------------- step 3 -------------------------------- */
 
 export function StepResources({ project, analysis, api }: { project: ProjectInput; analysis: ProjectAnalysis; api: ProjectApi }) {
+  const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | ProjectInput["resources"][number]["type"]>("all");
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
+  const [sort, setSort] = useState<"name" | "cost" | "utilization">("name");
+  const filteredResources = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    const result = project.resources.filter((resource) => {
+      const row = analysis.resources.find((item) => item.id === resource.id);
+      const assigned = project.activities.some((activity) => activity.resources.some((assignment) => assignment.resourceId === resource.id));
+      const catalogName = CATALOG.find((item) => item.key === resource.rateKey)?.name ?? "";
+      if (typeFilter !== "all" && resource.type !== typeFilter) return false;
+      if (assignmentFilter === "assigned" && !assigned) return false;
+      if (assignmentFilter === "unassigned" && assigned) return false;
+      if (assignmentFilter === "overallocated" && !row?.overallocated) return false;
+      const searchable = `${resource.name} ${resource.unit ?? ""} ${resource.rateSource ?? ""} ${catalogName}`.toLocaleLowerCase();
+      if (normalizedQuery && !searchable.includes(normalizedQuery)) return false;
+      return true;
+    });
+    return result.sort((left, right) => {
+      const leftAnalysis = analysis.resources.find((item) => item.id === left.id);
+      const rightAnalysis = analysis.resources.find((item) => item.id === right.id);
+      if (sort === "cost") return (rightAnalysis?.cost ?? 0) - (leftAnalysis?.cost ?? 0);
+      if (sort === "utilization") return (rightAnalysis?.utilization ?? 0) - (leftAnalysis?.utilization ?? 0);
+      return left.name.localeCompare(right.name, "fa");
+    });
+  }, [analysis.resources, assignmentFilter, project.activities, project.resources, query, sort, typeFilter]);
+  const resourceFiltersActive = Boolean(query) || typeFilter !== "all" || assignmentFilter !== "all" || sort !== "name";
+  const resourceTypeLabel = (type: ProjectInput["resources"][number]["type"]) => ({
+    labor: "نیروی انسانی",
+    equipment: "ماشین‌آلات",
+    material: "مصالح / مواد",
+    cost: "هزینه / خدمات",
+  })[type];
+
   return (
     <div className="space-y-5">
       <PricingPanel project={project} analysis={analysis} api={api} />
@@ -593,18 +699,53 @@ export function StepResources({ project, analysis, api }: { project: ProjectInpu
 
       <Card>
         <CardHeader title="منابع پروژه" subtitle="نرخ روزانه و ظرفیت مجاز هر منبع را وارد کنید؛ هزینه‌ها و بار کاری به‌صورت خودکار محاسبه می‌شود." icon={<span className="text-lg">👷</span>} />
-        <div className="p-5">
-          <div className="thin-scroll overflow-x-auto">
+        <div className="space-y-4 p-5">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1.4fr)_minmax(150px,1fr)_minmax(160px,1fr)_minmax(170px,1fr)_auto]">
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="جستجوی نام، واحد یا نرخ بازار…"
+              aria-label="جستجو در منابع"
+              className="h-10 py-2"
+            />
+            <Select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)} aria-label="فیلتر نوع منبع" className="h-10 py-2">
+              <option value="all">همه انواع منابع</option>
+              <option value="labor">نیروی انسانی</option>
+              <option value="equipment">ماشین‌آلات</option>
+              <option value="material">مصالح / مواد</option>
+              <option value="cost">هزینه / خدمات</option>
+            </Select>
+            <Select value={assignmentFilter} onChange={(event) => setAssignmentFilter(event.target.value)} aria-label="فیلتر تخصیص و ظرفیت" className="h-10 py-2">
+              <option value="all">همه منابع</option>
+              <option value="assigned">تخصیص‌یافته</option>
+              <option value="unassigned">بدون تخصیص</option>
+              <option value="overallocated">بیش از ظرفیت</option>
+            </Select>
+            <Select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} aria-label="مرتب‌سازی منابع" className="h-10 py-2">
+              <option value="name">مرتب‌سازی: نام</option>
+              <option value="cost">بیشترین هزینه</option>
+              <option value="utilization">بیشترین بهره‌وری</option>
+            </Select>
+            {resourceFiltersActive ? (
+              <Button variant="ghost" size="sm" onClick={() => { setQuery(""); setTypeFilter("all"); setAssignmentFilter("all"); setSort("name"); }}>
+                پاک‌کردن فیلتر
+              </Button>
+            ) : null}
+          </div>
+          <p className="text-[11px] text-slate-500" role="status" aria-live="polite">
+            نمایش {toPersianDigits(filteredResources.length)} از {toPersianDigits(project.resources.length)} منبع
+          </p>
+          <div className="thin-scroll hidden overflow-x-auto md:block">
             <table className="w-full min-w-[760px] text-[12.5px]">
               <thead>
                 <tr className="bg-slate-50 text-slate-500">
-                  {["نام منبع", "نوع", "نرخ بازار", "نرخ روزانه", "ظرفیت مجاز", "واحد-روز", "اوج تخصیص", "بهره‌وری", "هزینه"].map((h) => (
+                  {["نام منبع", "نوع", "اتصال به نرخ بازار", "واحد", "نرخ روزانه", "ظرفیت مجاز", "واحد-روز", "اوج تخصیص", "بهره‌وری", "هزینه", ""].map((h) => (
                     <th key={h} className="px-3 py-2.5 text-right font-semibold">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {project.resources.map((resource) => {
+                {filteredResources.map((resource) => {
                   const row = analysis.resources.find((r) => r.id === resource.id);
                   const over = row?.overallocated;
                   return (
@@ -614,6 +755,18 @@ export function StepResources({ project, analysis, api }: { project: ProjectInpu
                         {resource.rateSource ? (
                           <span className="mt-1 block text-[10px] text-slate-500">{resource.rateSource}</span>
                         ) : null}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Select
+                          value={resource.type}
+                          onChange={(e) => api.updateResource(resource.id, { type: e.target.value as ProjectInput["resources"][number]["type"] })}
+                          className="min-w-[120px] py-1.5"
+                        >
+                          <option value="labor">نیروی انسانی</option>
+                          <option value="equipment">ماشین‌آلات</option>
+                          <option value="material">مصالح</option>
+                          <option value="cost">هزینه / خدمات</option>
+                        </Select>
                       </td>
                       <td className="px-3 py-2">
                         <Select
@@ -630,16 +783,7 @@ export function StepResources({ project, analysis, api }: { project: ProjectInpu
                         </Select>
                       </td>
                       <td className="px-3 py-2">
-                        <Select
-                          value={resource.type}
-                          onChange={(e) => api.updateResource(resource.id, { type: e.target.value as ProjectInput["resources"][number]["type"] })}
-                          className="min-w-[120px] py-1.5"
-                        >
-                          <option value="labor">نیروی انسانی</option>
-                          <option value="equipment">ماشین‌آلات</option>
-                          <option value="material">مصالح</option>
-                          <option value="cost">هزینه / خدمات</option>
-                        </Select>
+                        <Input value={resource.unit ?? ""} onChange={(e) => api.updateResource(resource.id, { unit: e.target.value })} placeholder="واحد" className="w-28 py-1.5" aria-label="واحد اندازه‌گیری منبع" />
                       </td>
                       <td className="px-3 py-2">
                         <Input type="number" min={0} value={resource.rate} onChange={(e) => api.updateResource(resource.id, { rate: Number(e.target.value) })} className="w-32 py-1.5" />
@@ -658,19 +802,83 @@ export function StepResources({ project, analysis, api }: { project: ProjectInpu
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-700">{formatCompact(row?.cost ?? 0)}</td>
+                      <td className="px-2 py-2">
+                        <Button variant="danger" size="sm" onClick={() => api.removeResource(resource.id)} aria-label={`حذف منبع ${resource.name}`}>
+                          حذف
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}
-                {!project.resources.length ? (
+                {!filteredResources.length ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-slate-500">منبعی تعریف نشده است.</td>
+                    <td colSpan={11} className="px-4 py-8 text-center text-slate-500">
+                      {project.resources.length ? "منبعی با این فیلترها پیدا نشد." : "منبعی تعریف نشده است."}
+                    </td>
                   </tr>
                 ) : null}
               </tbody>
             </table>
           </div>
+          <div className="space-y-3 md:hidden">
+            {filteredResources.map((resource) => {
+              const row = analysis.resources.find((item) => item.id === resource.id);
+              const over = row?.overallocated ?? false;
+              return (
+                <article key={resource.id} className="hp-card space-y-3 p-4">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <Input value={resource.name} onChange={(event) => api.updateResource(resource.id, { name: event.target.value })} aria-label="نام منبع" />
+                      {resource.rateSource ? <span className="mt-1 block text-[10.5px] text-slate-500">{resource.rateSource}</span> : null}
+                    </div>
+                    <Button variant="danger" size="sm" onClick={() => api.removeResource(resource.id)} aria-label={`حذف منبع ${resource.name}`}>حذف</Button>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Field label="نوع منبع">
+                      <Select value={resource.type} onChange={(event) => api.updateResource(resource.id, { type: event.target.value as typeof resource.type })}>
+                        <option value="labor">نیروی انسانی</option>
+                        <option value="equipment">ماشین‌آلات</option>
+                        <option value="material">مصالح / مواد</option>
+                        <option value="cost">هزینه / خدمات</option>
+                      </Select>
+                    </Field>
+                    <Field label="اتصال به نرخ بازار">
+                      <Select value={resource.rateKey ?? ""} onChange={(event) => api.linkResourceRate(resource.id, event.target.value)}>
+                        <option value="">بدون اتصال به فهرست نرخ</option>
+                        {CATALOG.map((item) => <option key={item.key} value={item.key}>{item.name} ({item.unit})</option>)}
+                      </Select>
+                    </Field>
+                    <Field label="واحد اندازه‌گیری">
+                      <Input value={resource.unit ?? ""} onChange={(event) => api.updateResource(resource.id, { unit: event.target.value })} placeholder="مثلاً نفر-روز، تن، متر" />
+                    </Field>
+                    <Field label={`نرخ روزانه (${resource.unit ?? "واحد"})`}>
+                      <Input type="number" min={0} value={resource.rate} onChange={(event) => api.updateResource(resource.id, { rate: Number(event.target.value) })} />
+                    </Field>
+                    <Field label="ظرفیت مجاز در روز">
+                      <Input type="number" min={0} value={resource.capacity} onChange={(event) => api.updateResource(resource.id, { capacity: Number(event.target.value) })} />
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-xl bg-slate-50 p-2"><p className="text-[9.5px] text-slate-500">واحد-روز</p><p className="text-[11.5px] font-bold">{toPersianDigits(row?.totalUnits ?? 0)}</p></div>
+                    <div className="rounded-xl bg-slate-50 p-2"><p className="text-[9.5px] text-slate-500">اوج تخصیص</p><p className="text-[11.5px] font-bold">{toPersianDigits(row?.peakUnits ?? 0)}{over ? " ⚠" : ""}</p></div>
+                    <div className="rounded-xl bg-slate-50 p-2"><p className="text-[9.5px] text-slate-500">هزینه</p><p className="text-[11.5px] font-bold">{formatCompact(row?.cost ?? 0)}</p></div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ProgressBar value={row?.utilization ?? 0} tone={over ? "bad" : "info"} />
+                    <span className="whitespace-nowrap text-[10.5px] text-slate-500">بهره‌وری {formatPercent(row?.utilization ?? 0)}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge>{resourceTypeLabel(resource.type)}</Badge>
+                    {over ? <Badge tone="bad">بیش از ظرفیت</Badge> : null}
+                    {project.activities.some((activity) => activity.resources.some((assignment) => assignment.resourceId === resource.id)) ? <Badge tone="info">تخصیص‌یافته</Badge> : <Badge>بدون تخصیص</Badge>}
+                  </div>
+                </article>
+              );
+            })}
+            {!filteredResources.length ? <p className="py-6 text-center text-[12px] text-slate-500">منبعی با این فیلترها پیدا نشد.</p> : null}
+          </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button variant="secondary" size="sm" onClick={() => api.addResource()}>
+            <Button variant="secondary" size="sm" onClick={() => { setQuery(""); setTypeFilter("all"); setAssignmentFilter("all"); setSort("name"); api.addResource(); }}>
               + افزودن منبع
             </Button>
             {!project.resources.length ? (
@@ -685,7 +893,8 @@ export function StepResources({ project, analysis, api }: { project: ProjectInpu
       <Card>
         <CardHeader title="تحلیل هزینه فازها" subtitle="برآورد بودجه و هزینه واقعی هر فاز به‌صورت خودکار تجمیع شده است." icon={<span className="text-lg">💰</span>} />
         <div className="p-5">
-          <table className="w-full text-[12.5px]">
+          <div className="thin-scroll hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[620px] text-[12.5px]">
             <thead>
               <tr className="bg-slate-50 text-slate-500">
                 {["فاز", "تعداد فعالیت", "مدت", "پیشرفت", "بودجه", "هزینه واقعی"].map((h) => (
@@ -718,6 +927,32 @@ export function StepResources({ project, analysis, api }: { project: ProjectInpu
               </tr>
             </tfoot>
           </table>
+          </div>
+          <div className="space-y-3 md:hidden">
+            {analysis.costs.byPhase.map((phase) => {
+              const schedulePhase = analysis.schedule.phases.find((item) => item.name === phase.phase);
+              return (
+                <article key={phase.phase} className="hp-card space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="min-w-0 text-[13px] font-bold text-ink-900">{phase.phase}</h4>
+                    <Badge>{toPersianDigits(schedulePhase?.activityCount ?? 0)} فعالیت</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="rounded-xl bg-slate-50 p-2"><p className="text-[9.5px] text-slate-500">مدت</p><p className="text-[11.5px] font-bold">{toPersianDigits(schedulePhase?.duration ?? 0)} روز</p></div>
+                    <div className="rounded-xl bg-slate-50 p-2"><p className="text-[9.5px] text-slate-500">پیشرفت</p><p className="text-[11.5px] font-bold">{formatPercent(phase.progress)}</p></div>
+                    <div className="rounded-xl bg-slate-50 p-2"><p className="text-[9.5px] text-slate-500">بودجه</p><p className="break-words text-[11.5px] font-bold">{formatCompact(phase.budget)}</p></div>
+                    <div className="rounded-xl bg-slate-50 p-2"><p className="text-[9.5px] text-slate-500">هزینه واقعی</p><p className="break-words text-[11.5px] font-bold">{formatCompact(phase.actual)}</p></div>
+                  </div>
+                  <ProgressBar value={phase.progress} />
+                </article>
+              );
+            })}
+            {!analysis.costs.byPhase.length ? <p className="py-5 text-center text-[12px] text-slate-500">فازی برای نمایش وجود ندارد.</p> : null}
+            <div className="grid grid-cols-2 gap-2 rounded-xl border border-brand-100 bg-brand-50/60 p-3 text-[11px]">
+              <span className="font-bold text-ink-900">جمع بودجه</span><span className="text-left font-bold text-brand-800">{formatCompact(analysis.costs.budget)}</span>
+              <span className="font-bold text-ink-900">جمع هزینه واقعی</span><span className="text-left font-bold text-brand-800">{formatCompact(analysis.costs.actual)}</span>
+            </div>
+          </div>
         </div>
       </Card>
     </div>
@@ -825,84 +1060,215 @@ export function StepCalendar({ project, api }: { project: ProjectInput; api: Pro
 
 /* ----------------------------- step 5 -------------------------------- */
 
-export function StepMilestonesRisks({ project, api }: { project: ProjectInput; api: ProjectApi }) {
+export function StepMilestonesRisks({ project, analysis, api }: { project: ProjectInput; analysis: ProjectAnalysis; api: ProjectApi }) {
+  const [milestoneQuery, setMilestoneQuery] = useState("");
+  const [milestonePhase, setMilestonePhase] = useState("all");
+  const [milestoneStatus, setMilestoneStatus] = useState("all");
+  const [milestoneSort, setMilestoneSort] = useState<"date" | "name">("date");
+  const milestonePhases = useMemo(
+    () => Array.from(new Set([...project.activities.map((activity) => activity.phase), ...project.milestones.map((milestone) => milestone.phase ?? "")].filter(Boolean))),
+    [project.activities, project.milestones],
+  );
+  const filteredMilestones = useMemo(() => {
+    const normalizedQuery = milestoneQuery.trim().toLocaleLowerCase();
+    return [...project.milestones]
+      .filter((milestone) => {
+        const result = analysis.milestones.find((item) => item.id === milestone.id);
+        const phase = result?.phase ?? milestone.phase ?? "";
+        const status = result?.status ?? "upcoming";
+        const activity = project.activities.find((item) => item.id === milestone.activityId);
+        const searchable = `${milestone.name} ${phase} ${activity?.code ?? ""} ${activity?.name ?? ""} ${result?.date ?? milestone.date ?? ""}`.toLocaleLowerCase();
+        if (normalizedQuery && !searchable.includes(normalizedQuery)) return false;
+        if (milestonePhase !== "all" && phase !== milestonePhase) return false;
+        if (milestoneStatus !== "all" && status !== milestoneStatus) return false;
+        return true;
+      })
+      .sort((left, right) => {
+        const leftResult = analysis.milestones.find((item) => item.id === left.id);
+        const rightResult = analysis.milestones.find((item) => item.id === right.id);
+        if (milestoneSort === "name") return left.name.localeCompare(right.name, "fa");
+        return (leftResult?.date ?? left.date ?? "").localeCompare(rightResult?.date ?? right.date ?? "");
+      });
+  }, [analysis.milestones, milestonePhase, milestoneQuery, milestoneSort, milestoneStatus, project.activities, project.milestones]);
+  const milestoneFiltersActive = Boolean(milestoneQuery) || milestonePhase !== "all" || milestoneStatus !== "all" || milestoneSort !== "date";
+
+  const [riskQuery, setRiskQuery] = useState("");
+  const [riskCategory, setRiskCategory] = useState("all");
+  const [riskLevel, setRiskLevel] = useState("all");
+  const [riskSort, setRiskSort] = useState<"score" | "cost">("score");
+  const riskCategories = useMemo(() => Array.from(new Set(project.risks.map((risk) => risk.category).filter(Boolean)).values()).sort((a, b) => a.localeCompare(b, "fa")), [project.risks]);
+  const filteredRisks = useMemo(() => {
+    const normalizedQuery = riskQuery.trim().toLocaleLowerCase();
+    return [...project.risks]
+      .filter((risk) => {
+        const result = analysis.risks.find((item) => item.id === risk.id);
+        const searchable = `${risk.title} ${risk.category} ${risk.owner ?? ""} ${risk.mitigation ?? ""}`.toLocaleLowerCase();
+        if (normalizedQuery && !searchable.includes(normalizedQuery)) return false;
+        if (riskCategory !== "all" && risk.category !== riskCategory) return false;
+        if (riskLevel !== "all" && result?.level !== riskLevel) return false;
+        return true;
+      })
+      .sort((left, right) => {
+        const leftResult = analysis.risks.find((item) => item.id === left.id);
+        const rightResult = analysis.risks.find((item) => item.id === right.id);
+        return riskSort === "cost"
+          ? right.costImpact - left.costImpact
+          : (rightResult?.score ?? right.probability * right.impact) - (leftResult?.score ?? left.probability * left.impact);
+      });
+  }, [analysis.risks, project.risks, riskCategory, riskLevel, riskQuery, riskSort]);
+  const riskFiltersActive = Boolean(riskQuery) || riskCategory !== "all" || riskLevel !== "all" || riskSort !== "score";
+  const riskLevelLabel = (level: "low" | "medium" | "high" | "critical") => ({
+    low: "کم",
+    medium: "متوسط",
+    high: "زیاد",
+    critical: "بحرانی",
+  })[level];
+  const riskTone = (level: "low" | "medium" | "high" | "critical") => level === "critical" ? "bad" : level === "high" ? "warn" : level === "medium" ? "info" : "ok";
+  const milestoneStatusLabel = (status: "reached" | "upcoming" | "late") => status === "reached" ? "محقق‌شده" : status === "late" ? "در تأخیر" : "در پیش رو";
+
   return (
     <div className="space-y-5">
       <Card>
-        <CardHeader title="نقاط کنترل (Milestones)" subtitle="رویدادهای کلیدی پروژه؛ با اتصال به فعالیت، تاریخ آن به‌صورت خودکار محاسبه می‌شود." icon={<span className="text-lg">🚩</span>} />
+        <CardHeader
+          title="نقاط کنترل (Milestones)"
+          subtitle="رویدادهای کلیدی پروژه؛ با اتصال به فعالیت، تاریخ و وضعیت هر نقطه به‌صورت خودکار به‌روز می‌شود."
+          icon={<span className="text-lg">🚩</span>}
+          action={<Badge tone="info">{toPersianDigits(filteredMilestones.length)} از {toPersianDigits(project.milestones.length)} نقطه</Badge>}
+        />
         <div className="space-y-3 p-5">
-          {project.milestones.map((milestone) => (
-            <div key={milestone.id} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_220px_auto]">
-              <Input value={milestone.name} onChange={(e) => api.updateMilestone(milestone.id, { name: e.target.value })} />
-              <Select value={milestone.activityId ?? ""} onChange={(e) => api.updateMilestone(milestone.id, { activityId: e.target.value || undefined })}>
-                <option value="">— بدون اتصال به فعالیت —</option>
-                {project.activities.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.code} — {a.name}
-                  </option>
-                ))}
-              </Select>
-              <Button variant="danger" size="sm" onClick={() => api.removeMilestone(milestone.id)}>
-                حذف
-              </Button>
-            </div>
-          ))}
-          <Button variant="secondary" size="sm" onClick={() => api.addMilestone()}>
-            + افزودن نقطه کنترل
-          </Button>
-          {!project.milestones.length ? (
-            <p className="mt-1 text-[11.5px] text-slate-500">
-              نقطه کنتری ثبت نشده است. نقاط کنترل، رویدادهای کلیدی مانند «پایان فونداسیون» یا «تحویل موقت» هستند و
-              تاریخ آن‌ها به‌صورت خودکار از فعالیت متناظر محاسبه می‌شود.
-            </p>
-          ) : null}
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(140px,1fr)_auto]">
+            <Input value={milestoneQuery} onChange={(event) => setMilestoneQuery(event.target.value)} placeholder="جستجو در نام، فعالیت یا تاریخ…" aria-label="جستجو در نقاط کنترل" className="h-10 py-2" />
+            <Select value={milestonePhase} onChange={(event) => setMilestonePhase(event.target.value)} aria-label="فیلتر فاز نقاط کنترل" className="h-10 py-2">
+              <option value="all">همه فازها</option>
+              {milestonePhases.map((phase) => <option key={phase} value={phase}>{phase}</option>)}
+            </Select>
+            <Select value={milestoneStatus} onChange={(event) => setMilestoneStatus(event.target.value)} aria-label="فیلتر وضعیت نقاط کنترل" className="h-10 py-2">
+              <option value="all">همه وضعیت‌ها</option>
+              <option value="upcoming">در پیش رو</option>
+              <option value="reached">محقق‌شده</option>
+              <option value="late">در تأخیر</option>
+            </Select>
+            <Select value={milestoneSort} onChange={(event) => setMilestoneSort(event.target.value as typeof milestoneSort)} aria-label="مرتب‌سازی نقاط کنترل" className="h-10 py-2">
+              <option value="date">مرتب‌سازی: تاریخ</option>
+              <option value="name">مرتب‌سازی: نام</option>
+            </Select>
+            {milestoneFiltersActive ? <Button variant="ghost" size="sm" onClick={() => { setMilestoneQuery(""); setMilestonePhase("all"); setMilestoneStatus("all"); setMilestoneSort("date"); }}>پاک‌کردن فیلتر</Button> : null}
+          </div>
+          {filteredMilestones.map((milestone) => {
+            const result = analysis.milestones.find((item) => item.id === milestone.id);
+            const phase = result?.phase ?? milestone.phase ?? "—";
+            const activity = project.activities.find((item) => item.id === milestone.activityId);
+            const status = result?.status ?? "upcoming";
+            return (
+              <div key={milestone.id} className="rounded-xl border border-slate-200 p-3">
+                <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                  <Badge tone={status === "reached" ? "ok" : status === "late" ? "bad" : "info"}>{milestoneStatusLabel(status)}</Badge>
+                  <Badge>{phase}</Badge>
+                  {result?.date ? <Badge tone="accent">{formatJalali(result.date, { withMonthName: false })}</Badge> : null}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(220px,1fr)_minmax(150px,auto)_auto]">
+                  <Input value={milestone.name} onChange={(event) => api.updateMilestone(milestone.id, { name: event.target.value })} aria-label="نام نقطه کنترل" />
+                  <Select value={milestone.activityId ?? ""} onChange={(event) => api.updateMilestone(milestone.id, { activityId: event.target.value || undefined })} aria-label="فعالیت مرتبط با نقطه کنترل">
+                    <option value="">— بدون اتصال به فعالیت —</option>
+                    {project.activities.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}
+                  </Select>
+                  <Field label={milestone.activityId ? "تاریخ محاسبه‌شده" : "تاریخ ثابت (میلادی)"}>
+                    <Input type="date" value={milestone.activityId ? result?.date ?? "" : milestone.date ?? ""} onChange={(event) => api.updateMilestone(milestone.id, { date: event.target.value || undefined })} disabled={Boolean(milestone.activityId)} />
+                  </Field>
+                  <Button variant="danger" size="sm" onClick={() => api.removeMilestone(milestone.id)}>حذف</Button>
+                </div>
+                {activity ? <p className="mt-1 text-[10.5px] text-slate-500">فعالیت مرتبط: {activity.code} · {activity.name}</p> : null}
+              </div>
+            );
+          })}
+          {!filteredMilestones.length ? <p className="py-5 text-center text-[12px] text-slate-500">{project.milestones.length ? "نقطه کنترلی با این فیلترها یافت نشد." : "نقطه کنترلی ثبت نشده است."}</p> : null}
+          <Button variant="secondary" size="sm" onClick={() => { setMilestoneQuery(""); setMilestonePhase("all"); setMilestoneStatus("all"); setMilestoneSort("date"); api.addMilestone(); }}>+ افزودن نقطه کنترل</Button>
         </div>
       </Card>
 
       <Card>
-        <CardHeader title="ریسک‌های پروژه" subtitle="احتمال و اثر را از ۱ تا ۵ انتخاب کنید؛ ماتریس ریسک و ارزش در معرض ریسک خودکار محاسبه می‌شود." icon={<span className="text-lg">⚠️</span>} />
-        <div className="thin-scroll overflow-x-auto p-5">
-          <table className="w-full min-w-[820px] text-[12.5px]">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500">
-                {["عنوان ریسک", "دسته", "احتمال", "اثر", "اثر زمانی (روز)", "اثر مالی", "امتیاز", "راهکار کاهش", ""].map((h) => (
-                  <th key={h} className="px-2 py-2.5 text-right font-semibold">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {project.risks.map((risk) => {
-                const score = risk.probability * risk.impact;
-                return (
-                  <tr key={risk.id} className="border-t border-slate-100">
-                    <td className="min-w-[180px] px-2 py-2"><Input value={risk.title} onChange={(e) => api.updateRisk(risk.id, { title: e.target.value })} className="py-1.5" /></td>
-                    <td className="px-2 py-2"><Input value={risk.category} onChange={(e) => api.updateRisk(risk.id, { category: e.target.value })} className="w-28 py-1.5" /></td>
-                    <td className="px-2 py-2"><Input type="number" min={1} max={5} value={risk.probability} onChange={(e) => api.updateRisk(risk.id, { probability: Number(e.target.value) })} className="w-16 py-1.5" /></td>
-                    <td className="px-2 py-2"><Input type="number" min={1} max={5} value={risk.impact} onChange={(e) => api.updateRisk(risk.id, { impact: Number(e.target.value) })} className="w-16 py-1.5" /></td>
-                    <td className="px-2 py-2"><Input type="number" min={0} value={risk.scheduleImpact} onChange={(e) => api.updateRisk(risk.id, { scheduleImpact: Number(e.target.value) })} className="w-20 py-1.5" /></td>
-                    <td className="px-2 py-2"><Input type="number" min={0} value={risk.costImpact} onChange={(e) => api.updateRisk(risk.id, { costImpact: Number(e.target.value) })} className="w-28 py-1.5" /></td>
-                    <td className="px-2 py-2">
-                      <Badge tone={score >= 20 ? "bad" : score >= 12 ? "warn" : "ok"}>{toPersianDigits(score)}</Badge>
-                    </td>
-                    <td className="min-w-[200px] px-2 py-2"><Input value={risk.mitigation ?? ""} onChange={(e) => api.updateRisk(risk.id, { mitigation: e.target.value })} className="py-1.5" /></td>
-                    <td className="px-2 py-2">
-                      <Button variant="danger" size="sm" onClick={() => api.removeRisk(risk.id)}>حذف</Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button variant="secondary" size="sm" onClick={() => api.addRisk()}>
-              + افزودن ریسک
-            </Button>
-            {!project.risks.length ? (
-              <p className="text-[11.5px] text-slate-500">
-                ریسکی ثبت نشده است. برای هر ریسک، احتمال و اثر را از ۱ تا ۵ انتخاب کنید تا ماتریس ریسک و ارزش در
-                معرض ریسک محاسبه شود.
-              </p>
-            ) : null}
+        <CardHeader title="ریسک‌های پروژه" subtitle="دسته‌های ریسک بر اساس داده‌های پروژه فیلتر می‌شوند؛ احتمال و اثر از ۱ تا ۵، سطح ریسک و اولویت اقدام به‌صورت زنده محاسبه می‌شوند." icon={<span className="text-lg">⚠️</span>} action={<Badge tone="info">{toPersianDigits(filteredRisks.length)} از {toPersianDigits(project.risks.length)} ریسک</Badge>} />
+        <div className="space-y-3 p-5">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto]">
+            <Input value={riskQuery} onChange={(event) => setRiskQuery(event.target.value)} placeholder="جستجو در عنوان، راهکار یا مسئول…" aria-label="جستجو در ریسک‌ها" className="h-10 py-2" />
+            <Select value={riskCategory} onChange={(event) => setRiskCategory(event.target.value)} aria-label="فیلتر دسته ریسک" className="h-10 py-2">
+              <option value="all">همه دسته‌ها</option>
+              {riskCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+            </Select>
+            <Select value={riskLevel} onChange={(event) => setRiskLevel(event.target.value)} aria-label="فیلتر سطح ریسک" className="h-10 py-2">
+              <option value="all">همه سطوح</option>
+              <option value="critical">بحرانی (۲۰+)</option>
+              <option value="high">زیاد (۱۲–۱۹)</option>
+              <option value="medium">متوسط (۶–۱۱)</option>
+              <option value="low">کم (۰–۵)</option>
+            </Select>
+            <Select value={riskSort} onChange={(event) => setRiskSort(event.target.value as typeof riskSort)} aria-label="مرتب‌سازی ریسک‌ها" className="h-10 py-2">
+              <option value="score">مرتب‌سازی: بیشترین امتیاز</option>
+              <option value="cost">بیشترین اثر مالی</option>
+            </Select>
+            {riskFiltersActive ? <Button variant="ghost" size="sm" onClick={() => { setRiskQuery(""); setRiskCategory("all"); setRiskLevel("all"); setRiskSort("score"); }}>پاک‌کردن فیلتر</Button> : null}
+          </div>
+          <div className="thin-scroll hidden overflow-x-auto rounded-xl border border-slate-200 md:block">
+            <table className="w-full min-w-[1040px] text-[12.5px]">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500">
+                  {["عنوان ریسک", "دسته", "احتمال", "اثر", "اثر زمانی (روز)", "اثر مالی", "امتیاز", "راهکار کاهش", "مسئول", ""].map((heading) => <th key={heading} className="px-2 py-2.5 text-right font-semibold">{heading}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRisks.map((risk) => {
+                  const result = analysis.risks.find((item) => item.id === risk.id);
+                  const score = result?.score ?? risk.probability * risk.impact;
+                  const level = result?.level ?? (score >= 20 ? "critical" : score >= 12 ? "high" : score >= 6 ? "medium" : "low");
+                  return (
+                    <tr key={risk.id} className="border-t border-slate-100">
+                      <td className="min-w-[180px] px-2 py-2"><Input value={risk.title} onChange={(event) => api.updateRisk(risk.id, { title: event.target.value })} aria-label="عنوان ریسک" className="py-1.5" /></td>
+                      <td className="px-2 py-2"><Input value={risk.category} onChange={(event) => api.updateRisk(risk.id, { category: event.target.value })} aria-label="دسته ریسک" className="w-28 py-1.5" /></td>
+                      <td className="px-2 py-2"><Input type="number" min={1} max={5} value={risk.probability} onChange={(event) => api.updateRisk(risk.id, { probability: Number(event.target.value) })} aria-label="احتمال ریسک" className="w-16 py-1.5" /></td>
+                      <td className="px-2 py-2"><Input type="number" min={1} max={5} value={risk.impact} onChange={(event) => api.updateRisk(risk.id, { impact: Number(event.target.value) })} aria-label="اثر ریسک" className="w-16 py-1.5" /></td>
+                      <td className="px-2 py-2"><Input type="number" min={0} value={risk.scheduleImpact} onChange={(event) => api.updateRisk(risk.id, { scheduleImpact: Number(event.target.value) })} aria-label="اثر زمانی ریسک" className="w-20 py-1.5" /></td>
+                      <td className="px-2 py-2"><Input type="number" min={0} value={risk.costImpact} onChange={(event) => api.updateRisk(risk.id, { costImpact: Number(event.target.value) })} aria-label="اثر مالی ریسک" className="w-28 py-1.5" /></td>
+                      <td className="px-2 py-2"><Badge tone={riskTone(level)}>{riskLevelLabel(level)} · {toPersianDigits(score)}</Badge></td>
+                      <td className="min-w-[190px] px-2 py-2"><Input value={risk.mitigation ?? ""} onChange={(event) => api.updateRisk(risk.id, { mitigation: event.target.value })} aria-label="راهکار کاهش ریسک" className="py-1.5" /></td>
+                      <td className="min-w-[140px] px-2 py-2"><Input value={risk.owner ?? ""} onChange={(event) => api.updateRisk(risk.id, { owner: event.target.value })} aria-label="مسئول ریسک" className="py-1.5" /></td>
+                      <td className="px-2 py-2"><Button variant="danger" size="sm" onClick={() => api.removeRisk(risk.id)} aria-label={`حذف ریسک ${risk.title}`}>حذف</Button></td>
+                    </tr>
+                  );
+                })}
+                {!filteredRisks.length ? <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-500">ریسکی با این فیلترها پیدا نشد.</td></tr> : null}
+              </tbody>
+            </table>
+          </div>
+          <div className="space-y-3 md:hidden">
+            {filteredRisks.map((risk) => {
+              const result = analysis.risks.find((item) => item.id === risk.id);
+              const score = result?.score ?? risk.probability * risk.impact;
+              const level = result?.level ?? (score >= 20 ? "critical" : score >= 12 ? "high" : score >= 6 ? "medium" : "low");
+              return (
+                <article key={risk.id} className="hp-card space-y-3 p-4">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1"><Input value={risk.title} onChange={(event) => api.updateRisk(risk.id, { title: event.target.value })} aria-label="عنوان ریسک" /></div>
+                    <Badge tone={riskTone(level)}>{riskLevelLabel(level)} · {toPersianDigits(score)}</Badge>
+                    <Button variant="danger" size="sm" onClick={() => api.removeRisk(risk.id)} aria-label={`حذف ریسک ${risk.title}`}>حذف</Button>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Field label="دسته ریسک"><Input value={risk.category} onChange={(event) => api.updateRisk(risk.id, { category: event.target.value })} /></Field>
+                    <Field label="مسئول"><Input value={risk.owner ?? ""} onChange={(event) => api.updateRisk(risk.id, { owner: event.target.value })} placeholder="نام مسئول اقدام" /></Field>
+                    <Field label="احتمال (۱ تا ۵)"><Input type="number" min={1} max={5} value={risk.probability} onChange={(event) => api.updateRisk(risk.id, { probability: Number(event.target.value) })} /></Field>
+                    <Field label="اثر (۱ تا ۵)"><Input type="number" min={1} max={5} value={risk.impact} onChange={(event) => api.updateRisk(risk.id, { impact: Number(event.target.value) })} /></Field>
+                    <Field label="اثر زمانی (روز کاری)"><Input type="number" min={0} value={risk.scheduleImpact} onChange={(event) => api.updateRisk(risk.id, { scheduleImpact: Number(event.target.value) })} /></Field>
+                    <Field label={`اثر مالی (${project.meta.currency})`}><Input type="number" min={0} value={risk.costImpact} onChange={(event) => api.updateRisk(risk.id, { costImpact: Number(event.target.value) })} /></Field>
+                    <Field label="راهکار کاهش" className="sm:col-span-2"><Input value={risk.mitigation ?? ""} onChange={(event) => api.updateRisk(risk.id, { mitigation: event.target.value })} placeholder="اقدام پیشگیرانه یا واکنشی" /></Field>
+                  </div>
+                </article>
+              );
+            })}
+            {!filteredRisks.length ? <p className="py-5 text-center text-[12px] text-slate-500">ریسکی با این فیلترها پیدا نشد.</p> : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="secondary" size="sm" onClick={() => { setRiskQuery(""); setRiskCategory("all"); setRiskLevel("all"); setRiskSort("score"); api.addRisk(); }}>+ افزودن ریسک</Button>
+            <Badge tone="info">ارزش در معرض ریسک: {formatCompact(analysis.riskExposure)} {project.meta.currency}</Badge>
+            {!project.risks.length ? <p className="text-[11.5px] text-slate-500">ریسک‌ها بر اساس نوع پروژه می‌توانند دسته‌بندی شوند؛ امتیاز احتمال × اثر، سطح و ارزش در معرض ریسک به‌صورت خودکار محاسبه می‌شود.</p> : null}
           </div>
         </div>
       </Card>
@@ -925,7 +1291,16 @@ export function StepOutput({
   project: ProjectInput;
   api: ProjectApi;
 }) {
-  const groups = Array.from(new Set(REPORT_SECTIONS.map((s) => s.group)));
+  const [sectionQuery, setSectionQuery] = useState("");
+  const [sectionGroup, setSectionGroup] = useState("all");
+  const groups = Array.from(new Set(REPORT_SECTIONS.map((section) => section.group)));
+  const normalizedSectionQuery = sectionQuery.trim().toLocaleLowerCase();
+  const filteredSections = REPORT_SECTIONS.filter((section) => {
+    if (sectionGroup !== "all" && section.group !== sectionGroup) return false;
+    const searchable = `${section.label} ${section.description} ${section.group}`.toLocaleLowerCase();
+    return !normalizedSectionQuery || searchable.includes(normalizedSectionQuery);
+  });
+  const visibleGroups = groups.filter((group) => filteredSections.some((section) => section.group === group));
   const toggle = (key: string) =>
     setReportSections(reportSections.includes(key) ? reportSections.filter((s) => s !== key) : [...reportSections, key]);
 
@@ -934,7 +1309,7 @@ export function StepOutput({
       <Card>
         <CardHeader
           title="بخش‌های گزارش را انتخاب کنید"
-          subtitle="گزارش خروجی به‌صورت یک سند مهندسی استاندارد A4 با جلد، سرصفحه، جدول‌های حرفه‌ای و شماره‌گذاری تولید می‌شود."
+          subtitle="گزارش A4 و فایل HTML قابل چاپ بر اساس بخش‌های انتخابی شما ساخته می‌شوند؛ فیلترها را با نوع داده و حوزه پروژه تنظیم کنید."
           icon={<span className="text-lg">📄</span>}
           action={
             <div className="flex gap-2">
@@ -948,11 +1323,22 @@ export function StepOutput({
           }
         />
         <div className="space-y-5 p-5">
-          {groups.map((group) => (
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_220px]">
+            <Input value={sectionQuery} onChange={(event) => setSectionQuery(event.target.value)} placeholder="جستجوی بخش گزارش (مثلاً هزینه، ریسک، گانت)…" aria-label="جستجوی بخش‌های گزارش" />
+            <Select value={sectionGroup} onChange={(event) => setSectionGroup(event.target.value)} aria-label="فیلتر گروه گزارش">
+              <option value="all">همه گروه‌ها</option>
+              {groups.map((group) => <option key={group} value={group}>{group}</option>)}
+            </Select>
+          </div>
+          <p className="text-[11px] text-slate-500" role="status" aria-live="polite">
+            {toPersianDigits(reportSections.length)} بخش از {toPersianDigits(REPORT_SECTIONS.length)} انتخاب شده · {toPersianDigits(filteredSections.length)} نتیجه فیلتر
+          </p>
+          {!filteredSections.length ? <p className="py-5 text-center text-[12px] text-slate-500">بخشی با این جستجو پیدا نشد.</p> : null}
+          {visibleGroups.map((group) => (
             <div key={group}>
               <h4 className="mb-2 text-[12px] font-bold text-slate-500">{group}</h4>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {REPORT_SECTIONS.filter((s) => s.group === group).map((section) => {
+                {filteredSections.filter((s) => s.group === group).map((section) => {
                   const active = reportSections.includes(section.key);
                   return (
                     <button

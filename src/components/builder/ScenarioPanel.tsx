@@ -151,7 +151,7 @@ export function ScenarioPanel({
           ))}
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-slate-200">
+        <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 md:block">
           <table className="w-full min-w-[560px] text-[12px]">
             <thead>
               <tr className="bg-slate-50 text-slate-500">
@@ -175,6 +175,21 @@ export function ScenarioPanel({
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="space-y-2 md:hidden">
+          {rows.map((row) => (
+            <article key={row.label} className="hp-card space-y-2 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <h4 className="text-[12px] font-bold text-ink-900">{row.label}</h4>
+                <Badge tone={row.tone}>{row.delta}</Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="rounded-lg bg-slate-50 p-2"><p className="text-[9.5px] text-slate-500">مقدار فعلی</p><p className="break-words font-semibold">{row.base}</p></div>
+                <div className="rounded-lg bg-brand-50 p-2"><p className="text-[9.5px] text-slate-500">با تغییر</p><p className="break-words font-bold text-brand-800">{row.what}</p></div>
+              </div>
+            </article>
+          ))}
         </div>
 
         <p className="text-[11px] leading-6 text-slate-500">

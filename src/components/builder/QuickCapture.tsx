@@ -185,8 +185,8 @@ export function ImportDialog({
                 </Badge>
               </div>
             </div>
-            <div className="thin-scroll max-h-[220px] overflow-y-auto p-3">
-              <table className="w-full text-[11.5px]">
+            <div className="thin-scroll hidden max-h-[220px] overflow-auto p-3 md:block">
+              <table className="w-full min-w-[620px] text-[11.5px]">
                 <thead className="bg-slate-50 text-slate-500">
                   <tr>
                     {["کد", "عنوان", "فاز", "مدت", "پیش‌نیاز", "هزینه"].map((h) => (
@@ -214,6 +214,24 @@ export function ImportDialog({
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="thin-scroll max-h-[300px] space-y-2 overflow-y-auto p-3 md:hidden">
+              {preview.activities.map((activity) => {
+                const source = rowByName.get(activity.name);
+                return (
+                  <article key={activity.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div><p className="font-mono text-[10px] text-slate-500">{activity.code}</p><p className="text-[12px] font-bold text-ink-900">{activity.name}</p></div>
+                      <Badge>{toPersianDigits(activity.duration)} روز</Badge>
+                    </div>
+                    <p className="mt-1 text-[10.5px] text-slate-500">فاز: {activity.phase}</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-[10.5px]">
+                      <div className="rounded-lg bg-slate-50 p-2"><span className="text-slate-500">پیش‌نیاز: </span><b>{source?.predecessors.join("، ") || "—"}</b></div>
+                      <div className="rounded-lg bg-slate-50 p-2"><span className="text-slate-500">هزینه: </span><b>{activity.fixedCost ? toPersianDigits(activity.fixedCost) : "—"}</b></div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </div>
         ) : null}

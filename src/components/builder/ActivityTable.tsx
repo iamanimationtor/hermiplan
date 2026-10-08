@@ -35,6 +35,8 @@ export function ActivityTable({
   const [editing, setEditing] = useState<string | null>(null);
   const [phaseFilter, setPhaseFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [resourceFilter, setResourceFilter] = useState("all");
+  const [kindFilter, setKindFilter] = useState<"all" | "activity" | "milestone">("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"schedule" | "float" | "progress" | "cost">("schedule");
   const [onlyCritical, setOnlyCritical] = useState(false);
@@ -51,7 +53,14 @@ export function ActivityTable({
       .filter((row) => {
         if (!row.input) return false;
         if (phaseFilter !== "all" && row.input.phase !== phaseFilter) return false;
-        if (query && !`${row.input.name} ${row.input.code}`.includes(query.trim())) return false;
+        if (kindFilter === "activity" && row.analysis.milestone) return false;
+        if (kindFilter === "milestone" && !row.analysis.milestone) return false;
+        if (resourceFilter === "assigned" && row.input.resources.length === 0) return false;
+        if (resourceFilter === "unassigned" && row.input.resources.length > 0) return false;
+        if (resourceFilter !== "all" && resourceFilter !== "assigned" && resourceFilter !== "unassigned" && !row.input.resources.some((resource) => resource.resourceId === resourceFilter)) return false;
+        const normalizedQuery = query.trim().toLocaleLowerCase();
+        const searchable = `${row.input.name} ${row.input.code} ${row.input.phase} ${row.input.deliverable ?? ""} ${row.input.notes ?? ""} ${row.analysis.resourceNames.join(" ")}`.toLocaleLowerCase();
+        if (normalizedQuery && !searchable.includes(normalizedQuery)) return false;
         if (onlyCritical && !row.analysis.critical) return false;
         if (statusFilter !== "all" && row.analysis.status !== statusFilter) return false;
         return true;
@@ -63,7 +72,7 @@ export function ActivityTable({
       if (sort === "cost") return b.analysis.budgetCost - a.analysis.budgetCost;
       return a.analysis.es - b.analysis.es;
     });
-  }, [analysis.activities, project.activities, phaseFilter, query, statusFilter, sort, onlyCritical]);
+  }, [analysis.activities, project.activities, phaseFilter, query, statusFilter, resourceFilter, kindFilter, sort, onlyCritical]);
 
   const shown = rows.slice(0, visible);
   const editingActivity = project.activities.find((a) => a.id === editing) ?? null;
@@ -71,6 +80,8 @@ export function ActivityTable({
   const resetFilters = () => {
     setPhaseFilter("all");
     setStatusFilter("all");
+    setResourceFilter("all");
+    setKindFilter("all");
     setQuery("");
     setOnlyCritical(false);
     setSort("schedule");
@@ -78,7 +89,7 @@ export function ActivityTable({
   };
 
   const filtersActive =
-    phaseFilter !== "all" || statusFilter !== "all" || Boolean(query) || onlyCritical || sort !== "schedule";
+    phaseFilter !== "all" || statusFilter !== "all" || resourceFilter !== "all" || kindFilter !== "all" || Boolean(query) || onlyCritical || sort !== "schedule";
 
   return (
     <div className="space-y-4">
@@ -90,8 +101,9 @@ export function ActivityTable({
             setQuery(e.target.value);
             setVisible(PAGE_SIZE);
           }}
-          placeholder="جستجوی فعالیت یا کد…"
-          className="h-10 max-w-[210px] py-2"
+          placeholder="جستجوی فعالیت، کد، فاز یا منبع…"
+          aria-label="جستجو در فعالیت‌ها"
+          className="h-10 w-full max-w-[210px] py-2 sm:w-auto"
         />
         <Select
           value={phaseFilter}
@@ -99,7 +111,8 @@ export function ActivityTable({
             setPhaseFilter(e.target.value);
             setVisible(PAGE_SIZE);
           }}
-          className="h-10 max-w-[170px] py-2"
+          aria-label="فیلتر بر اساس فاز"
+          className="h-10 w-full max-w-[170px] py-2 sm:w-auto"
         >
           <option value="all">همه فازها</option>
           {phases.map((phase) => (
@@ -109,12 +122,42 @@ export function ActivityTable({
           ))}
         </Select>
         <Select
+          value={kindFilter}
+          onChange={(e) => {
+            setKindFilter(e.target.value as typeof kindFilter);
+            setVisible(PAGE_SIZE);
+          }}
+          aria-label="فیلتر بر اساس نوع ردیف"
+          className="h-10 w-full max-w-[160px] py-2 sm:w-auto"
+        >
+          <option value="all">فعالیت و نقطه کنترل</option>
+          <option value="activity">فعالیت‌ها</option>
+          <option value="milestone">نقاط کنترل</option>
+        </Select>
+        <Select
+          value={resourceFilter}
+          onChange={(e) => {
+            setResourceFilter(e.target.value);
+            setVisible(PAGE_SIZE);
+          }}
+          aria-label="فیلتر بر اساس تخصیص منبع"
+          className="h-10 w-full max-w-[190px] py-2 sm:w-auto"
+        >
+          <option value="all">همه تخصیص‌ها</option>
+          <option value="assigned">دارای منبع</option>
+          <option value="unassigned">بدون منبع</option>
+          {project.resources.map((resource) => (
+            <option key={resource.id} value={resource.id}>{resource.name}</option>
+          ))}
+        </Select>
+        <Select
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);
             setVisible(PAGE_SIZE);
           }}
-          className="h-10 max-w-[150px] py-2"
+          aria-label="فیلتر بر اساس وضعیت"
+          className="h-10 w-full max-w-[150px] py-2 sm:w-auto"
         >
           <option value="all">همه وضعیت‌ها</option>
           <option value="not-started">شروع‌نشده</option>
@@ -124,8 +167,12 @@ export function ActivityTable({
         </Select>
         <Select
           value={sort}
-          onChange={(e) => setSort(e.target.value as typeof sort)}
-          className="h-10 max-w-[175px] py-2"
+          onChange={(e) => {
+            setSort(e.target.value as typeof sort);
+            setVisible(PAGE_SIZE);
+          }}
+          aria-label="مرتب‌سازی فعالیت‌ها"
+          className="h-10 w-full max-w-[175px] py-2 sm:w-auto"
         >
           <option value="schedule">مرتب‌سازی: زمان شروع</option>
           <option value="float">مرتب‌سازی: کمترین شناوری</option>
@@ -134,6 +181,7 @@ export function ActivityTable({
         </Select>
         <button
           type="button"
+          aria-pressed={onlyCritical}
           onClick={() => setOnlyCritical((v) => !v)}
           className={`h-10 rounded-xl border px-3 text-[12.5px] font-semibold transition ${
             onlyCritical
@@ -153,8 +201,8 @@ export function ActivityTable({
           </button>
         ) : null}
         <div className="flex-1" />
-        <span className="hidden text-[11.5px] text-slate-500 sm:block">
-          {toPersianDigits(rows.length)} فعالیت
+        <span className="text-[11.5px] text-slate-500" role="status" aria-live="polite">
+          نمایش {toPersianDigits(shown.length)} از {toPersianDigits(rows.length)} فعالیت
         </span>
       </div>
 
@@ -279,7 +327,7 @@ export function ActivityTable({
 
       {/* ---------------------------- mobile cards ---------------------------- */}
       <div className="space-y-2.5 md:hidden">
-        {shown.map(({ analysis: a }) => (
+        {shown.map(({ analysis: a, input }) => (
           <div key={a.id} className="hp-card p-4">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -295,6 +343,9 @@ export function ActivityTable({
                   {a.name}
                 </button>
                 <p className="mt-0.5 text-[11px] text-slate-500">{a.phase}</p>
+                <p className="mt-1 break-words text-[10.5px] leading-5 text-slate-500">
+                  منابع: {a.resourceNames.join("، ") || "—"} · پیش‌نیاز: {toPersianDigits(input?.predecessors.length ?? 0)}
+                </p>
               </div>
               <StatusCell activity={a} />
             </div>

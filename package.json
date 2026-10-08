@@ -7,7 +7,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx scripts/engine-smoke.ts && tsx scripts/engine-verification.ts && tsx scripts/edge-case-audit.ts && tsx scripts/template-regression.ts && tsx scripts/import-parser.test.ts && tsx scripts/independent-verify.ts",
+    "test": "tsx scripts/engine-smoke.ts && tsx scripts/engine-verification.ts && tsx scripts/edge-case-audit.ts && tsx scripts/template-regression.ts && tsx scripts/import-parser.test.ts && tsx scripts/independent-verify.ts && tsx scripts/report-export.test.ts",
     "test:api": "tsx scripts/api-integration.ts"
   },
   "dependencies": {

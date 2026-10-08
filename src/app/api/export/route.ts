@@ -6,7 +6,7 @@ import { buildXlsx } from "@/lib/report/xlsx";
 import { buildMsProjectXml } from "@/lib/report/msproject";
 import { buildReportHtml } from "@/lib/report/html";
 import { buildDeliveryPackage } from "@/lib/report/package";
-import { REPORT_SECTIONS } from "@/lib/validation";
+import { REPORT_SECTIONS, reportOptionsSchema } from "@/lib/validation";
 import { renderGanttSvg, type GanttLink } from "@/lib/report/gantt-svg";
 import { clientKey, rateLimit, RATE_RULES } from "@/lib/server/rate-limit";
 import { readJsonBody } from "@/lib/server/body";
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
   const parsed = await readJsonBody(request);
   if (!parsed.ok) return parsed.response;
-  const body = parsed.body as { project?: unknown; format?: string; kind?: string; reportUrl?: string };
+  const body = parsed.body as { project?: unknown; format?: string; kind?: string; reportUrl?: string; reportOptions?: unknown };
 
   let input;
   try {
@@ -58,6 +58,16 @@ export async function POST(request: Request) {
       { status: 422 },
     );
   }
+  let reportOptions;
+  try {
+    reportOptions = reportOptionsSchema.parse(body.reportOptions ?? {});
+  } catch (error) {
+    return NextResponse.json(
+      { error: "گزینه‌های گزارش نامعتبر است", detail: (error as Error).message },
+      { status: 422 },
+    );
+  }
+
   const analysis = analyzeProject(input);
   const format = (body.format ?? "xlsx") as ExportFormat;
   const base = `HERMIPLAN-${encodeURIComponent((input.meta.name || "project").replace(/[^\w\u0600-\u06FF-]+/g, "-").slice(0, 36))}`;
@@ -69,16 +79,17 @@ export async function POST(request: Request) {
   const ganttSvg = renderGanttSvg({
     gantt: analysis.gantt,
     links,
-    showArrows: true,
+    showArrows: reportOptions.includeGanttDependencyArrows,
     statusDate: input.meta.statusDate,
     compact: analysis.gantt.rows.length > 90,
   });
 
   switch (format) {
     case "pdf": {
-      // The PDF is the print-ready report route; return the full HTML document so
-      // the client can open a dedicated print window with the exact A4 layout.
-      const html = buildReportHtml(input, analysis, ganttSvg);
+      // Keep the legacy `pdf` format id for compatibility, but explicitly return
+      // a downloadable, standalone HTML report; browsers create the actual PDF
+      // only when the recipient chooses Print → Save as PDF.
+      const html = buildReportHtml(input, analysis, ganttSvg, reportOptions);
       return new NextResponse(html, {
         headers: fileHeaders(`${base}-Report.html`, "text/html"),
       });
@@ -106,6 +117,7 @@ export async function POST(request: Request) {
       const payload = JSON.stringify(
         {
           meta: { ...input.meta, reportSections: REPORT_SECTIONS.length },
+          reportOptions,
           project: input,
           analysis,
         },
@@ -124,6 +136,7 @@ export async function POST(request: Request) {
         ganttSvg,
         reportUrl: body.reportUrl ?? "",
         author: input.meta.manager,
+        reportOptions,
       });
       return new NextResponse(archive as unknown as BodyInit, {
         headers: fileHeaders(`${base}-Package.zip`, "application/zip"),

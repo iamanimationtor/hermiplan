@@ -79,19 +79,19 @@ export function CardHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
-      <div className="flex items-start gap-3">
+    <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-5">
+      <div className="flex min-w-0 items-start gap-3 sm:flex-1">
         {icon ? (
-          <span className="mt-0.5 flex size-9 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+          <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
             {icon}
           </span>
         ) : null}
-        <div>
+        <div className="min-w-0">
           <h3 className="text-[15px] font-bold text-ink-900">{title}</h3>
           {subtitle ? <p className="mt-1 text-[12.5px] leading-6 text-slate-500">{subtitle}</p> : null}
         </div>
       </div>
-      {action}
+      {action ? <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">{action}</div> : null}
     </div>
   );
 }
@@ -257,19 +257,19 @@ export function Modal({
         tabIndex={-1}
         className={`animate-fade-up my-auto w-full ${wide ? "max-w-5xl" : "max-w-lg"} rounded-2xl border border-slate-200 bg-white shadow-2xl`}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h3 className="text-[15px] font-bold text-ink-900">{title}</h3>
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+          <h3 className="min-w-0 flex-1 text-[15px] font-bold leading-6 text-ink-900">{title}</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="بستن"
-            className="flex size-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
           >
             ✕
           </button>
         </div>
         <div className="thin-scroll max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
-        {footer ? <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3">{footer}</div> : null}
+        {footer ? <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 px-4 py-3 sm:px-5">{footer}</div> : null}
       </div>
     </div>
   );
