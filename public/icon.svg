@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0e2745"/>
+      <stop offset="100%" stop-color="#123a66"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#8ab2e3"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f5d18a"/>
+      <stop offset="100%" stop-color="#e2a13a"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 2.6 57.4 17.3v29.4L32 61.4 6.6 46.7V17.3z" fill="url(#plate)" stroke="rgb(255 255 255 / 0.18)" stroke-width="1.2"/>
+  <path d="M14.5 24.5c7.4-6.6 15.2-8.6 23.3-6" fill="none" stroke="url(#wing)" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M18 30c6.2-4.8 12.4-6.2 18.6-4.2" fill="none" stroke="url(#wing)" stroke-width="1.5" stroke-linecap="round" opacity="0.75"/>
+  <rect x="17" y="36" width="7.5" height="9" rx="1.8" fill="url(#bar)" opacity="0.55"/>
+  <rect x="27.5" y="31" width="7.5" height="14" rx="1.8" fill="url(#bar)" opacity="0.8"/>
+  <rect x="38" y="25.5" width="7.5" height="19.5" rx="1.8" fill="#eeb95c"/>
+  <rect x="17" y="47.5" width="28.5" height="2.4" rx="1.2" fill="rgb(255 255 255 / 0.35)"/>
+  <circle cx="49.5" cy="48.7" r="1.8" fill="#eeb95c"/>
+</svg>
