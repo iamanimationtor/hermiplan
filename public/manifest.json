@@ -1,0 +1,34 @@
+{
+  "name": "HERMIPLAN — پلتفرم هوشمند مدیریت و برنامه‌ریزی پروژه",
+  "short_name": "HERMIPLAN",
+  "description": "مدیریت، برنامه‌ریزی و تحلیل پروژه با موتور محاسباتی CPM/EVM، قیمت‌گذاری بازار ایران و گزارش مهندسی حرفه‌ای.",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/builder",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a1c37",
+  "theme_color": "#0a1c37",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
