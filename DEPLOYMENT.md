@@ -58,7 +58,9 @@ All are server-side; none are exposed to the browser bundle.
 | --- | --- | --- |
 | `DATABASE_URL` | **yes (production)** | Requests that touch the database return a clear 500 error; the site still builds and renders public pages |
 | `DATABASE_SSL` | no | TLS auto-enabled when the URL contains `sslmode=require` or `ssl=true` |
+| `DATABASE_SSL_SKIP_VERIFY` | no | TLS server certificates are verified; set `1` only for a provider with a private CA |
 | `DATABASE_POOL_MAX` | no | `3` in production, `10` in development |
+| `NEXT_PUBLIC_SITE_URL` | no (recommended) | Canonical origin for OpenGraph images, canonical URLs, robots.txt and the sitemap; falls back to `https://hermiplan.netlify.app` — set it to your real domain |
 | `SMS_PROVIDER_KEY` | only for phone login | Phone login is refused with HTTP 503 (`loginUnavailable`) |
 | `HERMIPLAN_ALLOW_DEMO_OTP` | **leave unset in production** | When unset together with `SMS_PROVIDER_KEY`, OTP codes are never returned in API responses |
 | `HERMIPLAN_MARKET_FEED` | no | The dated reference rate catalogue is used and the UI states this explicitly |

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, Card, CardHeader, Field, Input, ProgressBar, Select, StatTile, Textarea } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Field, Input, Modal, ProgressBar, Select, StatTile, Textarea } from "@/components/ui";
 import { ActivityTable } from "./ActivityTable";
 import type { ProjectApi } from "./useProject";
 import type { ProjectAnalysis, ProjectInput } from "@/lib/engine/types";
@@ -33,14 +33,16 @@ export function JalaliDateInput({
   label: string;
 }) {
   const [text, setText] = useState(isoToJalaliInput(value));
+  const [prevValue, setPrevValue] = useState(value);
 
   // keep the visible text in sync when the project (template / saved draft) is
-  // replaced from the outside, without fighting the user's own typing
-  useEffect(() => {
+  // replaced from the outside, without fighting the user's own typing —
+  // adjusted during render (the React pattern for derived state), not in an effect
+  if (value !== prevValue) {
+    setPrevValue(value);
     const parsed = jalaliInputToIso(text);
     if (parsed !== value) setText(isoToJalaliInput(value));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+  }
 
   return (
     <Field label={label} hint="تاریخ شمسی — نمونه: ۱۴۰۴/۰۵/۰۱">
@@ -79,6 +81,7 @@ export function StepBasics({ project, api }: { project: ProjectInput; api: Proje
   const [complexity, setComplexity] = useState("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"default" | "short" | "long" | "simple">("default");
+  const [pendingTemplate, setPendingTemplate] = useState<{ id: string; title: string } | null>(null);
 
   const filtered = useMemo(() => {
     const list = TEMPLATES.filter((template) => {
@@ -155,12 +158,9 @@ export function StepBasics({ project, api }: { project: ProjectInput; api: Proje
                 key={template.id}
                 type="button"
                 onClick={() => {
-                  if (
-                    project.activities.length > 0 &&
-                    !window.confirm(
-                      `قالب «${template.title}» جایگزین ${toPersianDigits(project.activities.length)} فعالیت فعلی می‌شود. ادامه می‌دهید؟ (با واگردانی قابل بازگشت است)`,
-                    )
-                  ) {
+                  if (project.activities.length > 0) {
+                    // confirm in-app (no native window.confirm) before replacing work
+                    setPendingTemplate({ id: template.id, title: template.title });
                     return;
                   }
                   api.loadTemplate(template.id, false);
@@ -196,6 +196,33 @@ export function StepBasics({ project, api }: { project: ProjectInput; api: Proje
           ) : null}
         </div>
       </Card>
+
+      <Modal
+        open={pendingTemplate !== null}
+        onClose={() => setPendingTemplate(null)}
+        title="جایگزینی قالب پروژه"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPendingTemplate(null)}>
+              انصراف
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (pendingTemplate) api.loadTemplate(pendingTemplate.id, false);
+                setPendingTemplate(null);
+              }}
+            >
+              جایگزینی قالب
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[12.5px] leading-7 text-slate-600">
+          قالب «{pendingTemplate?.title}» جایگزین {toPersianDigits(project.activities.length)} فعالیت فعلی
+          می‌شود. با دکمه «واگردانی» در نوار بالا می‌توانید این تغییر را برگردانید.
+        </p>
+      </Modal>
 
       <Card>
         <CardHeader title="مشخصات پروژه" subtitle="این اطلاعات در سربرگ و صفحات گزارش حرفه‌ای شما استفاده می‌شود." icon={<span className="text-lg">📋</span>} />

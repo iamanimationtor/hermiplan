@@ -12,7 +12,10 @@ const esc = (value: string | number) =>
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    // XML 1.0 forbids most C0 control characters — strip them so a hostile
+    // project name can never produce an unparseable MSPDI file
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "");
 
 /** MSPDI dependency type codes */
 const LINK_TYPE: Record<string, number> = { FS: 1, FF: 0, SF: 2, SS: 3 };

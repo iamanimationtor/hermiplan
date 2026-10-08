@@ -1,9 +1,16 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { otpCodes, projects, sessions, users } from "@/db/schema";
 
 const sha256 = (value: string): string => createHash("sha256").update(value).digest("hex");
+
+/** Constant-time comparison so verification time does not leak match information. */
+function safeEqualHash(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "hex");
+  const bufB = Buffer.from(b, "hex");
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
 
 /**
  * OTP verification with brute-force protection.
@@ -30,7 +37,7 @@ export async function verifyOtp(phone: string, code: string): Promise<{ ok: bool
     return { ok: false, reason: "تعداد تلاش‌های نامعتبر بیش از حد مجاز بود. کد جدید بگیرید." };
   }
 
-  if (record.codeHash !== sha256(code)) {
+  if (!safeEqualHash(record.codeHash, sha256(code))) {
     await db
       .update(otpCodes)
       .set({ attempts: String(attempts + 1) })

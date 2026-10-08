@@ -22,6 +22,38 @@ const TYPE_LABELS: Record<string, string> = {
   general: "پروژه عمومی",
 };
 
+/**
+ * Fixed document order of the report sections (the order the sheets render
+ * in). Section numbers count only the sections the viewer has enabled.
+ */
+const SECTION_DOCUMENT_ORDER = [
+  "executive",
+  "info",
+  "kpis",
+  "wbs",
+  "activities",
+  "schedule",
+  "gantt",
+  "critical",
+  "milestones",
+  "network",
+  "progress",
+  "resources",
+  "costs",
+  "pricing",
+  "risks",
+  "delays",
+  "baseline",
+  "status",
+  "standards",
+  "signature",
+];
+
+/** Makes an untrusted project name safe for use in a download filename. */
+function safeFileName(name: string): string {
+  return (name || "project").replace(/[\\/:*?"<>|\r\n]+/g, "-").slice(0, 60);
+}
+
 function SectionTitle({ index, title, subtitle }: { index: number; title: string; subtitle?: string }) {
   return (
     <div className="rpt-section-title">
@@ -97,19 +129,25 @@ export function ReportView({
   const [copied, setCopied] = useState(false);
   const [publicLink, setPublicLink] = useState(isPublic);
   const [visibilityBusy, setVisibilityBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   async function toggleVisibility() {
     if (!canManage) return;
     setVisibilityBusy(true);
+    setActionError(null);
     try {
       const response = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isPublic: !publicLink }),
       });
-      if (response.ok) setPublicLink((value) => !value);
+      if (response.ok) {
+        setPublicLink((value) => !value);
+      } else {
+        setActionError("تغییر وضعیت لینک انجام نشد. لطفاً دوباره تلاش کنید.");
+      }
     } catch {
-      /* the link state stays unchanged — no fake feedback */
+      setActionError("تغییر وضعیت لینک انجام نشد. لطفاً دوباره تلاش کنید.");
     } finally {
       setVisibilityBusy(false);
     }
@@ -128,11 +166,16 @@ export function ReportView({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("deliver") === "1") setDownloadOpen(true);
+    if (params.get("deliver") !== "1") return;
+    // open the download centre after mount (post-paint) instead of
+    // synchronously inside the effect
+    const frame = window.requestAnimationFrame(() => setDownloadOpen(true));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   async function download(formatId: string) {
     setBusyFormat(formatId);
+    setActionError(null);
     try {
       const response = await fetch("/api/export", {
         method: "POST",
@@ -143,7 +186,17 @@ export function ReportView({
           reportUrl: typeof window !== "undefined" ? window.location.href : "",
         }),
       });
-      if (!response.ok) throw new Error("failed");
+      if (!response.ok) {
+        let message = "دریافت فایل با خطا مواجه شد. لطفاً دوباره تلاش کنید.";
+        try {
+          const data = (await response.json()) as { error?: string };
+          if (data.error) message = data.error;
+        } catch {
+          /* keep the generic message */
+        }
+        setActionError(message);
+        return;
+      }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       if (formatId === "pdf") {
@@ -160,13 +213,13 @@ export function ReportView({
       const format = EXPORT_FORMATS.find((f) => f.id === formatId);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `HERMIPLAN-${project.meta.name || "project"}.${format?.ext ?? "txt"}`;
+      anchor.download = `HERMIPLAN-${safeFileName(project.meta.name)}.${format?.ext ?? "txt"}`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 4000);
     } catch {
-      window.alert("دریافت فایل با خطا مواجه شد. لطفاً دوباره تلاش کنید.");
+      setActionError("دریافت فایل با خطا مواجه شد. لطفاً دوباره تلاش کنید.");
     } finally {
       setBusyFormat(null);
     }
@@ -185,11 +238,13 @@ export function ReportView({
   const reportDate = formatJalali(project.meta.statusDate);
   const number = (value: number) => (currency === "IRR" ? formatCompact(value) : formatNumber(value));
   const money = (value: number) => formatCurrency(value, currency);
-  let counter = 0;
-  const nextIndex = () => {
-    counter += 1;
-    return counter;
-  };
+  // Section numbers follow the fixed document order and count only enabled
+  // sections — computed fresh each render without mutating render-scoped state.
+  const sectionIndex = new Map<string, number>(
+    SECTION_DOCUMENT_ORDER.filter((key) => sections.includes(key)).map(
+      (key: string, index: number): [string, number] => [key, index + 1],
+    ),
+  );
 
   const totalSheets = 5;
 
@@ -264,6 +319,22 @@ export function ReportView({
       </div>
 
       {/* -------------------------- download center -------------------------- */}
+      {actionError ? (
+        <div
+          role="alert"
+          className="no-print mx-auto mt-3 flex max-w-[1180px] items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-[12.5px] text-red-700"
+        >
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            aria-label="بستن پیام"
+            className="shrink-0 rounded-lg px-2 py-1 text-red-500 transition hover:bg-red-100"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
       <Modal open={downloadOpen} onClose={() => setDownloadOpen(false)} title="مرکز دریافت خروجی" wide>
         <div className="space-y-4">
           <p className="text-[12.5px] leading-7 text-slate-500">
@@ -381,7 +452,7 @@ export function ReportView({
         <section className="report-sheet">
           {has("executive") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="خلاصه مدیریتی (Executive Summary)" subtitle="جمع‌بندی خودکار وضعیت پروژه بر اساس شاخص‌های محاسباتی" />
+              <SectionTitle index={sectionIndex.get("executive") ?? 0} title="خلاصه مدیریتی (Executive Summary)" subtitle="جمع‌بندی خودکار وضعیت پروژه بر اساس شاخص‌های محاسباتی" />
               <div className="flex flex-wrap items-start gap-6">
                 <div className="min-w-[260px] flex-1">
                   <div className="rpt-callout">
@@ -407,7 +478,7 @@ export function ReportView({
 
           {has("info") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="مشخصات پروژه (Project Information)" />
+              <SectionTitle index={sectionIndex.get("info") ?? 0} title="مشخصات پروژه (Project Information)" />
               <table className="rpt-kv">
                 <tbody>
                   {[
@@ -452,7 +523,7 @@ export function ReportView({
 
           {has("kpis") ? (
             <div className="rpt-section">
-              <SectionTitle index={nextIndex()} title="شاخص‌های کلیدی عملکرد (KPIs)" />
+              <SectionTitle index={sectionIndex.get("kpis") ?? 0} title="شاخص‌های کلیدی عملکرد (KPIs)" />
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 {a.kpis.map((kpi) => (
                   <div
@@ -486,7 +557,7 @@ export function ReportView({
         <section className="report-sheet">
           {has("wbs") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="ساختار شکست کار (WBS)" subtitle="سلسله‌مراتب فازها و فعالیت‌های پروژه" />
+              <SectionTitle index={sectionIndex.get("wbs") ?? 0} title="ساختار شکست کار (WBS)" subtitle="سلسله‌مراتب فازها و فعالیت‌های پروژه" />
               <table className="rpt-table">
                 <thead>
                   <tr>
@@ -535,7 +606,7 @@ export function ReportView({
 
           {has("activities") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="فهرست فعالیت‌ها (Activity List)" />
+              <SectionTitle index={sectionIndex.get("activities") ?? 0} title="فهرست فعالیت‌ها (Activity List)" />
               <DataTable
                 headers={["کد", "عنوان فعالیت", "فاز", "مدت", "تاریخ شروع", "تاریخ پایان", "پیشرفت", "منابع", "بودجه"]}
                 rows={a.activities.map((act) => [
@@ -559,7 +630,7 @@ export function ReportView({
 
           {has("schedule") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="زمان‌بندی و شناوری فعالیت‌ها (Schedule & Float)" subtitle="محاسبه‌شده بر اساس الگوریتم CPM با تقویم کاری پروژه" />
+              <SectionTitle index={sectionIndex.get("schedule") ?? 0} title="زمان‌بندی و شناوری فعالیت‌ها (Schedule & Float)" subtitle="محاسبه‌شده بر اساس الگوریتم CPM با تقویم کاری پروژه" />
               <DataTable
                 headers={["کد", "فعالیت", "زودترین شروع", "زودترین پایان", "دیرترین شروع", "دیرترین پایان", "شناوری کل", "شناوری آزاد", "بحرانی"]}
                 rows={a.activities.map((act) => [
@@ -586,7 +657,7 @@ export function ReportView({
 
           {has("gantt") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="نمودار گانت (Gantt Chart)" subtitle="زمان‌بندی پروژه بر اساس تقویم کاری، همراه با مسیر بحرانی و خط تاریخ وضعیت" />
+              <SectionTitle index={sectionIndex.get("gantt") ?? 0} title="نمودار گانت (Gantt Chart)" subtitle="زمان‌بندی پروژه بر اساس تقویم کاری، همراه با مسیر بحرانی و خط تاریخ وضعیت" />
               <div className="thin-scroll rounded-lg border border-slate-200 p-2">
                 <GanttChart
                   gantt={a.gantt}
@@ -614,7 +685,7 @@ export function ReportView({
 
           {has("critical") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="مسیر بحرانی (Critical Path)" subtitle={`${toPersianDigits(a.criticalPath.length)} فعالیت بحرانی · ${toPersianDigits(a.criticalPathRatio)}٪ از کل ماندهزمان پروژه`} />
+              <SectionTitle index={sectionIndex.get("critical") ?? 0} title="مسیر بحرانی (Critical Path)" subtitle={`${toPersianDigits(a.criticalPath.length)} فعالیت بحرانی · ${toPersianDigits(a.criticalPathRatio)}٪ از کل ماندهزمان پروژه`} />
               <div className="rpt-callout mb-3 text-[10.5px] leading-6">
                 مسیر بحرانی زنجیره‌ای از فعالیت‌های وابسته است که هیچ شناوری زمانی ندارد؛ هرگونه تأخیر در آن‌ها باعث تأخیر مستقیم در پایان پروژه می‌شود. تمرکز منابع و پایش مدیریتی باید بر این فعالیت‌ها باشد.
               </div>
@@ -638,7 +709,7 @@ export function ReportView({
 
           {has("milestones") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="نقاط کنترل (Milestones)" />
+              <SectionTitle index={sectionIndex.get("milestones") ?? 0} title="نقاط کنترل (Milestones)" />
               <DataTable
                 headers={["عنوان نقطه کنترل", "فاز", "تاریخ تحقق", "وضعیت", "فعالیت مرتبط"]}
                 rows={a.milestones.map((m) => [
@@ -654,7 +725,7 @@ export function ReportView({
 
           {has("network") ? (
             <div className="rpt-section">
-              <SectionTitle index={nextIndex()} title="نمودار شبکه‌ای (Network Diagram)" subtitle="گراف وابستگی فعالیت‌ها به روش Activity-on-Node" />
+              <SectionTitle index={sectionIndex.get("network") ?? 0} title="نمودار شبکه‌ای (Network Diagram)" subtitle="گراف وابستگی فعالیت‌ها به روش Activity-on-Node" />
               <div className="thin-scroll rounded-lg border border-slate-200 p-2">
                 <NetworkDiagram
                   nodes={a.activities.map((act) => ({
@@ -681,7 +752,7 @@ export function ReportView({
         <section className="report-sheet">
           {has("progress") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="پیشرفت پروژه و تحلیل ارزش کسب‌شده (EVM)" />
+              <SectionTitle index={sectionIndex.get("progress") ?? 0} title="پیشرفت پروژه و تحلیل ارزش کسب‌شده (EVM)" />
               <div className="grid gap-3 md:grid-cols-2">
                 <table className="rpt-kv">
                   <tbody>
@@ -727,7 +798,7 @@ export function ReportView({
 
           {has("resources") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="منابع و تخصیص (Resources & Allocation)" />
+              <SectionTitle index={sectionIndex.get("resources") ?? 0} title="منابع و تخصیص (Resources & Allocation)" />
               <DataTable
                 headers={["منبع", "نوع", "ظرفیت مجاز", "واحد-روز تخصیص", "اوج تخصیص", "تاریخ اوج", "بهره‌وری", "هزینه"]}
                 rows={a.resources.map((r) => [
@@ -760,7 +831,7 @@ export function ReportView({
 
           {has("costs") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="هزینه‌ها و بودجه (Cost & Budget)" />
+              <SectionTitle index={sectionIndex.get("costs") ?? 0} title="هزینه‌ها و بودجه (Cost & Budget)" />
               <DataTable
                 headers={["فاز", "تعداد فعالیت", "بودجه (BAC)", "هزینه واقعی (AC)", "پیشرفت", "ارزش کسب‌شده"]}
                 rows={a.costs.byPhase.map((p) => [
@@ -801,7 +872,7 @@ export function ReportView({
 
           {has("pricing") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="قیمت‌گذاری بازار، تعدیل و برآورد نهایی" subtitle={`مبنای نرخ: ${a.pricing.seriesLabel} — منطقه ${a.pricing.regionLabel} — تاریخ نرخ: ${a.pricing.asOfJalali}`} />
+              <SectionTitle index={sectionIndex.get("pricing") ?? 0} title="قیمت‌گذاری بازار، تعدیل و برآورد نهایی" subtitle={`مبنای نرخ: ${a.pricing.seriesLabel} — منطقه ${a.pricing.regionLabel} — تاریخ نرخ: ${a.pricing.asOfJalali}`} />
               <table className="rpt-kv mb-3">
                 <tbody>
                   {[
@@ -871,7 +942,7 @@ export function ReportView({
 
           {has("risks") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="ریسک‌های پروژه (Risk Register)" subtitle={`ارزش در معرض ریسک: ${number(a.riskExposure)}`} />
+              <SectionTitle index={sectionIndex.get("risks") ?? 0} title="ریسک‌های پروژه (Risk Register)" subtitle={`ارزش در معرض ریسک: ${number(a.riskExposure)}`} />
               <div className="mb-4 grid grid-cols-[auto_repeat(5,1fr)] gap-1 text-[9px]">
                 <div />
                 {["اثر ۱", "اثر ۲", "اثر ۳", "اثر ۴", "اثر ۵"].map((label) => (
@@ -919,7 +990,7 @@ export function ReportView({
 
           {has("delays") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="تأخیرها و انحراف زمانی (Delays)" />
+              <SectionTitle index={sectionIndex.get("delays") ?? 0} title="تأخیرها و انحراف زمانی (Delays)" />
               {a.delays.length ? (
                 <DataTable
                   headers={["کد", "فعالیت", "فاز", "پایان برنامه‌ای", "پیشرفت واقعی", "پیشرفت برنامه‌ای", "تأخیر", "بحرانی"]}
@@ -942,7 +1013,7 @@ export function ReportView({
 
           {has("baseline") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={nextIndex()} title="مقایسه با مبنای برنامه (Baseline Comparison)" />
+              <SectionTitle index={sectionIndex.get("baseline") ?? 0} title="مقایسه با مبنای برنامه (Baseline Comparison)" />
               {a.baseline.available ? (
                 <>
                   <table className="rpt-kv mb-3">
@@ -986,7 +1057,7 @@ export function ReportView({
 
           {has("status") ? (
             <div className="rpt-section">
-              <SectionTitle index={nextIndex()} title="وضعیت و سلامت پروژه (Project Status)" />
+              <SectionTitle index={sectionIndex.get("status") ?? 0} title="وضعیت و سلامت پروژه (Project Status)" />
               <DataTable
                 headers={["حوزه", "وضعیت", "توضیح"]}
                 rows={a.health.signals.map((s) => [
@@ -1017,7 +1088,7 @@ export function ReportView({
           <section className="report-sheet">
             {has("standards") ? (
               <div className="rpt-section mb-6">
-                <SectionTitle index={nextIndex()} title="مبنای استانداردها و متدهای محاسباتی" subtitle="استانداردهای ملی و بین‌المللی مبنای محاسبات و ساختار این گزارش" />
+                <SectionTitle index={sectionIndex.get("standards") ?? 0} title="مبنای استانداردها و متدهای محاسباتی" subtitle="استانداردهای ملی و بین‌المللی مبنای محاسبات و ساختار این گزارش" />
                 <DataTable
                   headers={["کد", "عنوان استاندارد", "سطح", "شرح"]}
                   rows={a.standards.map((item) => [
@@ -1032,7 +1103,7 @@ export function ReportView({
                 </p>
               </div>
             ) : null}
-            <SectionTitle index={nextIndex()} title="تأیید و امضا (Approval)" />
+            <SectionTitle index={sectionIndex.get("signature") ?? 0} title="تأیید و امضا (Approval)" />
             <p className="mb-4 text-[10.5px] leading-6 text-slate-600">
               این گزارش بر اساس اطلاعات ثبت‌شده در پلتفرم HERMIPLAN و محاسبات استاندارد مدیریت پروژه (CPM و EVM) تهیه شده است. صحت داده‌های ورودی بر عهده تهیه‌کننده گزارش است.
             </p>

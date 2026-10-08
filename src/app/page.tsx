@@ -39,6 +39,30 @@ const TYPES = [
   ["📁", "پروژه عمومی", "ساختار ساده و قابل تنظیم برای هر پروژه", "عمومی"],
 ];
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hermiplan.netlify.app";
+
+const SOFTWARE_APP_LD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "HERMIPLAN",
+  applicationCategory: "BusinessApplication",
+  applicationSubCategory: "Project Management",
+  operatingSystem: "Web",
+  inLanguage: "fa",
+  description:
+    "پلتفرم هوشمند مدیریت، برنامه‌ریزی و تحلیل پروژه: موتور محاسباتی CPM/PDM، تحلیل ارزش کسب‌شده (EVM)، تخصیص منابع، قیمت‌گذاری بازار ایران، تعدیل و گزارش مهندسی حرفه‌ای در ۷ فرمت خروجی.",
+  url: siteUrl,
+  author: { "@type": "Person", name: "Mohammad Shirmardi" },
+  offers: { "@type": "Offer", price: "0", priceCurrency: "IRR" },
+  featureList: [
+    "موتور زمان‌بندی مسیر بحرانی (CPM/PDM) با شناوری کل و آزاد",
+    "تحلیل ارزش کسب‌شده (EVM) و شاخص‌های SPI/CPI",
+    "تخصیص و هموارسازی منابع",
+    "قیمت‌گذاری بر اساس فهرست‌بهای ایران و تعدیل ماهانه",
+    "گزارش A4 حرفه‌ای در ۷ فرمت خروجی",
+  ],
+};
+
 export default function HomePage() {
   const demo = analyzeProject(buildProjectFromTemplate("construction"));
   const ganttSvg = renderGanttSvg({ gantt: demo.gantt, showArrows: false });
@@ -48,6 +72,10 @@ export default function HomePage() {
 
   return (
     <div id="top" className="min-h-screen bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(SOFTWARE_APP_LD) }}
+      />
       <SiteNav />
 
       {/* ------------------------------- hero ------------------------------- */}

@@ -216,11 +216,6 @@ export function ensureViableCalendar(cal: WorkCalendar): WorkCalendar {
   return { ...normalized, workDays: DEFAULT_CALENDAR.workDays, holidays: [] };
 }
 
-function guardWorkdayTraversal(cursor: string, target: string): void {
-  void cursor;
-  void target;
-}
-
 export function countWorkingDays(cal: WorkCalendar, start: string, end: string): number {
   return workingDaysBetween(cal, start, end).length;
 }

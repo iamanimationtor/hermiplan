@@ -43,6 +43,7 @@ export function NetworkDiagram({
   const nodeHeight = 46;
 
   const positions = new Map<string, { x: number; y: number }>();
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const rowsByPhase = new Map<number, number>();
   nodes.forEach((node) => {
     const row = rowsByPhase.get(node.phaseIndex) ?? 0;
@@ -64,7 +65,7 @@ export function NetworkDiagram({
         const y1 = from.y + nodeHeight / 2;
         const x2 = to.x;
         const y2 = to.y + nodeHeight / 2;
-        const critical = nodes.find((n) => n.id === link.from)?.critical && nodes.find((n) => n.id === link.to)?.critical;
+        const critical = nodeById.get(link.from)?.critical && nodeById.get(link.to)?.critical;
         return (
           <g key={i} stroke={critical ? "#b91c1c" : "#94a3b8"} strokeWidth={critical ? 1.5 : 0.9} fill="none">
             <path d={`M ${x1} ${y1} C ${x1 + 22} ${y1}, ${x2 - 22} ${y2}, ${x2 - 2} ${y2}`} />

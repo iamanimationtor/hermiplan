@@ -135,14 +135,28 @@ export const projectInputSchema = z.object({
     budget: z.coerce.number().min(0).optional(),
     startDate: dateLike,
     statusDate: dateLike,
-    deadline: z.string().optional(),
+    deadline: z
+      .string()
+      .max(10)
+      .refine((value) => !value || isIsoDate(value), "تاریخ هدف باید به‌صورت yyyy-mm-dd باشد")
+      .optional(),
   }).prefault(() => ({})),
   calendar: z.object({
     workDays: z
       .array(z.coerce.number().min(0).max(6))
       .min(1, "حداقل یک روز کاری در هفته لازم است")
+      .max(7)
       .default([6, 0, 1, 2, 3]),
-    holidays: z.array(z.string()).default([]),
+    // bounded: an unbounded holiday list is a trivial storage/CPU DoS vector
+    holidays: z
+      .array(
+        z
+          .string()
+          .max(10)
+          .refine((value) => isIsoDate(value), "تاریخ تعطیل باید به‌صورت yyyy-mm-dd باشد"),
+      )
+      .max(400)
+      .default([]),
     hoursPerDay: z.coerce.number().min(1).max(24).default(8),
   }).prefault(() => ({})),
   activities: z.array(activity).max(1000).default([]),
@@ -208,8 +222,15 @@ export const DEFAULT_REPORT_SECTIONS = [
   "signature",
 ];
 
+const REPORT_SECTION_KEYS = REPORT_SECTIONS.map((section) => section.key);
+
 export const reportOptionsSchema = z.object({
-  sections: z.array(z.string()).default(DEFAULT_REPORT_SECTIONS),
+  // bounded and validated against the known section keys so arbitrary payloads
+  // cannot be persisted into report_options
+  sections: z
+    .array(z.enum(REPORT_SECTION_KEYS as [string, ...string[]]))
+    .max(REPORT_SECTIONS.length)
+    .default(DEFAULT_REPORT_SECTIONS),
   includeNotes: z.boolean().default(true),
   includeGanttDependencyArrows: z.boolean().default(true),
   ganttScale: z.enum(["day", "week", "month"]).default("day"),

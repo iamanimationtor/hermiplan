@@ -165,7 +165,7 @@ export function buildReportHtml(
         ["<b>جمع برآورد نهایی</b>", `<b>${money(a.pricing.breakdown.total)}</b>`],
       ],
     )}
-    <p class="note">مبنای نرخ‌ها: ${a.pricing.seriesLabel} — ${a.pricing.asOfJalali}؛ منطقه: ${a.pricing.regionLabel}؛ ضریب تعدیل عمومی: ${toPersianDigits(a.pricing.indexFactor)}٪</p>
+    <p class="note">مبنای نرخ‌ها: ${esc(a.pricing.seriesLabel)} — ${esc(a.pricing.asOfJalali)}؛ منطقه: ${esc(a.pricing.regionLabel)}؛ ضریب تعدیل عمومی: ${toPersianDigits(a.pricing.indexFactor)}٪</p>
     ${
       a.pricing.escalation.months.length
         ? table(

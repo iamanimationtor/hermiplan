@@ -226,7 +226,10 @@ export function buildSheets(analysis: ProjectAnalysis, input: ProjectInput): She
 
 /** neutralises spreadsheet formula injection (=, +, -, @, tab, CR) in untrusted cells */
 function csvSafe(value: string): string {
-  return /^[=+@\t\r]/.test(value) ? `'${value}` : value;
+  // Excel/Calc treat a leading =, +, -, @, tab or CR as a formula trigger
+  // (DDE payloads like `=cmd|'/c calc'!A1` included) — prefix with an
+  // apostrophe to force text interpretation.
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 }
 
 export function buildCsv(sheet: Sheet): string {
@@ -236,7 +239,7 @@ export function buildCsv(sheet: Sheet): string {
       row
         .map((cell) => {
           const value = csvSafe(String(cell ?? ""));
-          return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+          return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
         })
         .join(","),
     );

@@ -1,5 +1,8 @@
+import { randomInt } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createSession, destroySession, getCurrentUser, getGuestToken, normalizePhone, sha256 } from "@/lib/server/auth";
+import { db } from "@/db";
+import { otpCodes } from "@/db/schema";
 import { claimGuestProjects, findOrCreateUser, pruneAuthArtifacts, verifyOtp } from "@/lib/server/otp";
 import { clientKey, rateLimit, RATE_RULES } from "@/lib/server/rate-limit";
 
@@ -64,8 +67,14 @@ export async function POST(request: Request) {
     lastRequest.set(phone, now);
     void pruneAuthArtifacts();
 
-    const code = String(Math.floor(10_000 + Math.random() * 90_000));
-    await db_insertOtp(phone, code);
+    // Cryptographically secure OTP — Math.random() is predictable and must
+    // never back an authentication code.
+    const code = String(randomInt(10_000, 100_000));
+    await db.insert(otpCodes).values({
+      phone,
+      codeHash: sha256(code),
+      expiresAt: new Date(Date.now() + 5 * 60_000),
+    });
 
     const demoMode = !smsConfigured && demoAllowed;
     return NextResponse.json({
@@ -107,14 +116,4 @@ export async function POST(request: Request) {
 export async function DELETE() {
   await destroySession();
   return NextResponse.json({ ok: true });
-}
-
-async function db_insertOtp(phone: string, code: string): Promise<void> {
-  const { db } = await import("@/db");
-  const { otpCodes } = await import("@/db/schema");
-  await db.insert(otpCodes).values({
-    phone,
-    codeHash: sha256(code),
-    expiresAt: new Date(Date.now() + 5 * 60_000),
-  });
 }

@@ -6,6 +6,7 @@ import { analyzeProject } from "@/lib/engine/analysis";
 import { parseProjectInput, reportOptionsSchema } from "@/lib/validation";
 import { ensureGuestToken, getCurrentUser, getGuestToken } from "@/lib/server/auth";
 import { clientKey, rateLimit, RATE_RULES } from "@/lib/server/rate-limit";
+import { readJsonBody } from "@/lib/server/body";
 
 export const dynamic = "force-dynamic";
 
@@ -46,18 +47,10 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "بدنه درخواست معتبر نیست" }, { status: 400 });
-  }
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) return parsed.response;
 
-  if (Number(request.headers.get("content-length") ?? 0) > 3_000_000) {
-    return NextResponse.json({ error: "حجم داده پروژه بیش از حد مجاز است" }, { status: 413 });
-  }
-
-  const payload = body as { project?: unknown; reportOptions?: unknown };
+  const payload = parsed.body as { project?: unknown; reportOptions?: unknown };
   let input;
   try {
     input = parseProjectInput(payload.project ?? {});

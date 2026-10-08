@@ -106,6 +106,11 @@ export function ImportDialog({
     () => (parsed ? buildActivitiesFromImport(parsed) : null),
     [parsed],
   );
+  // row lookup by name is O(1) instead of a scan per preview row
+  const rowByName = useMemo(
+    () => new Map(parsed?.rows.map((row) => [row.name, row])),
+    [parsed],
+  );
 
   const apply = () => {
     if (!preview) return;
@@ -193,7 +198,7 @@ export function ImportDialog({
                 </thead>
                 <tbody>
                   {preview.activities.map((activity) => {
-                    const source = parsed?.rows.find((row) => row.name === activity.name);
+                    const source = rowByName.get(activity.name);
                     return (
                       <tr key={activity.id} className="border-t border-slate-100">
                         <td className="px-2 py-1.5 font-mono text-[10.5px] text-slate-500">{activity.code}</td>

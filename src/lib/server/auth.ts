@@ -52,11 +52,13 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
+    // Only the SHA-256 of the token is stored, so a database leak cannot be
+    // replayed into live sessions.
     const rows = await db
       .select({ id: users.id, phone: users.phone, displayName: users.displayName })
       .from(sessions)
       .innerJoin(users, eq(users.id, sessions.userId))
-      .where(and(eq(sessions.token, token), gt(sessions.expiresAt, new Date())))
+      .where(and(eq(sessions.token, sha256(token)), gt(sessions.expiresAt, new Date())))
       .limit(1);
     return rows[0] ?? null;
   } catch {
@@ -67,7 +69,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 export async function createSession(userId: string): Promise<void> {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000);
-  await db.insert(sessions).values({ token, userId, expiresAt });
+  await db.insert(sessions).values({ token: sha256(token), userId, expiresAt });
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -82,7 +84,7 @@ export async function destroySession(): Promise<void> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (token) {
-    await db.delete(sessions).where(eq(sessions.token, token));
+    await db.delete(sessions).where(eq(sessions.token, sha256(token)));
   }
   store.delete(SESSION_COOKIE);
 }

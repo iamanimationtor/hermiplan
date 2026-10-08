@@ -9,6 +9,7 @@ import { buildDeliveryPackage } from "@/lib/report/package";
 import { REPORT_SECTIONS } from "@/lib/validation";
 import { renderGanttSvg, type GanttLink } from "@/lib/report/gantt-svg";
 import { clientKey, rateLimit, RATE_RULES } from "@/lib/server/rate-limit";
+import { readJsonBody } from "@/lib/server/body";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,8 +36,6 @@ function fileHeaders(filename: string, type: string): HeadersInit {
   };
 }
 
-const MAX_BODY_BYTES = 3_000_000;
-
 export async function POST(request: Request) {
   const limited = rateLimit(clientKey(request, "export"), RATE_RULES.export);
   if (!limited.allowed) {
@@ -46,17 +45,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_BODY_BYTES) {
-    return NextResponse.json({ error: "حجم داده پروژه بیش از حد مجاز است" }, { status: 413 });
-  }
-
-  let body: { project?: unknown; format?: string; kind?: string; reportUrl?: string };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: "بدنه درخواست معتبر نیست" }, { status: 400 });
-  }
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body as { project?: unknown; format?: string; kind?: string; reportUrl?: string };
 
   let input;
   try {

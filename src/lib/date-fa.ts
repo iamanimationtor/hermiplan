@@ -11,7 +11,11 @@ export function toPersianDigits(input: string | number): string {
 }
 
 export function toLatinDigits(input: string): string {
-  return input.replace(/[۰-۹]/g, (d) => String(PERSIAN_DIGITS.indexOf(d)));
+  // Persian (۰-۹) AND Arabic-Indic (٠-٩) digits both appear when users paste
+  // from different sources — normalise both so parsing never silently fails.
+  return input
+    .replace(/[۰-۹]/g, (d) => String(PERSIAN_DIGITS.indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660));
 }
 
 /* ------------------------- Jalali conversion ------------------------ */

@@ -61,9 +61,20 @@ export function rateLimit(key: string, rule: RateLimitRule): RateLimitResult {
   return { allowed: true, remaining: rule.limit - bucket.hits.length, retryAfterSeconds: 0 };
 }
 
-/** Extracts a client identifier from proxy headers, falling back to "local". */
+/**
+ * Extracts a client identifier from proxy headers, falling back to "local".
+ *
+ * On Netlify the edge sets `x-nf-client-connection-ip` itself and it cannot be
+ * spoofed by the client, so it is preferred. `x-forwarded-for` is client-
+ * controlled input: taking its FIRST entry would let an attacker rotate fake
+ * values to dodge the limiter, so only the last (proxy-appended) entry is used
+ * as a fallback.
+ */
 export function clientKey(request: Request, scope: string): string {
+  const netlifyIp = request.headers.get("x-nf-client-connection-ip")?.trim();
+  if (netlifyIp) return `${scope}:${netlifyIp}`;
   const forwarded = request.headers.get("x-forwarded-for");
-  const ip = forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip")?.trim() || "local";
+  const lastForwarded = forwarded?.split(",").map((part) => part.trim()).filter(Boolean).pop();
+  const ip = lastForwarded || request.headers.get("x-real-ip")?.trim() || "local";
   return `${scope}:${ip}`;
 }

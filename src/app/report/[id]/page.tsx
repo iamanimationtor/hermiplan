@@ -27,11 +27,11 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   if (!row) notFound();
 
   // A public row renders a shareable report; private rows require ownership.
-  if (!row.isPublic) {
-    const [user, guestToken] = await Promise.all([getCurrentUser(), getGuestToken()]);
-    const owner = (user && row.ownerUserId === user.id) || (guestToken && row.guestToken === guestToken);
-    if (!owner) notFound();
-  }
+  const [user, guestToken] = await Promise.all([getCurrentUser(), getGuestToken()]);
+  const isOwner = Boolean(
+    (user && row.ownerUserId === user.id) || (guestToken && row.guestToken === guestToken),
+  );
+  if (!row.isPublic && !isOwner) notFound();
 
   // Defensive parsing: stored payloads were validated on write, but a legacy or
   // corrupted row must never crash the page.
@@ -76,7 +76,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       analysis={analysis}
       options={options}
       isPublic={row.isPublic}
-      canManage={Boolean(row.guestToken || row.ownerUserId)}
+      canManage={isOwner}
     />
   );
 }

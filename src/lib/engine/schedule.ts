@@ -146,14 +146,14 @@ export function computeSchedule(
     }
   }
 
-  // Kahn topological ordering
+  // Kahn topological ordering (head-pointer queue: O(V + E), no O(n) shift())
   const indegree = new Map<string, number>();
   for (const [id, node] of nodes) indegree.set(id, node.predecessors.length);
   const queue: string[] = [];
   for (const [id, degree] of indegree) if (degree === 0) queue.push(id);
   const order: string[] = [];
-  while (queue.length) {
-    const id = queue.shift() as string;
+  for (let head = 0; head < queue.length; head += 1) {
+    const id = queue[head];
     order.push(id);
     for (const succ of nodes.get(id)?.successors ?? []) {
       const next = (indegree.get(succ.id) ?? 0) - 1;

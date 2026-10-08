@@ -45,12 +45,18 @@ function createPool(): Pool {
   const requiresSsl =
     process.env.DATABASE_SSL === "require" || /sslmode\s*=\s*require|ssl\s*=\s*true/i.test(connectionString);
 
+  // TLS must authenticate the server: without certificate verification the
+  // connection is encrypted but open to man-in-the-middle attacks. The escape
+  // hatch (DATABASE_SSL_SKIP_VERIFY=1) exists only for providers with private
+  // CAs that cannot be verified from the function runtime.
+  const skipVerify = process.env.DATABASE_SSL_SKIP_VERIFY === "1";
+
   const pool = new Pool({
     connectionString,
     max: maxConnections,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
-    ssl: requiresSsl ? { rejectUnauthorized: false } : undefined,
+    ssl: requiresSsl ? { rejectUnauthorized: !skipVerify } : undefined,
   });
 
   // A serverless container can be frozen between requests; never let a broken

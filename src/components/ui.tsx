@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -194,20 +194,50 @@ export function Modal({
   footer?: ReactNode;
   wide?: boolean;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation();
         onClose();
+        return;
+      }
+      // focus trap: keep Tab/Shift+Tab cycling inside the dialog
+      if (event.key === "Tab") {
+        const dialog = dialogRef.current;
+        if (!dialog) return;
+        const focusable = dialog.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (event.shiftKey && (!active || active === first || !dialog.contains(active))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (!active || active === last || !dialog.contains(active))) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     };
     document.addEventListener("keydown", onKeyDown);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // move focus into the dialog on open, restore it on close
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    (firstFocusable ?? dialogRef.current)?.focus();
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
+      previouslyFocused.current?.focus?.();
     };
   }, [open, onClose]);
 
@@ -223,6 +253,8 @@ export function Modal({
       }}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className={`animate-fade-up my-auto w-full ${wide ? "max-w-5xl" : "max-w-lg"} rounded-2xl border border-slate-200 bg-white shadow-2xl`}
       >
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
@@ -258,7 +290,13 @@ export function ProgressBar({ value, tone = "info" }: { value: number; tone?: To
             ? "bg-accent-500"
             : "bg-brand-600";
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200/80">
+    <div
+      className="h-2 w-full overflow-hidden rounded-full bg-slate-200/80"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(clamped)}
+    >
       <div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${clamped}%` }} />
     </div>
   );

@@ -6,12 +6,16 @@ import { analyzeProject } from "@/lib/engine/analysis";
 import { parseProjectInput, reportOptionsSchema } from "@/lib/validation";
 import { getCurrentUser, getGuestToken } from "@/lib/server/auth";
 import { clientKey, rateLimit, RATE_RULES } from "@/lib/server/rate-limit";
+import { readJsonBody } from "@/lib/server/body";
 
 export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function loadProject(id: string) {
+  // Validate before touching the database: Postgres rejects malformed UUIDs
+  // with a 500-level error, and every handler (GET/PATCH/DELETE) funnels here.
+  if (!UUID_RE.test(id)) return null;
   const rows = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
   return rows[0] ?? null;
 }
@@ -77,12 +81,9 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 403 });
   }
 
-  let body: { project?: unknown; reportOptions?: unknown; isPublic?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: "بدنه درخواست معتبر نیست" }, { status: 400 });
-  }
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body as { project?: unknown; reportOptions?: unknown; isPublic?: unknown };
 
   // visibility-only update (used by the report toolbar)
   if (typeof body.isPublic === "boolean" && body.project === undefined) {

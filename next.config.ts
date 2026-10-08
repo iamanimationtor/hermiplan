@@ -14,6 +14,10 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
   { key: "X-DNS-Prefetch-Control", value: "off" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  // The site is always served over HTTPS (Netlify forces TLS); HSTS pins that
+  // for returning visitors. `preload` is deliberately omitted — it requires a
+  // domain-owner submission to the browser preload lists.
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
 ];
 
 const nextConfig: NextConfig = {

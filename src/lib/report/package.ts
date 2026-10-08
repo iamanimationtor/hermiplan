@@ -1,19 +1,14 @@
 import { createZip, type ZipEntry } from "./zip";
-import { buildCsv, buildExcelXml, buildSheets, type Sheet } from "./export";
+import { buildCsv, buildSheets, type Sheet } from "./export";
 import { buildXlsx } from "./xlsx";
 import { buildMsProjectXml } from "./msproject";
 import { buildReportHtml } from "./html";
-import { formatJalali, formatCompact, toPersianDigits } from "@/lib/date-fa";
 import type { ProjectAnalysis, ProjectInput } from "@/lib/engine/types";
 
 export interface DeliveryOptions {
   ganttSvg: string;
   reportUrl: string;
   author?: string;
-}
-
-function safeName(name: string): string {
-  return (name || "HERMIPLAN").replace(/[\\/:*?"<>|]+/g, "-").slice(0, 40);
 }
 
 function readMe(project: ProjectInput, analysis: ProjectAnalysis, options: DeliveryOptions): string {
@@ -63,7 +58,6 @@ export function buildDeliveryPackage(
   options: DeliveryOptions,
 ): Uint8Array {
   const sheets: Sheet[] = buildSheets(analysis, project);
-  const base = safeName(project.meta.name);
   const entries: ZipEntry[] = [
     { name: "README.txt", content: readMe(project, analysis, options) },
     { name: "Report.html", content: buildReportHtml(project, analysis, options.ganttSvg) },
@@ -79,9 +73,5 @@ export function buildDeliveryPackage(
     },
   ];
 
-  void formatJalali;
-  void formatCompact;
-  void toPersianDigits;
-  void buildExcelXml;
   return createZip(entries);
 }

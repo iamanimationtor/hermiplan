@@ -74,8 +74,10 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
     const draft = loadDraft();
     if (draft) api.replace(draft);
     if (typeof window !== "undefined" && !window.localStorage.getItem("hermiplan:welcomed")) {
-      setWelcomeOpen(true);
       window.localStorage.setItem("hermiplan:welcomed", "1");
+      // scheduled after paint: a first-visit modal is not worth a cascading render
+      const frame = window.requestAnimationFrame(() => setWelcomeOpen(true));
+      return () => window.cancelAnimationFrame(frame);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -93,17 +95,30 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
 
   async function downloadExport(format: "xlsx" | "xls" | "csv" | "json" | "msproject" | "package") {
     setBusy(true);
+    setError(null);
     try {
       const response = await fetch("/api/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project: current, format }),
       });
+      if (!response.ok) {
+        let message = "خروجی فایل با خطا مواجه شد.";
+        try {
+          const data = (await response.json()) as { error?: string };
+          if (data.error) message = data.error;
+        } catch {
+          /* keep the generic message */
+        }
+        setError(message);
+        return;
+      }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `HERMIPLAN-${current.meta.name || "project"}.${format === "package" ? "zip" : format === "msproject" ? "xml" : format}`;
+      const safeName = (current.meta.name || "project").replace(/[\\/:*?"<>|\r\n]+/g, "-").slice(0, 60);
+      anchor.download = `HERMIPLAN-${safeName}.${format === "package" ? "zip" : format === "msproject" ? "xml" : format}`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
