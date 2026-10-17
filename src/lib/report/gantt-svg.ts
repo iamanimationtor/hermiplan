@@ -110,9 +110,9 @@ export function renderGanttSvg({
       parts.push(
         `<rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" rx="2.5" fill="${row.critical ? "#fecaca" : "#dbeafe"}" stroke="${row.critical ? "#b91c1c" : "#3b82f6"}" stroke-width="0.9"/>`,
       );
-      if (row.progress > 0) {
+      if (row.progress >= 100) {
         parts.push(
-          `<rect x="${barX}" y="${barY}" width="${Math.max((barW * row.progress) / 100, 1)}" height="${barH}" rx="2.5" fill="${row.critical ? "#b91c1c" : "#2563eb"}"/>`,
+          `<rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" rx="2.5" fill="${row.critical ? "#b91c1c" : "#2563eb"}"/>`,
         );
       }
     }

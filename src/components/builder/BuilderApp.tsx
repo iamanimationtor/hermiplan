@@ -21,6 +21,7 @@ import {
 import { buildProjectFromTemplate } from "@/lib/templates";
 import { DEFAULT_REPORT_SECTIONS } from "@/lib/validation";
 import { formatCompact, formatJalali, formatPercent, toPersianDigits } from "@/lib/date-fa";
+import { downloadFilenameFromDisposition, safeDownloadFilename } from "@/lib/report/download";
 import type { ProjectInput } from "@/lib/engine/types";
 
 const STEPS = [
@@ -125,15 +126,20 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
         return;
       }
       const blob = await response.blob();
+      if (blob.size === 0) {
+        setError("فایل خروجی خالی است و دریافت نشد.");
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      const safeName = (current.meta.name || "project").replace(/[\\/:*?"<>|\r\n]+/g, "-").slice(0, 60);
-      anchor.download = `HERMIPLAN-${safeName}.${format === "package" ? "zip" : format === "msproject" ? "xml" : format}`;
+      const extension = format === "package" ? "zip" : format === "msproject" ? "xml" : format;
+      const fallback = `HERMIPLAN-${safeDownloadFilename(current.meta.name, "Project")}.${extension}`;
+      anchor.download = downloadFilenameFromDisposition(response.headers.get("content-disposition"), fallback);
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 4000);
     } catch {
       setError("خروجی فایل با خطا مواجه شد.");
     } finally {

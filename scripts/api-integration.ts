@@ -283,7 +283,11 @@ async function main() {
   const names = execSync("python3 -c \"import zipfile;z=zipfile.ZipFile('/tmp/it-package.zip');print(','.join(z.namelist()));print(z.testzip())\"", {
     encoding: "utf-8",
   }).trim().split("\n");
-  ok(names[0].split(",").length === 6, "بسته شامل ۶ فایل است", names[0]);
+  const packageEntries = names[0].split(",");
+  ok(packageEntries.length >= 20, "بسته شامل خروجی‌های اصلی و CSV جدول‌های موجود است", `entries=${packageEntries.length}`);
+  for (const required of ["README.txt", "Report.html", "Data.xlsx", "Data.xls", "MSProject.xml", "Project.json", "CSV/Activities.csv"]) {
+    ok(packageEntries.includes(required), `بسته شامل ${required} است`);
+  }
   ok(names[1] === "None", "یکپارچگی ZIP (CRC) تأیید شد", names[1]);
 
   const jsonExport = await fetch(`${BASE}/api/export`, {

@@ -241,15 +241,15 @@ export const reportOptionsSchema = z.object({
 export const EXPORT_FORMATS = [
   {
     id: "pdf",
-    label: "گزارش HTML (چاپ / PDF)",
+    label: "گزارش HTML مستقل (چاپ به PDF)",
     ext: "html",
-    hint: "گزارش کامل A4 — در مرورگر باز کنید و Ctrl+P → Save as PDF",
+    hint: "گزارش خودبسنده A4؛ در مرورگر باز کنید و Print → Save as PDF را انتخاب کنید",
   },
   { id: "xlsx", label: "Excel (xlsx)", ext: "xlsx", hint: "کارپوشه چندشییتی با فرمت استاندارد Office" },
-  { id: "xls", label: "Excel 2003 (xls)", ext: "xls", hint: "سازگار با نسخه‌های قدیمی Excel" },
+  { id: "xls", label: "Excel 2003 XML (xls)", ext: "xls", hint: "کارپوشه SpreadsheetML 2003 با پسوند XLS؛ قالب XML است، نه BIFF" },
   { id: "csv", label: "CSV", ext: "csv", hint: "داده جدولی با پشتیبانی کامل فارسی" },
   { id: "json", label: "JSON", ext: "json", hint: "داده کامل پروژه برای تبادل سیستم‌به‌سیستم" },
-  { id: "msproject", label: "MS Project (XML)", ext: "xml", hint: "قابل بازکردن در MS Project و Primavera" },
+  { id: "msproject", label: "MS Project XML (MSPDI)", ext: "xml", hint: "خروجی ساختاریافته زمان‌بندی، وابستگی، تقویم و منابع برای تبادل" },
   { id: "package", label: "بسته کامل (ZIP)", ext: "zip", hint: "همه فرمت‌ها به همراه فهرست تحویل" },
 ] as const;
 
