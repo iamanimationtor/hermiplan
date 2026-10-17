@@ -118,48 +118,78 @@ export function buildReportHtml(
       )
       .join("")}</div></div>`);
 
+  const analyzedActivitiesById = new Map(a.activities.map((activity) => [activity.id, activity]));
+  const sourceResourcesById = new Map(project.resources.map((resource) => [resource.id, resource]));
+  const representedWbsActivities = new Set(a.wbs.flatMap((phase) => phase.children.map((child) => child.id)));
+  const wbsRows = a.wbs.flatMap((phase) => [
+    [
+      phase.wbs,
+      phase.name,
+      toPersianDigits(phase.duration ?? 0),
+      formatJalali(phase.startDate ?? "", { withMonthName: false }),
+      formatJalali(phase.finishDate ?? "", { withMonthName: false }),
+      formatPercent(phase.progress ?? 0, 0),
+      money(phase.budget ?? 0),
+      "محاسبه‌شده",
+    ],
+    ...phase.children.map((child) => [
+      child.wbs,
+      child.name,
+      toPersianDigits(child.duration ?? 0),
+      formatJalali(child.startDate ?? "", { withMonthName: false }),
+      formatJalali(child.finishDate ?? "", { withMonthName: false }),
+      formatPercent(child.progress ?? 0, 0),
+      money(child.budget ?? 0),
+      "محاسبه‌شده",
+    ]),
+  ]);
+  for (const source of project.activities) {
+    if (representedWbsActivities.has(source.id)) continue;
+    wbsRows.push([
+      "",
+      source.name,
+      toPersianDigits(source.duration),
+      "—",
+      "—",
+      formatPercent(source.progress, 0),
+      "—",
+      "WBS/زمان‌بندی محاسبه نشد",
+    ]);
+  }
   sections.push(`<div class="sec" data-sections="wbs"><div class="t"><span class="idx">${next()}</span><h2>ساختار شکست کار (WBS)</h2></div>
     ${table(
-      ["کد", "شرح", "مدت", "شروع", "پایان", "پیشرفت", "بودجه"],
-      a.wbs.flatMap((phase) => [
-        [
-          phase.wbs,
-          phase.name,
-          toPersianDigits(phase.duration ?? 0),
-          formatJalali(phase.startDate ?? "", { withMonthName: false }),
-          formatJalali(phase.finishDate ?? "", { withMonthName: false }),
-          formatPercent(phase.progress ?? 0, 0),
-          money(phase.budget ?? 0),
-        ],
-        ...phase.children.map((child) => [
-          child.wbs,
-          child.name,
-          toPersianDigits(child.duration ?? 0),
-          formatJalali(child.startDate ?? "", { withMonthName: false }),
-          formatJalali(child.finishDate ?? "", { withMonthName: false }),
-          formatPercent(child.progress ?? 0, 0),
-          money(child.budget ?? 0),
-        ]),
-      ]),
+      ["کد", "شرح", "مدت", "شروع", "پایان", "پیشرفت", "بودجه", "وضعیت محاسبه"],
+      wbsRows,
     )}</div>`);
 
+  const activityRows = project.activities.map((source) => {
+    const activity = analyzedActivitiesById.get(source.id);
+    const resources = source.resources.map((assignment) => {
+      const resource = sourceResourcesById.get(assignment.resourceId);
+      return `${resource?.name ?? assignment.resourceId} × ${formatNumber(assignment.units)}`;
+    });
+    return [
+      source.code,
+      source.name,
+      source.phase,
+      toPersianDigits(source.duration),
+      activity ? formatJalali(activity.startDate, { withMonthName: false }) : "—",
+      activity ? formatJalali(activity.finishDate, { withMonthName: false }) : "—",
+      formatPercent(source.progress, 0),
+      resources.join("، ") || "—",
+      activity ? money(activity.budgetCost) : "—",
+      activity ? "محاسبه‌شده" : "زمان‌بندی محاسبه نشد",
+    ];
+  });
   sections.push(`<div class="sec" data-sections="activities"><div class="t"><span class="idx">${next()}</span><h2>فهرست فعالیت‌ها</h2></div>
     ${table(
-      ["کد", "عنوان فعالیت", "فاز", "مدت", "شروع", "پایان", "پیشرفت", "منابع", "بودجه"],
-      a.activities.map((act) => [
-        act.code,
-        act.name,
-        act.phase,
-        toPersianDigits(act.duration),
-        formatJalali(act.startDate, { withMonthName: false }),
-        formatJalali(act.finishDate, { withMonthName: false }),
-        formatPercent(act.progress, 0),
-        act.resourceNames.join("، ") || "—",
-        money(act.budgetCost),
-      ]),
+      ["کد", "عنوان فعالیت", "فاز", "مدت", "شروع", "پایان", "پیشرفت", "منابع", "بودجه", "وضعیت محاسبه"],
+      activityRows,
     )}</div>`);
 
+  const unscheduledCount = project.activities.length - a.activities.length;
   sections.push(`<div class="sec" data-sections="schedule"><div class="t"><span class="idx">${next()}</span><h2>زمان‌بندی و شناوری فعالیت‌ها</h2></div>
+    ${unscheduledCount > 0 ? `<p class="note">${toPersianDigits(unscheduledCount)} فعالیت زمان‌بندی‌نشده در ورودی پروژه وجود دارد؛ جزئیات ورودی در فهرست فعالیت‌ها حفظ شده و برای آن‌ها تاریخ/شناوری ساخته نشده است.</p>` : ""}
     ${table(
       ["کد", "فعالیت", "زودترین شروع", "زودترین پایان", "دیرترین شروع", "دیرترین پایان", "شناوری کل", "شناوری آزاد", "بحرانی"],
       a.activities.map((act) => [
@@ -233,6 +263,7 @@ export function buildReportHtml(
     ) : ""}</div>`);
 
   sections.push(`<div class="sec" data-sections="gantt"><div class="t"><span class="idx">${next()}</span><h2>نمودار گانت</h2></div>
+    <p class="note">نوارها تاریخ‌های برنامه‌ریزی‌شده را نشان می‌دهند. درصد پیشرفت در جدول فعالیت‌ها آمده و به تاریخ تکمیل واقعی تبدیل نشده است.</p>
     ${ganttSvg ? `<div style="border:1px solid var(--line);border-radius:8px;padding:6px;overflow:auto">${ganttSvg}</div>` : `<div class="callout">برای نمایش نمودار گانت، فعالیت یا نقطه کنترلی به پروژه اضافه کنید.</div>`}</div>`);
 
   sections.push(`<div class="sec" data-sections="costs pricing"><div class="t"><span class="idx">${next()}</span><h2>هزینه، تعدیل و برآورد نهایی</h2></div>

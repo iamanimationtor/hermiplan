@@ -206,11 +206,13 @@ export formats, Gantt, reports, private/public sharing — works with only
 
 ## 11. Runtime limits to be aware of
 
-* Synchronous Netlify functions: **10 s default / 26 s** on higher plans. The
-  heaviest operation measured is a 200-activity analysis plus full ZIP package:
-  **~77 ms**, well inside the limit.
+* Synchronous Netlify functions: **10 s default / 26 s** on higher plans. A
+  synthetic 200-activity chain in this sandbox took **228 ms** for analysis,
+  SVG rendering and a full ZIP package. This is a single local measurement,
+  not a production latency guarantee.
 * Function request/response payload: **6 MB**. The app rejects request bodies
-  above **3 MB** with 413, and a 200-activity export package is **~1.2 MB**.
+  above **3 MB** with 413. The same 200-activity sample produced a **230,404-byte**
+  package; size depends on the project data and generated report.
 * All exports are generated in memory — no filesystem writes, which is required
   because function filesystems are read-only.
 * Rate limiting is per function instance, not global. For a single Netlify

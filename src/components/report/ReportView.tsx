@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BarChart, GanttChart, HealthGauge, NetworkDiagram, ResourceHistogram } from "@/components/charts";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, Modal, Select } from "@/components/ui";
 import { DEFAULT_REPORT_SECTIONS, EXPORT_FORMATS, REPORT_SECTIONS, type ReportOptions } from "@/lib/validation";
-import { Modal } from "@/components/ui";
+import { CSV_SHEET_OPTIONS } from "@/lib/report/export";
+import { downloadFilenameFromDisposition, safeDownloadFilename } from "@/lib/report/download";
 import { Logo, LogoMark, CREATOR_CREDIT_FULL } from "@/components/Logo";
 import type { ProjectAnalysis, ProjectInput } from "@/lib/engine/types";
 import { formatCompact, formatCurrency, formatJalali, formatNumber, formatPercent, toPersianDigits } from "@/lib/date-fa";
@@ -49,9 +50,29 @@ const SECTION_DOCUMENT_ORDER = [
   "signature",
 ];
 
-/** Makes an untrusted project name safe for use in a download filename. */
-function safeFileName(name: string): string {
-  return (name || "project").replace(/[\\/:*?"<>|\r\n]+/g, "-").slice(0, 60);
+function csvKindIsAvailable(kind: string, project: ProjectInput, analysis: ProjectAnalysis): boolean {
+  switch (kind) {
+    case "activities": return true;
+    case "dependencies": return project.activities.some((activity) => activity.predecessors.length > 0);
+    case "wbs": return analysis.wbs.length > 0 || project.activities.length > 0;
+    case "gantt": return analysis.activities.length > 0;
+    case "milestones": return analysis.milestones.length > 0 || project.milestones.length > 0 || project.activities.some((activity) => activity.milestone || activity.duration === 0);
+    case "resources": return analysis.resources.length > 0;
+    case "assignments": return project.activities.some((activity) => activity.resources.length > 0);
+    case "costs": return analysis.costs.byPhase.length > 0;
+    case "evm": return true;
+    case "risks": return analysis.risks.length > 0;
+    case "delays": return analysis.delays.length > 0;
+    case "pricing": return analysis.pricing.rates.length > 0;
+    case "escalation": return analysis.pricing.escalation.months.length > 0;
+    case "costSummary": return true;
+    case "standards": return analysis.standards.length > 0;
+    case "baseline": return Boolean(project.baseline?.activities.length);
+    case "calendar": return true;
+    case "checks": return analysis.errors.length > 0 || analysis.warnings.length > 0;
+    case "info": return true;
+    default: return false;
+  }
 }
 
 function SectionTitle({ index, title, subtitle }: { index: number; title: string; subtitle?: string }) {
@@ -126,6 +147,7 @@ export function ReportView({
   const [printing, setPrinting] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [busyFormat, setBusyFormat] = useState<string | null>(null);
+  const [csvKind, setCsvKind] = useState("activities");
   const [copied, setCopied] = useState(false);
   const [publicLink, setPublicLink] = useState(isPublic);
   const [visibilityBusy, setVisibilityBusy] = useState(false);
@@ -183,6 +205,7 @@ export function ReportView({
         body: JSON.stringify({
           project,
           format: formatId,
+          ...(formatId === "csv" ? { kind: selectedCsvKind } : {}),
           reportUrl: typeof window !== "undefined" ? window.location.href : "",
           reportOptions: {
             sections,
@@ -206,11 +229,16 @@ export function ReportView({
         return;
       }
       const blob = await response.blob();
+      if (blob.size === 0) {
+        setActionError("فایل خروجی خالی است و دریافت نشد. لطفاً دوباره تلاش کنید.");
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const format = EXPORT_FORMATS.find((f) => f.id === formatId);
+      const fallback = `HERMIPLAN-${safeDownloadFilename(project.meta.name, "Project")}.${format?.ext ?? "bin"}`;
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `HERMIPLAN-${safeFileName(project.meta.name)}.${format?.ext ?? "txt"}`;
+      anchor.download = downloadFilenameFromDisposition(response.headers.get("content-disposition"), fallback);
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -255,6 +283,10 @@ export function ReportView({
   const totalSheets = reportSheets.length;
 
   const statusText = a.health.status === "good" ? "در وضعیت مطلوب" : a.health.status === "watch" ? "نیازمند پایش" : "در وضعیت بحرانی";
+  const availableCsvOptions = CSV_SHEET_OPTIONS.filter((option) => csvKindIsAvailable(option.id, project, a));
+  const selectedCsvKind = availableCsvOptions.some((option) => option.id === csvKind)
+    ? csvKind
+    : availableCsvOptions[0]?.id ?? "activities";
 
   return (
     <div>
@@ -356,6 +388,12 @@ export function ReportView({
             برای PDF، فایل «گزارش HTML» را دریافت کنید، در مرورگر باز کنید و <b>Ctrl+P → Save as PDF</b> بزنید؛
             خروجی برداری (Vector) با صفحه‌بندی A4 و سرستون‌های تکرارشونده تولید می‌شود.
           </p>
+          <label className="block max-w-xl">
+            <span className="mb-1 block text-[12px] font-semibold text-slate-700">محتوای CSV (هر فایل CSV یک جدول دارد)</span>
+            <Select value={selectedCsvKind} onChange={(event) => setCsvKind(event.target.value)} aria-label="جدول خروجی CSV">
+              {availableCsvOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+            </Select>
+          </label>
           <div className="grid gap-2 sm:grid-cols-2">
             {EXPORT_FORMATS.map((format) => (
               <button
@@ -380,7 +418,7 @@ export function ReportView({
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11.5px] leading-6 text-slate-500">
             <p className="font-bold text-ink-900">محتوای بسته کامل (ZIP)</p>
             <p className="mt-1">
-              گزارش HTML قابل چاپ + کارپوشه اکسل چندشییتی (اطلاعات، فعالیت‌ها، زمان‌بندی، منابع، هزینه، تعدیل، ریسک و استانداردها) + فایل Microsoft Project + داده JSON + CSV.
+              گزارش HTML قابل چاپ + فایل‌های XLSX و SpreadsheetML 2003 + XML زمان‌بندی MSPDI + JSON کامل + CSV جداگانه برای همه جدول‌های موجود (فعالیت، وابستگی، WBS، گانت، منابع، هزینه و پایش).
             </p>
           </div>
         </div>

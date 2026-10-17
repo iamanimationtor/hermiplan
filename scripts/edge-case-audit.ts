@@ -53,7 +53,10 @@ function assertAnalysisIsSafe(name: string, project: ProjectInput) {
   // every export path must survive
   try {
     const sheets = buildSheets(analysis, project);
-    check(sheets.length >= 8, `${name}: expected full sheet set, got ${sheets.length}`);
+    const names = new Set(sheets.map((sheet) => sheet.name));
+    check(names.has("Info") && names.has("Activities") && names.has("EVM") && names.has("Calendar"), `${name}: core workbook tabs are present`);
+    check(sheets.every((sheet) => sheet.headers.length > 0), `${name}: every worksheet has an explicit schema`);
+    check(sheets.every((sheet) => sheet.rows.length > 0 || (sheet.name === "Activities" && project.activities.length === 0)), `${name}: optional empty data tabs are omitted`);
     const xlsx = buildXlsx(sheets);
     check(xlsx instanceof Uint8Array && xlsx.length > 500, `${name}: xlsx not produced`);
     const msp = buildMsProjectXml(project, analysis);

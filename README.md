@@ -28,7 +28,7 @@
 | ایمنی داده | واگردانی/انجام مجدد (۴۰ مرحله) با Ctrl+Z، ذخیره خودکار پیش‌نویس، تأیید پیش از جایگزینی قالب |
 | تحلیل سناریو | What-if زنده: تأخیر فعالیت‌های بحرانی، تغییر سرعت اجرا و اثر نرخ تعدیل بر برآورد نهایی |
 | کمک به کاربر | راهنمای گام‌به‌گام + واژه‌نامه ۱۸ اصطلاح مهندسی به زبان ساده |
-| خروجی | ۷ فرمت: PDF (A4)، XLSX، XLS، CSV، JSON، MS Project XML، بسته کامل ZIP |
+| خروجی | ۷ فرمت: گزارش HTML خودبسنده A4 (چاپ به PDF)، XLSX، SpreadsheetML 2003 با پسوند XLS، CSV تک‌جدولی با انتخاب شیت، JSON کامل، MS Project XML، بسته ZIP شامل فایل‌های اصلی و CSVهای موجود |
 
 ## معماری
 
@@ -42,7 +42,7 @@ src/
 │  │  └─ types.ts      # مدل دامنه
 │  ├─ market/          # فهرست نرخ بازار ایران + موتور قیمت‌گذاری و تعدیل
 │  ├─ standards.ts     # استانداردها و متدهای محاسباتی
-│  ├─ report/          # موتور خروجی: gantt-svg، xlsx، zip، msproject، html، package
+│  ├─ report/          # خروجی‌های آزمون‌شده: xlsx، SpreadsheetML، CSV/JSON، MSPDI، HTML، Gantt و ZIP
 │  └─ templates.ts     # قالب‌های آماده پروژه
 ├─ components/         # UI (builder، report، charts، nav، logo)
 ├─ app/
@@ -65,10 +65,12 @@ npm run build && npm start
 
 ```bash
 npx tsx scripts/engine-smoke.ts          # مجموعه تست موتور (CPM، تقویم، EVM، قیمت‌گذاری)
-npx tsx scripts/engine-verification.ts   # ۷۶ بررسی با مقادیر محاسبه‌شده به‌صورت دستی
-npx tsx scripts/edge-case-audit.ts       # ممیزی ۹ بخشی موارد مرزی + هر ۵ مسیر خروجی
+npx tsx scripts/engine-verification.ts   # ۸۱ بررسی با مقادیر محاسبه‌شده به‌صورت دستی
+npx tsx scripts/edge-case-audit.ts       # ممیزی ۹ بخشی موارد مرزی + مسیرهای خروجی موتور
+npm test                                 # همه تست‌ها؛ شامل بازخوانی XLSX با ExcelJS و تست مستقیم هفت خروجی بدون DB
+npm run typecheck && npm run lint
 
-# یکپارچگی API، جداسازی کاربران، OTP و فایل‌های خروجی (نیاز به سرور در حال اجرا)
+# یکپارچگی API، جداسازی کاربران، OTP و پایگاه داده (نیاز به سرور و DATABASE_URL)
 npx next start -p 3170 &
 BASE_URL=http://localhost:3170 npx tsx scripts/api-integration.ts
 ```

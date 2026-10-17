@@ -64,11 +64,18 @@ console.log("  ✓ calendar arithmetic (Sat–Wed working week)");
 
 // progress / earned value
 const ev = buildProjectFromTemplate("general");
+ev.meta.startDate = "2026-01-03"; // Saturday, a working day in the project calendar
+// A date-only status date is interpreted at end-of-day. The day before start
+// must have no planned progress; the start workday receives its planned credit.
+ev.meta.statusDate = "2026-01-02";
+const beforeStartAnalysis = analyzeProject(ev);
+assert(beforeStartAnalysis.progress.overall === 0, "no actual progress before project start");
+assert(beforeStartAnalysis.progress.planned === 0, "no planned progress before project start");
 ev.meta.statusDate = ev.meta.startDate;
-const evAnalysis = analyzeProject(ev);
-assert(evAnalysis.progress.overall === 0, "no progress at project start");
-assert(evAnalysis.progress.planned === 0, "no planned progress at project start");
-console.log("  ✓ earned value at data date");
+const atStartAnalysis = analyzeProject(ev);
+assert(atStartAnalysis.progress.overall === 0, "no actual progress is fabricated at project start");
+assert(atStartAnalysis.progress.planned > 0, "the working-day status date includes planned progress through end-of-day");
+console.log("  ✓ earned value date semantics (date-only status is end-of-day)");
 
 // pricing & escalation
 for (const template of TEMPLATES) {
