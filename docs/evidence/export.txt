@@ -1,4 +1,4 @@
-# export quality — 2026-10-31T17:25:30Z
+# export quality — 2026-10-31T17:29:49Z
 
 ## with a live server
 ▶ ۱. XLSX — بسته واقعی Office
@@ -112,7 +112,7 @@
 
 ✔ 91 موفق / 0 ناموفق
 
-## without a server (pure builders)
+## without a server
 ▶ ۱. XLSX — بسته واقعی Office
   ✓ بخش [Content_Types].xml حاضر است
   ✓ xl/workbook.xml حاضر است
