@@ -769,15 +769,31 @@ export function BuilderApp({
         {savedList && savedList.length ? (
           <div className="space-y-2">
             {savedList.map((item) => (
-              <button
+              <div
                 key={item.id}
-                type="button"
-                onClick={() => loadSaved(item.id)}
-                className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-right transition hover:border-brand-400 hover:bg-brand-50/40"
+                className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 transition hover:border-brand-400 hover:bg-brand-50/40"
               >
-                <span className="text-[13px] font-semibold text-ink-900">{item.name}</span>
-                <span className="text-[11px] text-slate-500">{formatJalali(item.updatedAt.slice(0, 10), { withMonthName: false })}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => loadSaved(item.id)}
+                  className="min-w-0 flex-1 text-right"
+                  title="باز کردن در سازنده"
+                >
+                  <span className="block truncate text-[13px] font-semibold text-ink-900">{item.name}</span>
+                  <span className="block text-[11px] text-slate-500">
+                    {formatJalali(item.updatedAt.slice(0, 10), { withMonthName: false })}
+                  </span>
+                </button>
+                {/* A direct route to the report: the list already carries the
+                    capability key, so opening it never depends on a cookie. */}
+                <button
+                  type="button"
+                  onClick={() => router.push(reportUrl(item.id, item.viewKey))}
+                  className="shrink-0 rounded-lg border border-brand-200 bg-white px-2.5 py-1.5 text-[11.5px] font-bold text-brand-800 transition hover:bg-brand-50"
+                >
+                  گزارش
+                </button>
+              </div>
             ))}
           </div>
         ) : (

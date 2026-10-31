@@ -1,32 +1,34 @@
-# production smoke — next start + real PostgreSQL — 2026-10-31T17:26:40Z
+# production smoke — next start + real PostgreSQL — 2026-10-31T17:29:24Z
 
-$ curl -s http://127.0.0.1:3400/api/health
+## 1. the account door exists where a visitor looks
+$ curl -s :3400/ | grep -o "ورود / ثبت‌نام"
+ورود / ثبت‌نام
+$ curl -s :3400/ | grep -o "builder?account=1"
+builder?account=1
+$ curl -s :3400/builder | grep -o "ورود / ثبت‌نام"
+ورود / ثبت‌نام
+
+## 2. health
 {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
 
-## pages (and the account entry)
-/                        200  ورود / ثبت‌نام
+## 3. account flow (username + password, no SMS anywhere)
+register                      201
+login with UPPERCASE username  200  (case-insensitive uniqueness)
+login wrong password          401
+register duplicate (any case) 409
+foreign Origin                403
+session cookie usable         200  (GET /api/auth with the session)
+OTP request without SMS key   503
 
-/builder                 200  ورود / ثبت‌نام
+## 4. project -> report, with no cookie at all
+POST /api/projects            201  id=25e6b563…  viewKey=issued
+GET /report/<id>?k=<key>      200  (no cookie, no session)
+GET /report/<id>              404  (no cookie, no key ⇒ existence not revealed)
+GET /report/<id>?k=<tampered> 404
 
-/robots.txt              200  
-/sitemap.xml             200  
-
-## account flow
-register                                     201  {"ok":true,"claimedProjects":0,"user":{"id":"f2222aee-e254-4e65-8679-000bcc94d9b4","username":"smoke172640","phone":null,"displayName":null}}
-login with UPPERCASE username                200  {"ok":true,"claimedProjects":0,"user":{"id":"f2222aee-e254-4e65-8679-000bcc94d9b4","username":"smoke172640","p
-duplicate username (different case)          409  {"error":"این نام کاربری قبلاً گرفته شده است"}
-wrong password                               401  {"error":"نام کاربری یا رمز عبور نادرست است"}
-foreign Origin                               403
-
-## report page: owner path without any cookie (capability key)
-POST /api/projects (no account)              201  id=dd53cb01… viewKey=yes
-GET /report/<id>?k=<viewKey>  (no cookie)    200
-GET /report/<id>              (no cookie)    404
-
-## security headers on /
-X-Content-Type-Options: nosniff
+## 5. security headers on /
 X-Frame-Options: DENY
 Referrer-Policy: strict-origin-when-cross-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=()
 Strict-Transport-Security: max-age=31536000; includeSubDomains
-content-security-policy: default-src 'self'; script-src 'self' 'nonce-ZjVjMTNiODUtM2IzOS00MTBjLTg2N2UtM2E4ZDVj
+content-security-policy: default-src 'self'; script-src 'self' 'nonce-OWYzZDNjYzQtY2IwYS00NzBmLWIyMj
