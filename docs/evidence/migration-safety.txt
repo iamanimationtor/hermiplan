@@ -1,9 +1,10 @@
-# MIGRATION_SAFETY_ROLLBACK=1 npm run db:migration-safety (scratch db) — 2026-10-31T16:33:49Z
+# MIGRATION_SAFETY_ROLLBACK=1 npm run db:migration-safety (scratch db) — 2026-10-31T17:02:03Z
 ▶ ۱. هر مهاجرت فایل بازگشت جفت‌شده دارد
   ✓ 0001_baseline.sql → 0001_baseline.rollback.sql
   ✓ 0002_security_hardening.sql → 0002_security_hardening.rollback.sql
   ✓ 0003_share_tokens.sql → 0003_share_tokens.rollback.sql
   ✓ 0004_project_versions.sql → 0004_project_versions.rollback.sql
+  ✓ 0005_user_credentials.sql → 0005_user_credentials.rollback.sql
   ✓ شماره‌گذاری مهاجرت‌ها پیوسته است
   ✓ SCHEMA_VERSION با آخرین مهاجرت هم‌خوان است
 
@@ -32,12 +33,19 @@
   ✓ اجرای دوباره مهاجرت‌ها موفق است
   ✓ ساختار بازسازی‌شده با ساختار پیش از بازگشت یکسان است
 
+▶ ۶-ب. بازگشت ۰۰۰۵ با حسابِ بدون شماره متوقف می‌شود (نه حذف داده)
+  ✓ حساب بدون شماره ⇒ بازگشت ۰۰۰۵ با پیام روشن متوقف می‌شود
+  ✓ پس از تلاش ناموفق، ستون‌های اعتبارسنجی دست‌نخورده‌اند
+  ✓ با حذف حساب بدون شماره، بازگشت ۰۰۰۵ کامل می‌شود
+
 ▶ ۷. بازگشت مهاجرت‌های شماره‌دار هم اجرا می‌شود و قابل بازاعمال است
   ✓ 0004_project_versions: ردیف دفتر حذف شد
   ✓ 0003_share_tokens: ردیف دفتر حذف شد
   ✓ 0002_security_hardening: ردیف دفتر حذف شد
   ✓ ۰۰۰۲–۰۰۰۴ جدول‌های افزوده را واقعاً حذف کردند
   ✓ ستون projects.version با بازگشت ۰۰۰۴ حذف شد
+  ✓ ستون users.username با بازگشت ۰۰۰۵ حذف شد
+  ✓ بازگشت ۰۰۰۵ شماره موبایل را دوباره اجباری کرد
   ✓ ستون attempts به text بازگشت
   ✓ پیش‌فرض is_public به true بازگشت (فقط ساختار)
   ✓ بازاعمال ۰۰۰۲–۰۰۰۴ موفق است
@@ -46,4 +54,4 @@
   ✓ پس از بازاعمال، پیش‌فرض خصوصی است
   ✓ ساختار نهایی با ساختار اولیه یکسان است
 
-✔ 33 بررسی ایمنی مهاجرت — همه موفق
+✔ 39 بررسی ایمنی مهاجرت — همه موفق

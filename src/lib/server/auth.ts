@@ -47,8 +47,16 @@ export async function ensureGuestToken(): Promise<string> {
 
 export interface SessionUser {
   id: string;
-  phone: string;
+  /** Primary identity since 0005 — null only for legacy phone-only accounts. */
+  username: string | null;
+  /** Null for password-only accounts. */
+  phone: string | null;
   displayName: string | null;
+}
+
+/** The name to show in the UI: username first, then phone, then a generic label. */
+export function userLabel(user: Pick<SessionUser, "username" | "phone" | "displayName">): string {
+  return user.displayName?.trim() || user.username || user.phone || "کاربر";
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
@@ -57,7 +65,12 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   if (!token) return null;
   try {
     const rows = await db
-      .select({ id: users.id, phone: users.phone, displayName: users.displayName })
+      .select({
+        id: users.id,
+        username: users.username,
+        phone: users.phone,
+        displayName: users.displayName,
+      })
       .from(sessions)
       .innerJoin(users, eq(users.id, sessions.userId))
       .where(and(eq(sessions.token, token), gt(sessions.expiresAt, new Date())))

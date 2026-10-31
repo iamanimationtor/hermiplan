@@ -89,6 +89,52 @@ async function main(): Promise<void> {
   const xlsxOtherStamp = buildXlsx(sheets, new Date("2001-01-01T00:00:00Z"));
   check(Buffer.compare(Buffer.from(xlsx), Buffer.from(xlsxOtherStamp)) !== 0, "مهر زمانی واقعاً در آرشیو نوشته می‌شود");
 
+  /* Workbook validity: Excel is not forgiving about spelling.
+   *
+   * The sheet markup must use the element names from the SpreadsheetML schema
+   * (`<row>`, not `<Row>`): a capitalised tag makes Excel report a damaged file
+   * and offer to "repair" it, which silently drops styling. This caught a real
+   * bug — every sheet was written with `<Row>` — so the rule is asserted on
+   * every worksheet, not just one. */
+  const sheetXmls = xlsxZip
+    .filter((entry) => /^xl\/worksheets\/sheet\d+\.xml$/.test(entry.name))
+    .map((entry) => ({ name: entry.name, xml: entry.data.toString("utf8") }));
+  const wrongCase = sheetXmls.flatMap(({ name, xml }) => {
+    const bad = [...xml.matchAll(/<(\/?)([A-Z][A-Za-z]*)[\s>/]/g)].map((match) => `${match[1]}${match[2]}`);
+    return bad.length ? [`${name}: ${[...new Set(bad)].join(",")}`] : [];
+  });
+  check(wrongCase.length === 0, "برگه‌ها فقط از نام‌های استاندارد SpreadsheetML استفاده می‌کنند (row نه Row)", wrongCase.join(" · "));
+  check(
+    sheetXmls.every(({ xml }) => /<row r="1"/.test(xml)),
+    "هر برگه سطر داده واقعی <row> دارد",
+  );
+  const rels = xlsxZip.find((entry) => entry.name === "xl/_rels/workbook.xml.rels")?.data.toString("utf8") ?? "";
+  const relTargets = [...rels.matchAll(/Target="(worksheets\/sheet\d+\.xml)"/g)].map((match) => `xl/${match[1]}`);
+  check(
+    relTargets.length === sheets.length && relTargets.every((target) => xlsxNames.includes(target)),
+    "هر شیت اعلام‌شده در rels، فایل واقعی دارد",
+    `${relTargets.length} هدف`,
+  );
+  const contentTypes = xlsxZip.find((entry) => entry.name === "[Content_Types].xml")?.data.toString("utf8") ?? "";
+  check(
+    worksheetFiles.every((file) => contentTypes.includes(`/${file}`)),
+    "همه برگه‌ها در [Content_Types].xml معرفی شده‌اند",
+  );
+  check(
+    sheetXmls.every(({ xml }) => /rightToLeft="1"/.test(xml) && /state="frozen"/.test(xml)),
+    "هر برگه راست‌به‌چپ است و سطر سربرگ ثابت شده",
+  );
+  check(
+    sheetXmls.every(({ xml }) => /<autoFilter /.test(xml)),
+    "هر برگه فیلتر روی سربرگ دارد",
+  );
+  const stylesXml = xlsxZip.find((entry) => entry.name === "xl/styles.xml")?.data.toString("utf8") ?? "";
+  check(/<numFmt /.test(stylesXml) || /numFmtId="\d+"/.test(stylesXml), "قالب عددی (جداکننده هزارگان) تعریف شده است");
+  check(
+    sheetXmls.some(({ xml }) => /<c r="[A-Z]+\d+"(?: s="\d+")?><v>-?\d/.test(xml)),
+    "دست‌کم بخشی از اعداد به‌صورت عددی ذخیره شده‌اند (نه متن)",
+  );
+
   // The workbook must carry the sections a reader expects to find.
   for (const required of ["Info", "Activities", "Milestones", "Resources", "Costs", "Pricing", "CostSummary", "Standards"]) {
     check(declaredSheets.includes(required), `شیت «${required}» موجود است`);

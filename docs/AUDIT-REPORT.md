@@ -200,14 +200,15 @@
 
 | مورد | جزئیات |
 | --- | --- |
-| فایل‌ها | `drizzle/0001_baseline.sql`، `0002_security_hardening.sql`، `0003_share_tokens.sql`، `0004_project_versions.sql` — هر چهار فایل با `*.rollback.sql` جفت‌شده |
+| فایل‌ها | `drizzle/0001_baseline.sql`، `0002_security_hardening.sql`، `0003_share_tokens.sql`، `0004_project_versions.sql`، `0005_user_credentials.sql` — هر پنج فایل با `*.rollback.sql` جفت‌شده |
 | اجراکننده | `scripts/migrate.ts` (`npm run db:migrate`)، دفتر `_hermiplan_migrations` (نام، checksum، زمان) |
 | حالت‌ها | `--status` فهرست اعمال‌شده/باقی‌مانده، `--dry-run` چاپ SQL بدون اجرا، تشخیص تغییر در فایل اعمال‌شده |
 | ویژگی | همه دستورات `IF NOT EXISTS`/`ADD COLUMN IF NOT EXISTS`؛ هیچ `DROP`/`RENAME`/`TRUNCATE` در مسیر ارتقا نیست |
-| آزمون واقعی | پایگاه خالی ⇒ `0001`–`0004` اعمال شد؛ اجرای دوباره بی‌اثر («Nothing to do»)؛ دست‌کاری checksum رد شد؛ بازگشت ۰۰۰۴+۰۰۰۳+۰۰۰۲ و سپس اعمال مجدد بدون خطا (`migration-safety.txt` ۳۳ بررسی)؛ مهاجرت پایگاه نسخه قبل بدون از دست رفتن داده (`legacy-db.txt`: ۲+۳۱ و rollback ۹) |
+| آزمون واقعی | پایگاه خالی ⇒ `0001`–`0005` اعمال شد؛ اجرای دوباره بی‌اثر («Nothing to do»)؛ دست‌کاری checksum رد شد؛ بازگشت کامل و اعمال مجدد بدون خطا (`migration-safety.txt` **۳۹ بررسی**، شامل توقفِ امن بازگشت ۰۰۰۵ وقتی حساب بدون شماره وجود دارد)؛ مهاجرت پایگاه نسخه قبل بدون از دست رفتن داده (`legacy-db.txt`: ۲+۳۱ و rollback ۹) |
 | جداول | `projects`, `users`, `sessions`, `otp_codes`, `project_events`, `rate_limits`, `project_share_tokens`, `project_versions`, `_hermiplan_migrations` |
+| حساب‌ها (`0005`) | `users.username` (یکتا روی `lower(username)`، جزئی) + `users.password_hash` (`scrypt$N$r$p$salt$hash`)، `users.phone` اکنون nullable؛ قید `users_identity_present` تضمین می‌کند هر حساب دست‌کم یک راه ورود داشته باشد |
 | نسخه‌گذاری | ستون `projects.version` (پیش‌فرض ۱) + جدول `project_versions` با قید یکتای `(project_id, version)`، ایندکس `(project_id, created_at DESC)` و `ON DELETE CASCADE` |
-| کشف استقرار ناقص | `/api/health` در نبود هر یک از این جداول **۵۰۳ + `missingTables`** برمی‌گرداند |
+| کشف استقرار ناقص | `/api/health` در نبود هر یک از این جداول **۵۰۳ + `missingTables`** برمی‌گرداند؛ از این نسخه **ستون‌ها** هم بررسی می‌شوند (`projects.version`، `users.username`، `users.password_hash`) و در نبودشان `missingColumns` گزارش می‌شود |
 | ساختار آماده برای فاز بعد | در `docs` و `schema` فقط الگوی مالکیت/رخداد اضافه شد؛ جداول Company/ProjectMember/Role و… **عمداً ساخته نشدند** (بدون نیاز فعلی) |
 | مهاجرت production | **اجرا نشد و بدون تأیید شما اجرا نخواهد شد** |
 
@@ -219,21 +220,24 @@
 | --- | --- |
 | `npm run typecheck` | ✅ بدون خطا |
 | `npm run lint` | ✅ ۰ خطا / ۰ هشدار |
-| `npm test` | ✅ ۱۱ از ۱۱ مجموعه (با `DATABASE_URL` و بدون آن یکسان) |
+| `npm test` | ✅ ۱۲ از ۱۲ مجموعه (با `DATABASE_URL` و بدون آن یکسان) |
 | ├ `scripts/version-diff-check.ts` | ✅ ۴۱ بررسی خالص مقایسه نسخه‌ها (افزوده/حذف‌شده/تغییر، ترتیب پایدار، پوشش کامل فیلدها) |
 | ├ `scripts/engine-verification.ts` | ✅ ۸۱ بررسی مستقل |
 | ├ `scripts/engine-regressions.ts` | ✅ ۱۹۱ بررسی در ۱۵ بخش: FNLT، MSO، Milestone، Baseline، پیشرفت مقداری/مالی، EVM، تاریخ افزایش هزینه و فراداده نرخ، مدت/چرخه، چهار رابطه، فراخوانی مستقیم، تاریخ وضعیت، راه‌حل تشخیص‌ها، خروجی گزارش HTML، **سیاست گرد کردن پول** |
 | ├ `scripts/engine-smoke.ts` | ✅ ✅ ALL ENGINE CHECKS PASSED |
 | ├ `scripts/edge-case-audit.ts` | ✅ ✅ EDGE-CASE AUDIT PASSED (شامل `NaN`/`Infinity` در هر ۵ مسیر خروجی) |
 | ├ `scripts/security-checks.ts` | ✅ ۲۹۱ بررسی (شامل قاعده‌های خالص تاریخچه: checksum متعارف، بودجه هرس، برچسب علت) |
-| ├ `scripts/access-mode-check.ts` | ✅ ۵۱ بررسی قاعدهٔ حالت دسترسی (فایل معتبر/نامعتبر، پروفایل `open`/`locked`، هرگز برداشته نشدن سهمیه‌های امنیتی، و **هر پیشوند کلید سهمیه در کد مسیرها** با فهرست محصول/امنیت هم‌خوان) |
+| ├ `scripts/password-check.ts` | ✅ ۴۵ بررسی رمز عبور و نام کاربری (هش scrypt، نمک، هش خراب، سیاست‌ها، نرمال‌سازی ارقام فارسی) |
+| ├ `scripts/access-mode-check.ts` | ✅ ۵۲ بررسی قاعدهٔ حالت دسترسی (فایل معتبر/نامعتبر، پروفایل `open`/`locked`، هرگز برداشته نشدن سهمیه‌های امنیتی، و **هر پیشوند کلید سهمیه در کد مسیرها** با فهرست محصول/امنیت هم‌خوان) |
 | ├ `scripts/project-file-check.ts` | ✅ ۳۱ بررسی رفت‌وبرگشت فایل پشتیبان پروژه |
 | ├ `scripts/import-parser.test.ts` | ✅ ✅ IMPORT PARSER: ALL CHECKS PASSED |
 | └ `scripts/template-regression.ts` | ✅ ALL 10 TEMPLATES CLEAN (۲۱/۱۵۸/۱۹، ۱۴/۱۷۱/۱۴، ۱۳/۹۸/۱۱، ۱۱/۹۸/۱۱، ۱۵/۹۲/۱۴، ۱۱/۹۴/۱۰، ۱۳/۱۲۶/۱۳، ۱۱/۵۳/۹، ۱۱/۸۴/۱۱، ۱۰/۳۷/۱۰ و بودجه‌های متناظر بدون تغییر) |
-| `npm run test:access` | ✅ ۵۱ بررسی؛ `npm run access:status` ⇒ `open` از `config/access.json`، سقف لینک ۱۰۰٬۰۰۰، تاریخچه ۱۰۰/۳۲MB |
+| `npm run test:access` | ✅ ۵۲ بررسی؛ `npm run access:status` ⇒ `open` از `config/access.json`، سقف لینک ۱۰۰٬۰۰۰، تاریخچه ۱۰۰/۳۲MB |
 | `npm run build` | ✅ Next.js 16.2.6 — ۲۰ مسیر (تاریخچه، بازگردانی و مقایسه)؛ `/` و `/builder` پویا (برای nonce هر درخواست) |
-| `npm run test:api` (سرور تولیدی + PostgreSQL واقعی ۱۸٫۶) | ✅ **۱۹۲ موفق / ۰ ناموفق / ۶ نادیده** در حالت `locked` و **۱۹۰ / ۰ / ۷** در حالت `open` (نادیده‌ها: ۶ مسیر OTP که در production بسته است + ۱ ادعای «به‌ازای هر IP» که در `open` سنجیدنی نیست) |
-| `npm run test:api` با `HERMIPLAN_ALLOW_DEMO_OTP=1` روی `next dev` | ✅ **۱۹۶ موفق / ۰ ناموفق / ۰ نادیده** |
+| `npm run test:api` (سرور تولیدی + PostgreSQL واقعی ۱۸٫۶) | ✅ **۲۲۳ موفق / ۰ ناموفق / ۶ نادیده** در حالت `locked` و **۲۲۱ / ۰ / ۷** در حالت `open` (نادیده‌ها: ۶ مسیر OTP که در production بسته است + ۱ ادعای «به‌ازای هر IP» که در `open` سنجیدنی نیست) |
+| `npm run test:journey` (سفر کامل تا خروجی) | ✅ **۷۹ بررسی**: ثبت‌نام، تعریف پروژه، ویرایش/تاریخچه، و باز کردن واقعی هر ۷ فرمت (XLSX پارس‌شده، CSV سطر‌شماری، MSPDI با UID یکتا و `PT#H#M#S`، سند چاپی بدون منبع بیرونی، ZIP با CRC) + اشتراک + حذف |
+| `npm run test:password` | ✅ ۴۵ بررسی خالص رمز/نام کاربری |
+| `npm run test:api` با `HERMIPLAN_ALLOW_DEMO_OTP=1` روی `next dev` | ✅ **۲۲۸ موفق / ۰ ناموفق / ۰ نادیده** |
 | `npm run db:migrate` روی پایگاه خالی | ✅ `0001`–`0004` اعمال شد؛ اجرای دوباره بی‌اثر |
 | بررسی حالت production (`next start`) | ✅ `/api/auth` ⇒ ۵۰۳ بدون افشای کد؛ `/api/health` ⇒ `{ok:true, schemaVersion:4, database:"ok", rateLimitStore:"postgres", shareLinks:"postgres", revisionHistory:"postgres", access:{mode:"open", source:"config", shareLinkCap:100000, history:{count:100, bytes:33554432}}}` (و در نبود مهاجرت، ۵۰۳ با `missingTables`)؛ `/` و `/builder` ⇒ ۲۰۰ |
 | `npm ci` (اجرای واقعی، از صفر) | ✅ `added 406 packages` و `EXIT=0` — قفل و `package.json` هم‌خوان |
@@ -241,7 +245,7 @@
 | `npm run test:db:integrity` | ✅ **۲۰ بررسی** (`db-integrity.txt`؛ §۵ تازه: یکتایی نسخه، ۲۴ نویسنده هم‌زمان، آبشار تاریخچه) |
 | `npm run db:share-audit` | ✅ فهرست لینک‌های فعال + علامت‌خوردن پروژه «منتشرشده پیش از ۰۰۰۳» (`share-audit.txt`) |
 | `scripts/legacy-db-check.ts` (سناریوی پایگاه نسخه قبل) | ✅ prepare: ۲ · مهاجرت: **۳۱ بررسی** · rollback ۰۰۰۴+۰۰۰۳+۰۰۰۲: بدون خطا · verify-rollback: **۹ بررسی** · اعمال مجدد: موفق — بدون از دست رفتن هیچ ردیف |
-| `npm run db:migration-safety` (پایگاه دورانداختنی) | ✅ **۳۳ بررسی**: جفت rollback، idempotency، drift، قفل بازگشت پایه، بازگشت کامل و بازسازی هم‌ساختار، حذف واقعی جدول/ستون‌های افزوده در بازگشت، و **پیوستگی شماره مهاجرت‌ها + هم‌خوانی `SCHEMA_VERSION` با آخرین فایل** |
+| `npm run db:migration-safety` (پایگاه دورانداختنی) | ✅ **۳۹ بررسی**: جفت rollback، idempotency، drift، قفل بازگشت پایه، بازگشت کامل و بازسازی هم‌ساختار، حذف واقعی جدول/ستون‌های افزوده در بازگشت، و **پیوستگی شماره مهاجرت‌ها + هم‌خوانی `SCHEMA_VERSION` با آخرین فایل** |
 | `production-smoke` روی `next start` | ✅ health ok، `/` و `/builder` ۲۰۰، گزارش ناشناس ۴۰۴، ورود بدون پیامک ۵۰۳، هدرهای امنیتی حاضر |
 
 سناریوهای یکپارچگی اجراشده (`api`، ۱۹۲ بررسی + ۶ نادیده در `locked`؛ ۱۹۰ + ۷ در `open`): ساخت پروژه و مالکیت، جداسازی مستأجر و
@@ -267,6 +271,7 @@
 
 | کنترل | وضعیت | شاهد |
 | --- | --- | --- |
+| احراز هویت با نام کاربری و رمز عبور: هش scrypt با نمک و پارامترهای همراه، مقایسهٔ زمان‌ثابت، یکتایی نام کاربری روی `lower(username)`، پیام و زمان یکسان برای «رمز غلط»/«کاربر ناشناس»، سقف ۱۰ تلاش/۱۵دقیقه برای هر نام کاربری | ✅ | `src/lib/server/password.ts`, `src/lib/server/accounts.ts`, `drizzle/0005`, `password-check` (۴۵), `api` §۶-ب (۲۵) |
 | احراز هویت با OTP واقعی (CSPRNG، هش، انقضا، تلاش محدود، مصرف اتمیک) | ✅ | `security` §۲، `api` §۶ |
 | نبود سرویس پیامک ⇒ ۵۰۳ (بدون کد، بدون ردیف در پایگاه) | ✅ | اجرای دستی روی build تولیدی + `api` |
 | حالت دمو فقط خارج از production و با فعال‌سازی صریح | ✅ | `security` §۳ |

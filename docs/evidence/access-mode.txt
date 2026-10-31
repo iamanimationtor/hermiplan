@@ -1,33 +1,22 @@
-# access mode — 2026-10-31T16:35:57Z
+# access mode — 2026-10-31T17:02:03Z
 $ cat config/access.json
 {
-  "mode": "open",
+  "mode": "locked",
   "updatedAt": "2026-10-31",
-  "note": "پیش از انتشار عمومی: همهٔ امکانات برای همه، بدون سهمیهٔ محصول و بدون سقف لینک اشتراک. برای تحویل واقعی: npm run access:locked و پس از آن build."
+  "note": "تحویل واقعی: محدودیت‌های مستندشده فعال است (سهمیهٔ هر endpoint و سقف ۱۰ لینک اشتراک)."
 }
 
 $ npm run access:status
-حالت فعال: open  (منبع: config/access.json)
-سقف لینک فعال هر پروژه: ۱۰۰٬۰۰۰
-تاریخچهٔ هر پروژه: 100 نسخه / 32 مگابایت
+حالت فعال: locked  (منبع: config/access.json)
+سقف لینک فعال هر پروژه: ۱۰
+تاریخچهٔ هر پروژه: 20 نسخه / 8 مگابایت
 
-سهمیه‌های محصول برداشته شده‌اند: analyze, export, projects, projectRead, projectsList, shareCreate, shareRevoke, shareRead, versionRead, versionRestore
-سهمیه‌های امنیتی همچنان فعال‌اند: auth (ورود) · otpRequest (درخواست کد) · otpVerify (بررسی کد)
-یادآوری: این حالت هیچ سهمیه‌ای برای ساخت پروژه، خروجی و لینک اشتراک اعمال نمی‌کند.
+همهٔ سهمیه‌های مستندشده (README → محدودیت نرخ) فعال هستند.
 
 آخرین تغییر فایل: 2026-10-31
-یادداشت: پیش از انتشار عمومی: همهٔ امکانات برای همه، بدون سهمیهٔ محصول و بدون سقف لینک اشتراک. برای تحویل واقعی: npm run access:locked و پس از آن build.
+یادداشت: تحویل واقعی: محدودیت‌های مستندشده فعال است (سهمیهٔ هر endpoint و سقف ۱۰ لینک اشتراک).
 
 $ npm run test:access
-
-> test:access
-> tsx scripts/access-mode-check.ts
-
-▶ ۱. فایل سوئیچ
-  ✓ config/access.json یک JSON معتبر است
-  ✓ مقدار mode یکی از حالت‌های شناخته‌شده است
-
-▶ ۲. حالت locked (تحویل واقعی)
   ✓ پروفایل locked
   ✓ سقف لینک اشتراک ۱۰ است
   ✓ تاریخچه ۲۰ نسخه / ۸MB
@@ -73,6 +62,7 @@ $ npm run test:access
   ✓ سد امنیتی «auth» واقعاً استفاده شده و در فهرست محصول نیست
   ✓ سد امنیتی «otp» واقعاً استفاده شده و در فهرست محصول نیست
   ✓ سهمیه‌های بیرونی (market) در فهرست محصول نیستند
+  ✓ کلید سهمیه هیچ فراخوانی‌ای را درون خود جای نمی‌دهد (await فراموش‌شده ⇒ باکت مشترک)
 
 ▶ ۶. مقدار نامعتبر نباید بی‌صدا «باز» شود
   ✓ «open» پذیرفته می‌شود
@@ -86,27 +76,15 @@ $ npm run test:access
   ✓ مقدار نامعتبر {} ⇒ locked
   ✓ مقدار نامعتبر "unlimited" ⇒ locked
 
-✔ 51 بررسی حالت دسترسی — همه موفق
+✔ 52 بررسی حالت دسترسی — همه موفق
 
-$ curl -s :3400/api/health (config → open)
-{"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"config","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
+$ curl -s :3400/api/health (config → locked)
+{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
 
-$ curl -s :3410/api/health (HERMIPLAN_ACCESS_MODE=locked, same build)
-{"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"env","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
+$ curl -s :3410/api/health (HERMIPLAN_ACCESS_MODE=open, same build)
+{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"env","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
 
-$ curl -s :3400/builder | grep "بدون سهمیه" (badge shown only in open)
-1
-$ curl -s :3410/builder | grep "بدون سهمیه"
+$ curl -s :3400/builder | grep -c "بدون سهمیه"  (badge hidden in locked)
 0
-
-## round-trip: locked → open (file only; build needed to apply)
-$ npm run access:locked
-✓ config/access.json روی «locked» تنظیم شد.
-$ npm run access:open
-✓ config/access.json روی «open» تنظیم شد.
-$ cat config/access.json
-{
-  "mode": "open",
-  "updatedAt": "2026-10-31",
-  "note": "پیش از انتشار عمومی: همهٔ امکانات برای همه، بدون سهمیهٔ محصول و بدون سقف لینک اشتراک. برای تحویل واقعی: npm run access:locked و پس از آن build."
-}
+$ curl -s :3410/builder | grep -c "بدون سهمیه"  (badge shown in open)
+1

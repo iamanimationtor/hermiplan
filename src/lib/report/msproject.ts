@@ -23,9 +23,14 @@ function dateTime(iso: string, hour = 8): string {
   return `${iso}T${String(hour).padStart(2, "0")}:00:00`;
 }
 
+/**
+ * ISO-8601 duration in the exact shape MS Project itself writes (`PT8H0M0S`).
+ * The short form `PT8H` is legal ISO-8601, but several importers (and MS
+ * Project's own schema validation) expect the full hour/minute/second triple.
+ */
 function duration(days: number, hoursPerDay: number): string {
   const hours = Math.max(0, Math.round(days * hoursPerDay));
-  return `PT${hours}H`;
+  return `PT${hours}H0M0S`;
 }
 
 export function buildMsProjectXml(input: ProjectInput, analysis: ProjectAnalysis): string {
@@ -52,6 +57,7 @@ export function buildMsProjectXml(input: ProjectInput, analysis: ProjectAnalysis
     totalSlack: number;
     freeSlack: number;
     milestone: boolean;
+    cost: number;
     links: { uid: number; type: number; lag: number }[];
   }[] = [];
 
@@ -76,6 +82,7 @@ export function buildMsProjectXml(input: ProjectInput, analysis: ProjectAnalysis
       totalSlack: 0,
       freeSlack: 0,
       milestone: false,
+      cost: 0,
       links: [],
     });
 
@@ -98,6 +105,7 @@ export function buildMsProjectXml(input: ProjectInput, analysis: ProjectAnalysis
           totalSlack: activity.totalFloat,
           freeSlack: activity.freeFloat,
           milestone: activity.milestone,
+          cost: activityById.get(activity.id)?.budgetCost ?? 0,
           links: [],
         });
       });
@@ -149,6 +157,7 @@ export function buildMsProjectXml(input: ProjectInput, analysis: ProjectAnalysis
         <PercentComplete>${Math.round(row.progress)}</PercentComplete>
         <Milestone>${row.milestone ? 1 : 0}</Milestone>
         <Critical>${row.critical ? 1 : 0}</Critical>
+        <Cost>${row.cost}</Cost>
         <TotalSlack>${Math.round(row.totalSlack * hours * 60)}</TotalSlack>
         <FreeSlack>${Math.round(row.freeSlack * hours * 60)}</FreeSlack>
         <Active>1</Active>

@@ -35,12 +35,12 @@ function buildSheet(sheet: Sheet, index: number): string {
   const rows: string[] = [];
 
   rows.push(
-    `<Row r="1">${sheet.headers
+    `<row r="1">${sheet.headers
       .map(
         (header, i) =>
           `<c r="${columnName(i)}1" s="1" t="inlineStr"><is><t xml:space="preserve">${xml(header)}</t></is></c>`,
       )
-      .join("")}</Row>`,
+      .join("")}</row>`,
   );
 
   sheet.rows.forEach((row, rowIndex) => {
@@ -54,7 +54,7 @@ function buildSheet(sheet: Sheet, index: number): string {
         return `<c r="${ref}" s="2" t="inlineStr"><is><t xml:space="preserve">${xml(String(cell ?? ""))}</t></is></c>`;
       })
       .join("");
-    rows.push(`<Row r="${r}">${cells}</Row>`);
+    rows.push(`<row r="${r}">${cells}</row>`);
   });
 
   const cols = Array.from({ length: columns }, (_, i) => {

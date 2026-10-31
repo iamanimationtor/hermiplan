@@ -27,6 +27,21 @@ const REQUIRED_TABLES = [
   "project_versions",
 ];
 
+/**
+ * Columns a *fully* migrated database must have.
+ *
+ * Tables are not enough: `0004`/`0005` add columns to existing tables, so a
+ * database migrated only through `0003` has every table and still breaks on
+ * the first save (no `projects.version`) or the first sign-in (no
+ * `users.password_hash`). Reporting that here turns a confusing 500 into a
+ * deployment instruction.
+ */
+const REQUIRED_COLUMNS: { table: string; column: string }[] = [
+  { table: "projects", column: "version" },
+  { table: "users", column: "username" },
+  { table: "users", column: "password_hash" },
+];
+
 export async function GET() {
   try {
     await db.execute(sql`select 1`);
@@ -43,13 +58,28 @@ export async function GET() {
     const found = new Set(rows.map((row) => row.table_name));
     const missing = REQUIRED_TABLES.filter((table) => !found.has(table));
 
-    if (missing.length > 0) {
+    const presentColumns = await db.execute<{ table_name: string; column_name: string }>(sql`
+      SELECT table_name, column_name
+        FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name IN ('projects', 'users')
+    `);
+    const columnRows = (presentColumns as unknown as { rows?: { table_name: string; column_name: string }[] }).rows ?? [];
+    const foundColumns = new Set(columnRows.map((row) => `${row.table_name}.${row.column_name}`));
+    const missingColumns = missing.length
+      ? []
+      : REQUIRED_COLUMNS.filter(({ table, column }) => !foundColumns.has(`${table}.${column}`)).map(
+          ({ table, column }) => `${table}.${column}`,
+        );
+
+    if (missing.length > 0 || missingColumns.length > 0) {
       return Response.json(
         {
           ok: false,
           schemaVersion: SCHEMA_VERSION,
           database: "ok",
           missingTables: missing,
+          missingColumns,
           message: "مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید",
         },
         { status: 503, headers: { "Cache-Control": "no-store" } },

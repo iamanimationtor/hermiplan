@@ -179,12 +179,23 @@ export async function claimGuestProjects(userId: string, guestToken: string | nu
   }
 }
 
-export async function findOrCreateUser(phone: string): Promise<{ id: string; phone: string; displayName: string | null }> {
-  const existing = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
+export async function findOrCreateUser(phone: string): Promise<{
+  id: string;
+  username: string | null;
+  phone: string | null;
+  displayName: string | null;
+}> {
+  const pick = {
+    id: users.id,
+    username: users.username,
+    phone: users.phone,
+    displayName: users.displayName,
+  };
+  const existing = await db.select(pick).from(users).where(eq(users.phone, phone)).limit(1);
   if (existing[0]) {
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, existing[0].id));
     return existing[0];
   }
-  const inserted = await db.insert(users).values({ phone, lastLoginAt: new Date() }).returning();
+  const inserted = await db.insert(users).values({ phone, lastLoginAt: new Date() }).returning(pick);
   return inserted[0];
 }

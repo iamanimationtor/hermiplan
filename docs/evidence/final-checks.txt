@@ -1,25 +1,25 @@
-# final checks (a11y, export, layout, versions, project file, bundle, access) — 2026-10-31T16:36:34Z
-## npm run test:access
-  ✓ مقدار نامعتبر "unlimited" ⇒ locked
+# final checks (a11y, export, layout, versions, project file, bundle, journey) — 2026-10-31T17:01:51Z
+## a11y
 
-✔ 51 بررسی حالت دسترسی — همه موفق
-## npm run test:a11y
 ✔ 32 بررسی دسترس‌پذیری/موبایل — همه موفق
   تحلیل ایستای HTML سرو‌شده است، نه اجرای axe در مرورگر.
-## npm run test:export
+## export
 
-✔ 72 موفق / 0 ناموفق
-## npm run test:layout
+✔ 80 موفق / 0 ناموفق
+## layout
 ✔ 24 بررسی چیدمان/رندر — همه موفق
   این جایگزین آزمون مرورگری نیست: چیدمان CSS واقعی هنوز در مرورگر دیده نشده است.
-## npm run test:versions
+## versions
 
 ✔ 41 بررسی تفاوت نسخه‌ها — همه موفق
-## npm run test:project-file
+## project file
 
 ✔ 31 بررسی فایل پروژه — همه موفق
-## npm run test:bundle
+## bundle
 
 ✔ 6 مسیر در بودجه‌ی تعیین‌شده هستند.
-## bash scripts/csp-real-routes.sh
+## csp real routes
 ✔ 78 بررسی CSP — همه موفق
+## access mode
+
+✔ 52 بررسی حالت دسترسی — همه موفق

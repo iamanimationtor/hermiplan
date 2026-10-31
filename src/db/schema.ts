@@ -52,9 +52,24 @@ export const projects = pgTable(
   ],
 );
 
+/**
+ * Accounts.
+ *
+ * Two ways to exist: a **username + password** account (the default since
+ * `0005_user_credentials`) or a legacy phone-only account created by the SMS
+ * flow. `phone` is therefore nullable, and the pair of columns below is what
+ * makes sign-in possible.
+ *
+ * `username` is stored lower-case and unique through a *partial* index on
+ * `lower(username)` — `Ali` and `ali` are the same account, and password-only
+ * rows (all with `phone = null`) never collide on the phone unique constraint.
+ */
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  phone: text("phone").notNull().unique(),
+  phone: text("phone").unique(),
+  username: text("username"),
+  /** `scrypt$N$r$p$salt$hash` — parameters travel with the digest. */
+  passwordHash: text("password_hash"),
   displayName: text("display_name"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
@@ -194,5 +209,5 @@ export const rateLimits = pgTable(
  * Schema revision understood by this code base. Bumped whenever a migration is
  * required; the health endpoint exposes it for deployment verification.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 export const schemaVersion = sql`4`;

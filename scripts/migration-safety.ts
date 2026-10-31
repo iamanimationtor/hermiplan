@@ -167,6 +167,37 @@ async function main(): Promise<void> {
     const afterRebuild = await snapshot();
     check(afterRebuild === beforeRollback, "ساختار بازسازی‌شده با ساختار پیش از بازگشت یکسان است");
 
+    console.log("\n▶ ۶-ب. بازگشت ۰۰۰۵ با حسابِ بدون شماره متوقف می‌شود (نه حذف داده)");
+    await client.query(
+      "insert into users (username, password_hash) values ('rollbackprobe', 'scrypt$32768$8$1$x$y')",
+    );
+    let guardMessage = "";
+    try {
+      await client.query(readFileSync(join(dir, "0005_user_credentials.rollback.sql"), "utf8"));
+    } catch (error) {
+      guardMessage = error instanceof Error ? error.message : String(error);
+      await client.query("ROLLBACK").catch(() => undefined);
+    }
+    check(
+      /rollback 0005 aborted/.test(guardMessage),
+      "حساب بدون شماره ⇒ بازگشت ۰۰۰۵ با پیام روشن متوقف می‌شود",
+      guardMessage.split("\n")[0],
+    );
+    const credentialColumns = await client.query<{ count: string }>(
+      "select count(*) from information_schema.columns where table_schema='public' and table_name='users' and column_name in ('username','password_hash')",
+    );
+    check(Number(credentialColumns.rows[0]?.count) === 2, "پس از تلاش ناموفق، ستون‌های اعتبارسنجی دست‌نخورده‌اند");
+    await client.query("delete from users where username = 'rollbackprobe'");
+    const cleanRollback = readFileSync(join(dir, "0005_user_credentials.rollback.sql"), "utf8");
+    let cleanError = "";
+    try {
+      await client.query(cleanRollback);
+    } catch (error) {
+      cleanError = error instanceof Error ? error.message : String(error);
+      await client.query("ROLLBACK").catch(() => undefined);
+    }
+    check(cleanError === "", "با حذف حساب بدون شماره، بازگشت ۰۰۰۵ کامل می‌شود", cleanError.split("\n")[0]);
+
     console.log("\n▶ ۷. بازگشت مهاجرت‌های شماره‌دار هم اجرا می‌شود و قابل بازاعمال است");
     for (const version of ["0004_project_versions", "0003_share_tokens", "0002_security_hardening"]) {
       await client.query(readFileSync(join(dir, `${version}.rollback.sql`), "utf8"));
@@ -181,6 +212,14 @@ async function main(): Promise<void> {
       "select 1 from information_schema.columns where table_schema='public' and table_name='projects' and column_name='version'",
     );
     check(versionColumn.rowCount === 0, "ستون projects.version با بازگشت ۰۰۰۴ حذف شد");
+    const usernameColumn = await client.query(
+      "select 1 from information_schema.columns where table_schema='public' and table_name='users' and column_name='username'",
+    );
+    check(usernameColumn.rowCount === 0, "ستون users.username با بازگشت ۰۰۰۵ حذف شد");
+    const phoneNullable = await client.query<{ is_nullable: string }>(
+      "select is_nullable from information_schema.columns where table_schema='public' and table_name='users' and column_name='phone'",
+    );
+    check(phoneNullable.rows[0]?.is_nullable === "NO", "بازگشت ۰۰۰۵ شماره موبایل را دوباره اجباری کرد", phoneNullable.rows[0]?.is_nullable);
     const otpType = await client.query<{ data_type: string }>(
       "select data_type from information_schema.columns where table_schema='public' and table_name='otp_codes' and column_name='attempts'",
     );

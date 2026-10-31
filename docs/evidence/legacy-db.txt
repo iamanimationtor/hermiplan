@@ -1,34 +1,22 @@
-# legacy database compatibility — 2026-10-31T16:17:10Z
-fresh database hermiplan_legacy15 · prepare → migrate → verify → rollback → verify-rollback
+# legacy database cycle (previous release schema → 0005 → rollback) — 2026-10-31T17:02:13Z
 
-$ prepare
+## prepare
 ▶ ساخت پایگاه داده نسخه قبلی (legacy) و درج داده‌های موجود
   ✓ پایگاه داده برای سناریوی مهاجرت خالی است
   وضعیت اولیه: {"projects":2,"users":1,"otps":1}
   ✓ نسخه قبل: پیش‌فرض is_public برابر true است
 
 ✔ مرحله «prepare» با 2 بررسی موفق
-$ db:migrate
-Database: 127.0.0.1:5544/hermiplan_legacy15
-  → 0001_baseline (pending)
-  → 0002_security_hardening (pending)
-  → 0003_share_tokens (pending)
-  → 0004_project_versions (pending)
 
-▶ applying 0001_baseline
+## migrate
   ✓ applied
 
-▶ applying 0002_security_hardening
-  ✓ applied
-
-▶ applying 0003_share_tokens
-  ✓ applied
-
-▶ applying 0004_project_versions
+▶ applying 0005_user_credentials
   ✓ applied
 
 All migrations applied.
-$ verify
+
+## verify
 ▶ تأیید مهاجرت روی پایگاه داده نسخه قبل (بدون از دست رفتن داده)
   ✓ همه پروژه‌های قبلی باقی مانده‌اند
   ✓ کاربران باقی مانده‌اند
@@ -63,7 +51,8 @@ $ verify
   ✓ حذف پروژه، تاریخچه آن را هم پاک می‌کند (CASCADE)
 
 ✔ مرحله «verify» با 31 بررسی موفق
-$ rollback
+
+## rollback
 ▶ اجرای rollback رسمی 0004_project_versions.rollback.sql
   ✓ rollback اجرا شد
 ▶ اجرای rollback رسمی 0003_share_tokens.rollback.sql
@@ -72,7 +61,8 @@ $ rollback
   ✓ rollback اجرا شد
 
 ✔ مرحله «rollback» بدون خطا اجرا شد
-$ verify-rollback
+
+## verify-rollback
 ▶ تأیید rollback: اسکیمای قبلی بازگشت و داده‌ها سالم ماندند
   ✓ attempts به text بازگشت
   ✓ جدول rate_limits حذف شد

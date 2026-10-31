@@ -1,6 +1,8 @@
-# production smoke — 2026-10-31T16:36:34Z
+# production smoke — 2026-10-31T17:01:46Z
 $ curl -s http://127.0.0.1:3400/api/health
-{"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"config","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
+{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
+
+## pages
 /                                                    200
 /builder                                             200
 /robots.txt                                          200
@@ -8,13 +10,16 @@ $ curl -s http://127.0.0.1:3400/api/health
 /report/00000000-0000-4000-8000-000000000000         404
 /s/not-a-real-token                                  404
 
-$ curl -s -X POST /api/auth (no SMS provider)
-400
+## account flows on the production build
+POST /api/auth register (same-origin)          201  {"ok":true,"claimedProjects":0,"user":{"id":"93ad2e0f-a7f7-4736-b0dc-020ecd06d9ab","username":"smoke170146","phone":null,"displayName":null}}
+POST /api/auth login (wrong password)          401  {"error":"نام کاربری یا رمز عبور نادرست است"}
+POST /api/auth with foreign Origin             403
+POST /api/auth OTP request (no SMS provider)   503  {"error":"ورود با موبایل در این نصب فعال نیست: سرویس پیامک پیکربندی نشده است. استف�
 
-$ security headers on /
+## security headers on /
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 Referrer-Policy: strict-origin-when-cross-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=()
 Strict-Transport-Security: max-age=31536000; includeSubDomains
-content-security-policy: default-src 'self'; script-src 'self' 'nonce-MDMxMmU5ZTgtNmJiNC00Mzg1LWFkYWItYWZhYmZmOGM1ZmJm' 
+content-security-policy: default-src 'self'; script-src 'self' 'nonce-NDc0ZjU5ZjctYjE3NC00ODY0LTk1YWUtNjg5MGQ2

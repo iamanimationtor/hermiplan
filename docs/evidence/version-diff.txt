@@ -1,6 +1,4 @@
-# pure revision-diff suite — 2026-10-31T15:06:59Z
-npx tsx scripts/version-diff-check.ts
-
+# npm run test:versions — 2026-10-31T16:53:47Z
 ▶ ۱. نسخه‌های یکسان
   ✓ دو نسخه با محتوای یکسان، «بدون تفاوت» گزارش می‌شوند
   ✓ شمارش تغییرات صفر است
@@ -55,4 +53,3 @@ npx tsx scripts/version-diff-check.ts
   ✓ کارکرد متره با برنامه‌ای/واقعی/تأییدشده نمایش داده می‌شود
 
 ✔ 41 بررسی تفاوت نسخه‌ها — همه موفق
-EXIT=0

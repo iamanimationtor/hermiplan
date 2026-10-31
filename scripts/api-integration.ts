@@ -987,6 +987,143 @@ async function main() {
   ok(JSON.parse(afterLogout.body).user === null, "نشست پس از خروج باطل است");
   await call(otpJar, `/api/projects/${guestId}`, { method: "DELETE" });
 
+  /* ---- ۶-ب. ثبت‌نام و ورود با نام کاربری و رمز عبور (بدون پیامک) ---- */
+  console.log("\n▶ ۶-ب. نام کاربری و رمز عبور: ثبت‌نام، ورود، یکتایی و شمارش تلاش‌ها");
+  {
+    const userA = `u${RUN_ID}a`;
+    const userB = `u${RUN_ID}b`;
+    const passA = "Passw0rd!2026";
+    const ipA = `${CLIENT_IP}.71`;
+    const ipB = `${CLIENT_IP}.72`;
+    const ipC = `${CLIENT_IP}.73`;
+    const ipD = `${CLIENT_IP}.74`;
+    const login = (jar: Jar | null, body: Record<string, unknown>, ip: string) =>
+      call(jar, "/api/auth", { method: "POST", body: JSON.stringify(body), ip });
+
+    const weak = await login(null, { action: "register", username: userA, password: "short1" }, ipA);
+    ok(weak.status === 422, "رمز کوتاه در ثبت‌نام ⇒ ۴۲۲", `got ${weak.status}`);
+
+    const noDigit = await login(null, { action: "register", username: userA, password: "onlyletters" }, ipA);
+    ok(noDigit.status === 422, "رمز بدون رقم ⇒ ۴۲۲", `got ${noDigit.status}`);
+
+    const shortName = await login(null, { action: "register", username: "ab", password: passA }, ipA);
+    ok(shortName.status === 422, "نام کاربری کوتاه ⇒ ۴۲۲", `got ${shortName.status}`);
+
+    const reserved = await login(null, { action: "register", username: "Admin", password: passA }, ipA);
+    ok(reserved.status === 409, "نام کاربری رزرو‌شده (Admin) ⇒ ۴۰۹", `got ${reserved.status}`);
+
+    const jarA = new Jar();
+    const registered = await login(jarA, { action: "register", username: userA.toUpperCase(), password: passA }, ipA);
+    const registeredBody = JSON.parse(registered.body || "{}") as {
+      user?: { id?: string; username?: string; phone?: string };
+      claimedProjects?: number;
+    };
+    ok(registered.status === 201, "ثبت‌نام با نام کاربری و رمز ⇒ ۲۰۱", `got ${registered.status}: ${registered.body.slice(0, 120)}`);
+    ok(registeredBody.user?.username === userA, "نام کاربری ذخیره‌شده کوچک‌شده است", String(registeredBody.user?.username));
+    ok(jarA.has("hermiplan_session"), "پس از ثبت‌نام کوکی نشست صادر می‌شود");
+    ok(
+      !/password|hash/i.test(registered.body),
+      "پاسخ ثبت‌نام هیچ هش یا رمزی برنمی‌گرداند",
+      registered.body.slice(0, 120),
+    );
+
+    const storedRow = await dbQuery(
+      "select lower(username) || '|' || left(password_hash, 7) || '|' || (password_hash <> $2)::text from users where lower(username) = $1",
+      [userA, passA],
+    );
+    ok(storedRow === `${userA}|scrypt$|true`, "پایگاه: نام کوچک و هش scrypt (نه رمز خام)", storedRow);
+
+    const duplicate = await login(null, { action: "register", username: userA, password: passA }, ipB);
+    ok(duplicate.status === 409, "نام کاربری تکراری ⇒ ۴۰۹", `got ${duplicate.status}`);
+    const duplicateDifferentCase = await login(
+      null,
+      { action: "register", username: userA.replace("u", "U"), password: "Other0ne!" },
+      ipB,
+    );
+    ok(duplicateDifferentCase.status === 409, "نام کاربری تکراری با حروف بزرگ هم رد می‌شود ⇒ ۴۰۹", `got ${duplicateDifferentCase.status}`);
+
+    const second = await login(new Jar(), { action: "register", username: userB, password: passA }, ipB);
+    ok(second.status === 201, "کاربر دوم با نام دیگر ساخته می‌شود", `got ${second.status}`);
+
+    const jarLogin = new Jar();
+    const signedIn = await login(jarLogin, { action: "login", username: userA, password: passA }, ipC);
+    ok(signedIn.status === 200, "ورود با رمز درست ⇒ ۲۰۰", `got ${signedIn.status}`);
+    ok(jarLogin.has("hermiplan_session"), "ورود کوکی نشست می‌دهد");
+
+    const wrong = await login(null, { action: "login", username: userA, password: "Wrong0ne!" }, ipC);
+    const wrongBody = JSON.parse(wrong.body || "{}") as { error?: string };
+    ok(wrong.status === 401, "رمز نادرست ⇒ ۴۰۱", `got ${wrong.status}`);
+    const unknown = await login(null, { action: "login", username: `u${RUN_ID}z`, password: passA }, ipC);
+    const unknownBody = JSON.parse(unknown.body || "{}") as { error?: string };
+    ok(unknown.status === 401, "کاربر ناشناس ⇒ ۴۰۱", `got ${unknown.status}`);
+    ok(
+      wrongBody.error === unknownBody.error && Boolean(wrongBody.error),
+      "پیام خطا برای «رمز غلط» و «کاربر ناشناس» یکسان است (بدون افشای وجود حساب)",
+      `${wrongBody.error} ≠ ${unknownBody.error}`,
+    );
+
+    const caseInsensitive = await login(new Jar(), { action: "login", username: userA.toUpperCase(), password: passA }, ipC);
+    ok(caseInsensitive.status === 200, "ورود با نام کاربری بزرگ/کوچک متفاوت کار می‌کند", `got ${caseInsensitive.status}`);
+
+    const me = await call(jarLogin, "/api/auth");
+    ok(JSON.parse(me.body).user?.username === userA, "نشست، نام کاربری را برمی‌گرداند");
+
+    /* انتقال پروژهٔ مهمان به حساب، هنگام ثبت‌نام و هنگام ورود */
+    const guestJar = new Jar();
+    const guestCreated = await call(guestJar, "/api/projects", { method: "POST", body: payload, ip: ipD });
+    const guestId = JSON.parse(guestCreated.body || "{}").id as string;
+    const claimUser = `u${RUN_ID}c`;
+    // Same cookie jar as the guest project: the claim is "the projects of *this*
+    // browser", so a fresh jar (different guest token) must claim nothing.
+    const claimJar = guestJar;
+    const claimRegister = await login(claimJar, { action: "register", username: claimUser, password: passA }, ipD);
+    const claimBody = JSON.parse(claimRegister.body || "{}") as { claimedProjects?: number; user?: { id?: string } };
+    ok(claimRegister.status === 201, "ثبت‌نام کاربر سوم انجام شد", `got ${claimRegister.status}`);
+    ok((claimBody.claimedProjects ?? 0) >= 1, "پروژهٔ مهمان به حساب تازه منتقل شد", String(claimBody.claimedProjects));
+    const claimedOwner = await dbQuery(
+      "select case when owner_user = $2::uuid then 'owner' else coalesce(owner_user::text, 'NULL') end from projects where id = $1",
+      [guestId, claimBody.user?.id ?? ""],
+    );
+    ok(claimedOwner === "owner", "مالکیت پروژه در پایگاه به کاربر جدید رسید", claimedOwner);
+
+    const logout2 = await call(claimJar, "/api/auth", { method: "DELETE" });
+    ok(logout2.status === 200, "خروج انجام شد");
+    const afterLogout2 = await call(claimJar, "/api/auth");
+    ok(JSON.parse(afterLogout2.body).user === null, "نشست پس از خروج باطل است");
+    // Ownership is "the account OR the guest cookie of the creating browser", so
+    // the original browser keeps reaching its own project after logout — that is
+    // intended. What must never happen is a *different* browser getting in.
+    const afterLogoutRead = await call(claimJar, `/api/projects/${guestId}`, { ip: ipD });
+    ok(afterLogoutRead.status === 200, "پس از خروج، همان مرورگر با کوکی مهمان هنوز پروژهٔ خودش را می‌بیند", `got ${afterLogoutRead.status}`);
+    const strangerRead = await call(new Jar(), `/api/projects/${guestId}`, { ip: ipD });
+    ok(strangerRead.status === 404, "مرورگر دیگر به پروژهٔ منتقل‌شده دسترسی ندارد ⇒ ۴۰۴", `got ${strangerRead.status}`);
+    const otherDevice = new Jar();
+    const otherLogin = await login(otherDevice, { action: "login", username: claimUser, password: passA }, ipD);
+    ok(otherLogin.status === 200, "ورود از «دستگاه دیگر» با همان حساب ⇒ ۲۰۰", `got ${otherLogin.status}`);
+    const otherDeviceRead = await call(otherDevice, `/api/projects/${guestId}`, { ip: ipD });
+    ok(otherDeviceRead.status === 200, "پروژهٔ منتقل‌شده از دستگاه دیگر هم باز می‌شود (هدف اصلی حساب)", `got ${otherDeviceRead.status}`);
+
+    /* شمارش تلاش‌های ورود: سقف ۱۰ در ۱۵ دقیقه برای هر نام کاربری */
+    const bruteUser = `u${RUN_ID}d`;
+    const ipE = `${CLIENT_IP}.75`;
+    await login(new Jar(), { action: "register", username: bruteUser, password: passA }, ipD);
+    const attemptStatuses: number[] = [];
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const response = await login(null, { action: "login", username: bruteUser, password: "Bad0ne!!" }, ipE);
+      attemptStatuses.push(response.status);
+    }
+    const blocked = await login(null, { action: "login", username: bruteUser, password: passA }, ipE);
+    ok(
+      attemptStatuses.length === 10 && attemptStatuses.every((status) => status === 401),
+      "۱۰ تلاش ناموفق پشت‌سرهم همه ۴۰۱ می‌گیرند (نه ۴۲۹ پراکنده)",
+      attemptStatuses.join(","),
+    );
+    ok(blocked.status === 429, "تلاش یازدهم برای همان نام کاربری ⇒ ۴۲۹ (حتی با رمز درست)", `got ${blocked.status}`);
+    ok(Number(blocked.response.headers.get("retry-after") ?? 0) > 0, "پاسخ ۴۲۹ هدر Retry-After دارد");
+
+    await call(claimJar, `/api/projects/${guestId}`, { method: "DELETE" });
+  }
+
   /* ---------------- 7. حذف ---------------- */
   console.log("\n▶ ۷. حذف پروژه");
   const deleted = await call(owner, `/api/projects/${id}`, { method: "DELETE" });

@@ -1,15 +1,37 @@
-# health probe — 2026-10-31T16:33:01Z
+# health probe — 2026-10-31T16:59:58Z
 
-## migrated database, access mode open (config/access.json) — :3400
+## migrated database, access mode locked (config/access.json)
+$ curl -s -w "%{http_code}" :3400/api/health
+{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
 HTTP 200
-{"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"config","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
 
-## same build, HERMIPLAN_ACCESS_MODE=locked — :3410 (env overrides file, no rebuild)
+## same build, HERMIPLAN_ACCESS_MODE=open — no rebuild
+$ curl -s :3410/api/health
+{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"env","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
 HTTP 200
-{"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"env","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
 
-## pages
-/                                                            HTTP 200
-/builder                                                     HTTP 200
-/report/00000000-0000-4000-8000-000000000000                 HTTP 404
-/s/not-a-real-token                                          HTTP 404
+## empty database (migrations not applied)
+$ DATABASE_URL=…empty_check next start :3600
+{"ok":false,"schemaVersion":5,"database":"ok","missingTables":["projects","users","sessions","otp_codes","project_events","rate_limits","project_share_tokens","project_versions"],"missingColumns":[],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
+HTTP 503
+
+## database migrated only through 0004 (tables present, 0005 columns missing)
+$ DATABASE_URL=…partial_check next start :3600   # users.username/password_hash dropped
+{"ok":false,"schemaVersion":5,"database":"ok","missingTables":[],"missingColumns":["users.username","users.password_hash"],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
+HTTP 503
+
+## pages on :3400
+/                                                    200
+/builder                                             200
+/robots.txt                                          200
+/sitemap.xml                                         200
+/report/00000000-0000-4000-8000-000000000000         404
+/s/not-a-real-token                                  404
+
+## 404 page for an unknown report actually explains what to do
+$ curl -s :3400/report/00000000-0000-4000-8000-000000000000 | grep -c "گزارش برای این مرورگر یا حساب"
+1
+
+## 404 page for an invalid share link
+$ curl -s :3400/s/not-a-real-token | grep -c "لینک اشتراک معتبر نیست"
+1

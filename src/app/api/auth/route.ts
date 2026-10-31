@@ -11,11 +11,33 @@ import {
 import { checkRateLimit, RATE_RULES, clientIp, retryAfterHeaders } from "@/lib/server/rate-limit";
 import { demoOtpAllowed, readSmsConfig, sendOtpSms } from "@/lib/server/sms";
 import { csrfRejection, isSameOriginRequest, jsonError, jsonOk, readJson } from "@/lib/server/http";
+import {
+  canonicalUsername,
+  hashPassword,
+  isReservedUsername,
+  passwordProblem,
+  usernameProblem,
+  verifyPassword,
+} from "@/lib/server/password";
+import { createAccount, findUserByUsername, touchLastLogin } from "@/lib/server/accounts";
 
 export const dynamic = "force-dynamic";
 
 /** Minimum delay between two codes for the same phone number. */
 const OTP_RESEND_SECONDS = 45;
+
+/** Password guessing budget per username, independent of the per-IP budget. */
+const USER_LOGIN_RULE = { limit: 10, windowMs: 15 * 60_000 };
+
+/**
+ * A digest of a random password, verified when the username does not exist.
+ *
+ * Without it, "no such user" returns in microseconds while a wrong password
+ * costs a full scrypt (~100 ms) — a timing oracle for which usernames exist.
+ * Computed once per process, on first use.
+ */
+let decoyHash: Promise<string> | null = null;
+const decoy = () => (decoyHash ??= hashPassword("decoy-password-1"));
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -33,7 +55,12 @@ export async function POST(request: Request) {
 
   const parsed = await readJson(request);
   if (!parsed.ok) return jsonError(400, "درخواست نامعتبر است");
-  const body = parsed.body as { action?: string; phone?: string; code?: string };
+  const body = parsed.body as { action?: string; phone?: string; code?: string; username?: string; password?: string };
+
+  // Username + password first: those actions carry no phone at all, so parsing
+  // the phone before dispatching would reject every sign-in with a 422.
+  if (body.action === "register") return handleRegister(body.username, body.password);
+  if (body.action === "login") return handleLogin(body.username, body.password);
 
   const phoneResult = parsePhone(body.phone ?? "");
   if (!phoneResult.ok) {
@@ -41,16 +68,106 @@ export async function POST(request: Request) {
   }
   const phone = phoneResult.phone;
 
-  if (body.action === "request") {
-    return handleRequestCode(request, phone);
-  }
-  if (body.action === "verify") {
-    return handleVerify(request, phone, body.code);
-  }
+  if (body.action === "request") return handleRequestCode(phone);
+  if (body.action === "verify") return handleVerify(request, phone, body.code);
   return jsonError(400, "عملیات پشتیبانی نمی‌شود");
 }
 
-async function handleRequestCode(request: Request, phone: string) {
+/**
+ * Registration.
+ *
+ * Order matters: validate the shape *before* touching the database, then let
+ * PostgreSQL decide uniqueness. A pre-flight `SELECT` alone would leave a race
+ * in which two simultaneous registrations both pass the check.
+ */
+async function handleRegister(rawUsername: unknown, rawPassword: unknown) {
+  const usernameIssue = usernameProblem(rawUsername);
+  if (usernameIssue) return jsonError(422, usernameIssue);
+  const passwordIssue = passwordProblem(rawPassword);
+  if (passwordIssue) return jsonError(422, passwordIssue);
+
+  const username = canonicalUsername(rawUsername);
+  if (isReservedUsername(username)) {
+    return jsonError(409, "این نام کاربری رزرو شده است؛ نام دیگری انتخاب کنید");
+  }
+
+  // Fast path only (a friendly message instead of a 500); the index is the
+  // authority and the INSERT below handles the losing racer.
+  if (await findUserByUsername(username)) {
+    return jsonError(409, "این نام کاربری قبلاً گرفته شده است");
+  }
+
+  const passwordHash = await hashPassword(String(rawPassword));
+  const created = await createAccount({ username, passwordHash });
+  if (!created.ok) {
+    return jsonError(409, "این نام کاربری قبلاً گرفته شده است");
+  }
+
+  const guestToken = await getGuestToken();
+  const claimed = await claimGuestProjects(created.user.id, guestToken);
+  await createSession(created.user.id);
+
+  return jsonOk(
+    {
+      ok: true,
+      claimedProjects: claimed,
+      user: {
+        id: created.user.id,
+        username: created.user.username,
+        phone: created.user.phone,
+        displayName: created.user.displayName,
+      },
+    },
+    201,
+  );
+}
+
+/**
+ * Sign-in.
+ *
+ * A wrong password, an unknown username and a malformed digest all answer with
+ * the same 401 body, and the unknown-username path still pays for a full
+ * scrypt verification so the response time does not reveal which usernames
+ * exist. Failures are counted per username and per IP.
+ */
+async function handleLogin(rawUsername: unknown, rawPassword: unknown) {
+  const usernameIssue = usernameProblem(rawUsername);
+  if (usernameIssue) return jsonError(422, usernameIssue);
+  if (typeof rawPassword !== "string" || rawPassword.length === 0) {
+    return jsonError(422, "رمز عبور را وارد کنید");
+  }
+  if (rawPassword.length > 200) return jsonError(422, "رمز عبور نمی‌تواند بیش از ۲۰۰ نویسه باشد");
+
+  const username = canonicalUsername(rawUsername);
+  const byUser = await checkRateLimit(`auth:user:${username}`, USER_LOGIN_RULE);
+  if (!byUser.allowed) {
+    return jsonError(
+      429,
+      "تعداد تلاش‌های ورود برای این نام کاربری بیش از حد مجاز است. چند دقیقه بعد دوباره تلاش کنید.",
+      {},
+      retryAfterHeaders(byUser),
+    );
+  }
+
+  const user = await findUserByUsername(username);
+  const matches = await verifyPassword(rawPassword, user?.passwordHash ?? (await decoy()));
+  if (!user || !matches) {
+    return jsonError(401, "نام کاربری یا رمز عبور نادرست است");
+  }
+
+  void touchLastLogin(user.id).catch(() => undefined);
+  const guestToken = await getGuestToken();
+  const claimed = await claimGuestProjects(user.id, guestToken);
+  await createSession(user.id);
+
+  return jsonOk({
+    ok: true,
+    claimedProjects: claimed,
+    user: { id: user.id, username: user.username, phone: user.phone, displayName: user.displayName },
+  });
+}
+
+async function handleRequestCode(phone: string) {
   const sms = readSmsConfig();
   const demo = demoOtpAllowed();
 
@@ -112,8 +229,11 @@ async function handleRequestCode(request: Request, phone: string) {
 async function handleVerify(request: Request, phone: string, rawCode: string | undefined) {
   // Two independent limits: a client IP cannot cycle phone numbers, and a
   // phone number cannot be attacked from many IPs.
+  // Hoisted on purpose: a call inside the key template is how a forgotten
+  // `await` once turned every client into the same bucket.
+  const verifyIp = clientIp(request);
   const [byIp, byPhone] = await Promise.all([
-    checkRateLimit(`otp:verify:ip:${clientIp(request)}`, RATE_RULES.otpVerify),
+    checkRateLimit(`otp:verify:ip:${verifyIp}`, RATE_RULES.otpVerify),
     checkRateLimit(`otp:verify:phone:${phone}`, RATE_RULES.otpVerify),
   ]);
   if (!byIp.allowed || !byPhone.allowed) {
@@ -139,7 +259,7 @@ async function handleVerify(request: Request, phone: string, rawCode: string | u
   return jsonOk({
     ok: true,
     claimedProjects: claimed,
-    user: { id: user.id, phone: user.phone, displayName: user.displayName },
+    user: { id: user.id, username: user.username, phone: user.phone, displayName: user.displayName },
   });
 }
 

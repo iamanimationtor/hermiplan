@@ -128,6 +128,33 @@ console.log("\n▶ ۵. هر کلید واقعی سهمیه با فهرست مح�
     ![...alwaysLimited].some((scope) => (PRODUCT_QUOTA_KEYS as readonly string[]).includes(scope)),
     "سهمیه‌های بیرونی (market) در فهرست محصول نیستند",
   );
+  /*
+   * A key built from a *call* (`${clientIpFromHeaders()}`) silently becomes
+   * "[object Promise]" when the call is async and the await is forgotten. One
+   * forgotten await then turns every request into the same bucket — a global
+   * limiter that locks the first user out of sign-in. The rule below is cheap
+   * and catches the whole class: only plain identifiers may be interpolated.
+   */
+  const callInKey: string[] = [];
+  const walkKeys = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) walkKeys(full);
+      else if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) {
+        const source = readFileSync(full, "utf8");
+        for (const match of source.matchAll(/checkRateLimit\(\s*`([^`]*)`/g)) {
+          const key = match[1];
+          if (/\$\{[^}]*\(/.test(key)) callInKey.push(`${full}: ${key}`);
+        }
+      }
+    }
+  };
+  walkKeys(join(process.cwd(), "src", "app"));
+  check(
+    callInKey.length === 0,
+    "کلید سهمیه هیچ فراخوانی‌ای را درون خود جای نمی‌دهد (await فراموش‌شده ⇒ باکت مشترک)",
+    callInKey.join(" · "),
+  );
 }
 
 console.log("\n▶ ۶. مقدار نامعتبر نباید بی‌صدا «باز» شود");

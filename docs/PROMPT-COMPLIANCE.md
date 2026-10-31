@@ -91,12 +91,13 @@
 | مسیر گزارش نباید دانستن UUID را مجوز بداند | **انجام‌شده** | `/report/[id]` فقط مالک؛ غریبه ۴۰۴؛ `api-integration` §۳ و §۳ج | — |
 | لینک اشتراک توکنی با هش SHA-256، انقضا، ابطال، سقف | **انجام‌شده** | `src/lib/server/share-token*.ts`، `0003`، `api-integration` §۳/۳ب | — |
 | احراز مجوز سمت سرور روی همه مسیرهای پروژه | **انجام‌شده** | هر route با `isProjectOwner`؛ آزمون منفی برای GET/PATCH/DELETE/share/versions | — |
+| ورود با نام کاربری و رمز عبور (به‌جای پیامک): هش scrypt با نمک، یکتایی نام کاربری بدون حساسیت به حروف، پیام خطای یکسان برای «رمز غلط»/«کاربر ناشناس»، سقف تلاش برای هر نام کاربری | **انجام‌شده** | `src/lib/server/password.ts`، `src/lib/server/accounts.ts`، `drizzle/0005_user_credentials.sql`؛ `password-check.ts` (۴۵) و `api` §۶-ب (۲۵) | — |
 | OTP واقعی: ارسال، CSPRNG، هش، انقضا، محدودیت تلاش، فاصله ارسال، مصرف اتمیک | **انجام‌شده** | `src/lib/server/otp.ts`، `src/app/api/auth/route.ts`، `otp-sms-check.ts` (۳۹ بررسی روی مسیر واقعی پیامک با ارائه‌دهنده ساختگی) | — |
 | اصلاح `normalizePhone` | **انجام‌شده** | `src/lib/server/phone.ts`، `security-checks.ts` §۱ | — |
 | محدودیت نرخ مشترک (PostgreSQL) + مستندسازی هر endpoint | **انجام‌شده** | `src/lib/server/rate-limit.ts` (جدول `rate_limits`)، `README.md` جدول سهمیه‌ها، `db-integrity-check.ts` §۱ | — |
-| حالت دسترسی پیش از انتشار: بی‌سهمیه برای کاربر، امنیت دست‌نخورده | **انجام‌شده (افزوده این دور)** | `config/access.json` + `src/lib/access-mode.ts`؛ `access-mode-check.ts` ۵۱ بررسی (شامل ۱۰ مقدار نامعتبر ⇒ `locked` و اسکن پیشوند کلیدهای واقعی سهمیه)؛ `api` §۹ در هر دو حالت؛ `/api/health` ⇒ `access` | بازگرداندن سهمیه‌ها با `npm run access:locked` پیش از انتشار عمومی |
+| حالت دسترسی پیش از انتشار: بی‌سهمیه برای کاربر، امنیت دست‌نخورده | **انجام‌شده (افزوده این دور)** | `config/access.json` + `src/lib/access-mode.ts`؛ `access-mode-check.ts` ۵۲ بررسی (شامل ۱۰ مقدار نامعتبر ⇒ `locked` و اسکن پیشوند کلیدهای واقعی سهمیه)؛ `api` §۹ در هر دو حالت؛ `/api/health` ⇒ `access` | بازگرداندن سهمیه‌ها با `npm run access:locked` پیش از انتشار عمومی |
 | بازبینی نشست/کوکی (HttpOnly/Secure/SameSite/انقضا/ابطال/CSRF) | **انجام‌شده** | `src/lib/server/auth.ts`، `src/lib/server/http.ts` (`isSameOriginRequest`) | — |
-| سخت‌سازی و آزمون‌های منفی مجوز | **انجام‌شده** | `api-integration` (۱۹۲ بررسی در `locked` / ۱۹۰ در `open`)، `security-checks` (۲۹۱ بررسی)، `export-check` (۷۲ بررسی)، `access-mode-check` (۵۱ بررسی) | — |
+| سخت‌سازی و آزمون‌های منفی مجوز | **انجام‌شده** | `api-integration` (۲۲۳ بررسی در `locked` / ۲۲۱ در `open`)، `security-checks` (۲۹۱ بررسی)، `export-check` (۸۰ بررسی با سرور / ۶۲ بدون سرور)، `access-mode-check` (۵۲ بررسی)، `password-check` (۴۵ بررسی)، `journey` (۷۹ بررسی سرتاسری) | — |
 | CSP و هدرهای امنیتی | **انجام‌شده** | `src/middleware.ts` (nonce، بدون `unsafe-inline` در script)، `test:csp` ۲۴ بررسی روی دو صفحه + ۹۲ بررسی روی هفت مسیر واقعی + `csp-real-routes.sh` ۷۸ بررسی روی مسیرهای واقعی (مالک، اشتراک، دو ۴۰۴) | — |
 | ارسال واقعی پیامک با ارائه‌دهنده بیرونی | **ناقص** | کل زنجیره با ارائه‌دهنده محلی آزموده شد (`docs/evidence/otp-sms.txt`) | کلید `SMS_PROVIDER_KEY` + `SMS_OTP_TEMPLATE` شما |
 | محافظت از داده (بدون مهاجرت مخرب، برگشت‌پذیر) | **انجام‌شده** | `drizzle/0002..0004` + فایل rollback، `migration-safety.ts` (۳۳ بررسی، شامل بازگشت کامل و بازسازی هم‌ساختار) | — |
@@ -127,8 +128,8 @@
 
 | معیار | وضعیت | شاهد | باقی‌مانده |
 | --- | --- | --- | --- |
-| آزمون واحد برای هر دو گذر، شناوری، چهار رابطه، Lag، تقویم، نقطه عطف، محدودیت، چرخه، Baseline، پیشرفت، EVM، منابع، نرخ، تعدیل، نگاشت تاریخ | **انجام‌شده** | `npm test` = ۱۱ مجموعه؛ موتور ۸۱ + رگرسیون ۱۹۱ + امنیت ۲۹۱ + خروجی ۶۱ + تفاوت نسخه‌ها ۴۱ + حالت دسترسی ۵۱؛ و در `test:api` تاریخچه/مقایسه/اعتبارسنجی ۷۵ بررسی | — |
-| ۲۲ سناریوی یکپارچگی | **انجام‌شده (بیش از خواسته)** | `npm run test:api`: ۱۹۲ بررسی روی build تولیدی در حالت `locked`، ۱۹۰ در `open` و ۱۹۶ روی `next dev` (شامل ۶ سناریوی OTP که فقط با دمو باز است) | — |
+| آزمون واحد برای هر دو گذر، شناوری، چهار رابطه، Lag، تقویم، نقطه عطف، محدودیت، چرخه، Baseline، پیشرفت، EVM، منابع، نرخ، تعدیل، نگاشت تاریخ | **انجام‌شده** | `npm test` = ۱۲ مجموعه؛ موتور ۸۱ + رگرسیون ۱۹۱ + امنیت ۲۹۱ + خروجی ۶۲ + تفاوت نسخه‌ها ۴۱ + حالت دسترسی ۵۲ + رمز/نام کاربری ۴۵؛ و در `test:api` تاریخچه/مقایسه/اعتبارسنجی ۷۵ بررسی و در `test:journey` باز کردن واقعی هر ۷ خروجی (۷۹ بررسی) | — |
+| ۲۲ سناریوی یکپارچگی | **انجام‌شده (بیش از خواسته)** | `npm run test:api`: ۲۲۳ بررسی روی build تولیدی در حالت `locked`، ۲۲۱ در `open` و ۲۲۸ روی `next dev` (شامل ۶ سناریوی OTP که فقط با دمو باز است)، به‌همراه `test:journey` با ۷۹ بررسی سرتاسری | — |
 | آزمون مرجع محاسبه دستی | **انجام‌شده** | `scripts/engine-verification.ts` (اعداد دستی در §۱، §۵، §۶) | — |
 | اجرای واقعی فرمان‌های package.json (`npm ci`, typecheck, lint, test, integration, api, build) | **انجام‌شده** | `docs/evidence/npm-ci.txt`, `typecheck.txt`, `lint.txt`, `tests.txt`, `api-integration*.txt`, `build.txt` | `test:load` فقط محلی اجرا شد (ظرفیت Netlify سنجیده نشد) |
 | فایل پشتیبان پروژه (رفت‌وبرگشت/رد فایل نامعتبر) | **انجام‌شده (افزوده این دور)** | `scripts/project-file-check.ts` **۳۱ بررسی** در `npm test` | — |
