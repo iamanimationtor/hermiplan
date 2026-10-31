@@ -170,18 +170,3 @@ export async function resolveShareToken(token: string): Promise<ResolvedShare | 
 
   return { projectId: row.projectId, tokenId: row.tokenId };
 }
-
-/** Active-token count for a project (used by the report toolbar). */
-export async function countActiveShareTokens(projectId: string): Promise<number> {
-  const rows = await db
-    .select({ id: projectShareTokens.id })
-    .from(projectShareTokens)
-    .where(
-      and(
-        eq(projectShareTokens.projectId, projectId),
-        isNull(projectShareTokens.revokedAt),
-        or(isNull(projectShareTokens.expiresAt), sql`${projectShareTokens.expiresAt} > now()`),
-      ),
-    );
-  return rows.length;
-}

@@ -1,5 +1,6 @@
-# npm test — 2026-10-31T12:36:21Z  (after a clean npm ci)
-$ npm test
+# npm test — 2026-10-31T12:39:03Z
+# run WITH DATABASE_URL exported on purpose: the suite must not depend on the caller's environment
+$ DATABASE_URL=postgresql://…:5544/postgres npm test
 
 > test
 > tsx scripts/run-tests.ts
@@ -16,7 +17,7 @@ $ npm test
 ▶ ۸. تاریخ هدف پایان و شناوری منفی
 ▶ ۹. انحراف زمان‌بندی نسبت به Baseline (تعریف صحیح)
 ▶ ۱۰. کارایی روی پروژه بزرگ
-    زمان تحلیل: 29ms برای ۵۰۰ فعالیت
+    زمان تحلیل: 31ms برای ۵۰۰ فعالیت
 
 ✔ 81 بررسی مستقل موتور — همه با محاسبه دستی تأیید شد
 
@@ -70,13 +71,13 @@ ALL ENGINE CHECKS PASSED
   ✓ cyclic-project (1 acts, 5 wd, 1ms)
 
 ▶ ۴. تقویم‌های خاص
-  ✓ holidays-blocked-week (10 acts, 37 wd, 3ms)
+  ✓ holidays-blocked-week (10 acts, 37 wd, 2ms)
   ✓ empty workDays falls back to the default working week
-  ✓ single-working-day (10 acts, 37 wd, 2ms)
-  ✓ very-long-project (10 acts, 216 wd, 3ms)
+  ✓ single-working-day (10 acts, 37 wd, 1ms)
+  ✓ very-long-project (10 acts, 216 wd, 4ms)
 
 ▶ ۵. انواع وابستگی، Lag منفی و محدودیت‌ها
-  ✓ mixed-dependencies (8 acts, 12 wd, 2ms)
+  ✓ mixed-dependencies (8 acts, 12 wd, 1ms)
 
 ▶ ۶. قیمت‌گذاری و تعدیل
   ✓ pricing & escalation (direct 56148223000 → total 81216716879)
@@ -86,18 +87,18 @@ ALL ENGINE CHECKS PASSED
 
 ▶ ۸. همه قالب‌ها × همه مسیرهای خروجی
   ✓ template:construction (21 acts, 158 wd, 2ms)
-  ✓ template:civil (14 acts, 171 wd, 2ms)
+  ✓ template:civil (14 acts, 171 wd, 1ms)
   ✓ template:architecture (13 acts, 98 wd, 1ms)
   ✓ template:infrastructure (11 acts, 98 wd, 1ms)
-  ✓ template:software (15 acts, 92 wd, 1ms)
+  ✓ template:software (15 acts, 92 wd, 2ms)
   ✓ template:manufacturing (11 acts, 94 wd, 1ms)
-  ✓ template:research (13 acts, 126 wd, 1ms)
-  ✓ template:event (11 acts, 53 wd, 1ms)
-  ✓ template:renovation (11 acts, 84 wd, 2ms)
+  ✓ template:research (13 acts, 126 wd, 2ms)
+  ✓ template:event (11 acts, 53 wd, 0ms)
+  ✓ template:renovation (11 acts, 84 wd, 1ms)
   ✓ template:general (10 acts, 37 wd, 1ms)
 
 ▶ ۹. Baseline و پیشرفت کامل/صفر
-  ✓ baseline-100% (15 acts, 92 wd, 18ms)
+  ✓ baseline-100% (15 acts, 92 wd, 19ms)
 
 ══════════ EDGE-CASE AUDIT PASSED ══════════
 

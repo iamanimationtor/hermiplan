@@ -8,9 +8,8 @@
  */
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { projects } from "@/db/schema";
+import { projects, projectShareTokens } from "@/db/schema";
 import { analyzeProject } from "@/lib/engine/analysis";
-import { projectShareTokens } from "@/db/schema";
 import {
   DEFAULT_REPORT_SECTIONS,
   parseProjectInput,

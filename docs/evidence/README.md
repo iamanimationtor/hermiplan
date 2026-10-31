@@ -8,7 +8,7 @@
 | `npm-ci.txt` | `npm ci --no-audit --no-fund` | نصب دقیق از `package-lock.json` بدون خطا |
 | `typecheck.txt` | `npx tsc --noEmit` | `EXIT=0` |
 | `lint.txt` | `npx eslint . -f json` | `errors 0 warnings 0` |
-| `tests.txt` | `npm test` | ۷ مجموعه سبز، `EXIT=0` |
+| `tests.txt` | `npm test` (با `DATABASE_URL` صادرشده) | ۷ مجموعه سبز، `EXIT=0` — مجموعه به متغیرهای محیطی وابسته نیست |
 | `build.txt` | `npm run build` | `✓ Compiled successfully` |
 | `real-postgres.txt` | `db:status` + `select version()` | PostgreSQL واقعی، سه مهاجرت اعمال‌شده |
 | `api-integration.txt` | `npm run test:api` روی build تولیدی | ۶۲ موفق / ۰ ناموفق / ۶ نادیده (مسیر OTP در production بسته است) |

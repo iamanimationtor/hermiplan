@@ -165,16 +165,28 @@ console.log("▶ ۵. اعتبارسنجی شناسه و استخراج IP");
 async function main() {
   console.log("▶ ۶. محدودکننده نرخ (حالت جایگزین حافظه‌ای)");
   {
-    // No DATABASE_URL in the test environment ⇒ the documented in-memory fallback
-    // is used. The result must still be a hard deny once the quota is exhausted.
-    const key = `test:${Date.now()}`;
-    const rule = { limit: 3, windowMs: 60_000 };
-    const results = [];
-    for (let i = 0; i < 4; i += 1) results.push(await checkRateLimit(key, rule));
-    check(results[0].allowed && results[1].allowed && results[2].allowed, "سه درخواست اول مجاز است");
-    check(!results[3].allowed, "درخواست چهارم رد می‌شود");
-    check(results[3].retryAfterSeconds > 0, "زمان تلاش مجدد گزارش می‌شود");
-    check(results[3].degraded === true, "نبود دیتابیس به‌صورت degraded اعلام می‌شود");
+    /**
+     * The documented in-memory fallback is only reachable when no database is
+     * configured. `npm test` must behave identically whether or not the caller
+     * happens to have DATABASE_URL exported — earlier this block failed only
+     * when a developer ran the suite with that variable set. The environment is
+     * therefore made explicit for the duration of the check and restored after.
+     */
+    const savedUrl = process.env.DATABASE_URL;
+    delete process.env.DATABASE_URL;
+    try {
+      const key = `test:${Date.now()}`;
+      const rule = { limit: 3, windowMs: 60_000 };
+      const results = [];
+      for (let i = 0; i < 4; i += 1) results.push(await checkRateLimit(key, rule));
+      check(results[0].allowed && results[1].allowed && results[2].allowed, "سه درخواست اول مجاز است");
+      check(!results[3].allowed, "درخواست چهارم رد می‌شود");
+      check(results[3].retryAfterSeconds > 0, "زمان تلاش مجدد گزارش می‌شود");
+      check(results[3].degraded === true, "نبود دیتابیس به‌صورت degraded اعلام می‌شود");
+    } finally {
+      if (savedUrl === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = savedUrl;
+    }
   }
 
   /* ---------------- share tokens (256-bit, hashed at rest) ---------------- */

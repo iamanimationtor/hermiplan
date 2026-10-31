@@ -1,6 +1,6 @@
-# api integration — production build, REAL PostgreSQL 18.6 — 2026-10-31T12:27:56Z
-$ BASE_URL=http://127.0.0.1:3400 npm run test:api   (shell: HERMIPLAN_ALLOW_DEMO_OTP unset → production path)
-▶ سرور هدف: http://127.0.0.1:3400 · IP آزمون: 10.40.177.233 · شماره‌ها: 09126772331/09126772332/09126772333
+# api integration — production build, REAL PostgreSQL 18.6 — 2026-10-31T12:37:46Z
+$ BASE_URL=http://127.0.0.1:3400 npm run test:api
+▶ سرور هدف: http://127.0.0.1:3400 · IP آزمون: 10.40.16.86 · شماره‌ها: 09122668361/09122668362/09122668363
 
 ▶ ۱. ساخت پروژه و دسترسی مالک
   ✓ ساخت پروژه با ۲۰۱

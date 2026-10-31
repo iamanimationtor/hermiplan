@@ -1,4 +1,4 @@
-# CSP verification — 2026-10-31T12:27:58Z
+# CSP verification — 2026-10-31T12:37:47Z
 $ BASE_URL=http://127.0.0.1:3400 npm run test:csp
 ▶ /
 ▶ /builder

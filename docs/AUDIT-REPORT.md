@@ -127,6 +127,7 @@
 | CSP وجود نداشت | زیاد | `src/middleware.ts` | nonce در هر درخواست، `script-src` بدون `unsafe-inline` | `npm run test:csp` (۲۲ بررسی) |
 | سیاست گرد کردن پول متمرکز و آزموده نبود | متوسط | `src/lib/engine/money.ts` | گرد کردن یک‌بار، `total = Σ اجزا`، `NaN`/`Infinity` ⇒ ۰ | رگرسیون §۱۵ (۱۱ بررسی) |
 | هیچ سنجش عملکرد یا هم‌زمانی وجود نداشت | متوسط | `scripts/load-test.ts`, `scripts/db-integrity-check.ts` | بنچمارک محلی + هم‌زمانی ۴۰ اتصال روی PostgreSQL واقعی | `load.txt`, `db-integrity.txt` |
+| `npm test` به متغیر محیطی `DATABASE_URL` وابسته بود (آزمون fallback حافظه‌ای با دیتابیس متصل شکست می‌خورد) | متوسط | `scripts/security-checks.ts` §۶ | محیط به‌صورت صریح و موقت پاک می‌شود و بازگردانده می‌شود؛ اجرای مجموعه با و بدون `DATABASE_URL` یکسان است | `tests.txt` (اجرا با `DATABASE_URL`) + ۱۰ اجرای متوالی سبز |
 
 ---
 
