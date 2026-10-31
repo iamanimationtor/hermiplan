@@ -1,12 +1,8 @@
-# npm ci — 2026-10-31T11:56:02Z
+# npm ci — 2026-10-31T12:30:30Z
 $ npm ci --no-audit --no-fund
 npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.hirok.io
 npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.hirok.io
 npm warn deprecated eslint@9.39.4: This version is no longer supported. Please see https://eslint.org/version-support for other options.
 
-added 399 packages in 13s
-
-real	0m13.250s
-user	0m9.717s
-sys	0m6.574s
+added 406 packages in 6m
 EXIT=0

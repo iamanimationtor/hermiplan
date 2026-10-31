@@ -38,6 +38,9 @@ export const RATE_RULES = {
   auth: { limit: envInt("RATE_LIMIT_AUTH", 12), windowMs: 60_000 },
   otpRequest: { limit: envInt("RATE_LIMIT_OTP_REQUEST", 5), windowMs: 15 * 60_000 },
   otpVerify: { limit: envInt("RATE_LIMIT_OTP_VERIFY", 10), windowMs: 15 * 60_000 },
+  shareCreate: { limit: envInt("RATE_LIMIT_SHARE_CREATE", 10), windowMs: 60 * 60_000 },
+  shareRevoke: { limit: envInt("RATE_LIMIT_SHARE_REVOKE", 30), windowMs: 60_000 },
+  shareRead: { limit: envInt("RATE_LIMIT_SHARE_READ", 240), windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export interface RateLimitResult {

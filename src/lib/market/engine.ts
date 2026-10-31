@@ -1,4 +1,5 @@
 import { toJalali, JALALI_MONTHS } from "@/lib/date-fa";
+import { percentOfMoney, roundMoney, sumMoney } from "@/lib/engine/money";
 import { isIsoDate } from "@/lib/engine/calendar";
 import type {
   EscalationMonth,
@@ -283,17 +284,32 @@ export interface EscalationResult {
   note: string;
 }
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
+/**
+ * Rounding is delegated to the single money policy in `lib/engine/money.ts`, so
+ * that the estimate breakdown, the escalation scenario and every export share
+ * one definition of "two decimals, half away from zero".
+ */
+const round2 = roundMoney;
 
 /** ساختار برآورد هزینه مطابق روش فهرست‌بهای (مستقیم + بالاسری + سود + احتیاط + تعدیل) */
 export function computeCostBreakdown(direct: number, escalation: number, pricing: ProjectPricing) {
-  const overhead = round2(direct * (pricing.overheadPercent / 100));
-  const profit = round2((direct + overhead) * (pricing.profitPercent / 100));
-  const contingency = round2(direct * (pricing.contingencyPercent / 100));
-  const total = round2(direct + overhead + profit + contingency + escalation);
-  return { direct: round2(direct), overhead, profit, contingency, escalation: round2(escalation), total };
+  // Rule 1 of the money policy: each component is rounded once, where it is born.
+  const directRounded = round2(direct);
+  const overhead = percentOfMoney(directRounded, pricing.overheadPercent);
+  const profit = percentOfMoney(directRounded + overhead, pricing.profitPercent);
+  const contingency = percentOfMoney(directRounded, pricing.contingencyPercent);
+  const escalationRounded = round2(escalation);
+  // Rule 2: the total is the sum of the printed components, so the column the
+  // reader adds up equals the total that is printed.
+  const total = sumMoney([directRounded, overhead, profit, contingency, escalationRounded]);
+  return {
+    direct: directRounded,
+    overhead,
+    profit,
+    contingency,
+    escalation: escalationRounded,
+    total,
+  };
 }
 
 /** نتیجه کامل قیمت‌گذاری برای گزارش و تحلیل */

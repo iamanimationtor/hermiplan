@@ -1,0 +1,14 @@
+# real PostgreSQL server — 2026-10-31T12:27:53Z
+$ npx tsx scripts/pg-dev-server.ts   # embedded-postgres devDependency, no root, no Docker
+$ npm run db:status
+Database: 127.0.0.1:5544/postgres
+  ✓ 0001_baseline (applied)
+  ✓ 0002_security_hardening (applied)
+  ✓ 0003_share_tokens (applied)
+
+Schema is up to date.
+
+$ node scripts/.pgver.ts
+PostgreSQL 18.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit
+migrations: 0001_baseline, 0002_security_hardening, 0003_share_tokens
+tables: _hermiplan_migrations, otp_codes, project_events, project_share_tokens, projects, rate_limits, sessions, users

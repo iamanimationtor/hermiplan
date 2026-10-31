@@ -8,6 +8,12 @@ import { demoOtpAllowed, readSmsConfig } from "../src/lib/server/sms";
 import { generateOtp, hashOtp, MAX_OTP_ATTEMPTS, OTP_LENGTH } from "../src/lib/server/otp";
 import { checkRateLimit, clientIp } from "../src/lib/server/rate-limit";
 import { isSameOriginRequest, isUuid } from "../src/lib/server/http";
+import {
+  generateShareToken,
+  hashShareToken,
+  SHARE_TOKEN_BYTES,
+  SHARE_TOKEN_RE,
+} from "../src/lib/server/share-token-core";
 
 let failures = 0;
 let checks = 0;
@@ -169,6 +175,32 @@ async function main() {
     check(!results[3].allowed, "درخواست چهارم رد می‌شود");
     check(results[3].retryAfterSeconds > 0, "زمان تلاش مجدد گزارش می‌شود");
     check(results[3].degraded === true, "نبود دیتابیس به‌صورت degraded اعلام می‌شود");
+  }
+
+  /* ---------------- share tokens (256-bit, hashed at rest) ---------------- */
+  console.log("\n▶ توکن اشتراک گزارش");
+  {
+    const token = generateShareToken();
+    check(SHARE_TOKEN_RE.test(token), "توکن با ۴۳ نویسه base64url ساخته می‌شود", token);
+    check(SHARE_TOKEN_BYTES === 32, "آنتروپی توکن ۲۵۶ بیت است");
+    check(!/[/+=]/.test(token), "توکن نویسه‌های ناسازگار با URL ندارد (بدون نیاز به escape)");
+
+    // 1000 draws must all be distinct (a CSPRNG collision here would mean a
+    // predictable generator, which is the actual failure mode we care about).
+    const drawn = new Set(Array.from({ length: 1000 }, () => generateShareToken()));
+    check(drawn.size === 1000, "۱۰۰۰ توکن پیاپی همه یکتا هستند");
+
+    const hash = hashShareToken(token);
+    check(/^[0-9a-f]{64}$/.test(hash), "هش SHA-256 در قالب ۶۴ نویسه هگز است");
+    check(hash === hashShareToken(token), "هش قطعی است (جست‌وجو با تساوی روی هش)");
+    check(hash !== token, "هش با توکن یکسان نیست (توکن خام ذخیره نمی‌شود)");
+    check(hashShareToken(token + "x") !== hash, "تغییر یک نویسه، هش را کاملاً عوض می‌کند");
+
+    // The database stores only the digest, so these are the only accepted shapes.
+    check(!SHARE_TOKEN_RE.test("x".repeat(42)), "توکن کوتاه‌تر رد می‌شود");
+    check(!SHARE_TOKEN_RE.test("x".repeat(44)), "توکن بلندتر رد می‌شود");
+    check(!SHARE_TOKEN_RE.test("../../etc/passwd"), "ورودی مسیرگونه رد می‌شود");
+    check(!SHARE_TOKEN_RE.test("00000000-0000-4000-8000-000000000000"), "UUID به‌جای توکن پذیرفته نمی‌شود");
   }
 
 }

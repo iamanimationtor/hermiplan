@@ -1,14 +1,12 @@
 import type { NextConfig } from "next";
 
 /**
- * Baseline security headers.
+ * Baseline security headers applied to every response.
  *
- * A strict CSP is intentionally NOT set: the Persian webfont is loaded from a
- * CDN through a CSS `@import`, and Next.js injects inline bootstrap scripts, so
- * a policy written without browser testing would either break the UI or be
- * meaningless. This is a documented, known gap (see
- * docs/AUDIT-REPORT.md → «معیارهای پذیرش ناتمام») rather than a guessed
- * configuration.
+ * The Content-Security-Policy lives in `src/middleware.ts`, because it needs a
+ * per-request nonce for Next.js's inline bootstrap script; a static header here
+ * could not carry one. See `scripts/csp-check.ts` for the automated check of the
+ * served policy and `docs/evidence/csp.txt` for its output.
  */
 const baseSecurityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -37,6 +35,16 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
           { key: "Cache-Control", value: "no-store, max-age=0" },
+        ],
+      },
+      {
+        // Share links (`/s/<token>`) are the same document reached through a
+        // secret URL: never index, never cache, never leak the token by referrer.
+        source: "/s/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+          { key: "Cache-Control", value: "no-store, max-age=0" },
+          { key: "Referrer-Policy", value: "no-referrer" },
         ],
       },
     ];

@@ -1,23 +1,27 @@
-# production-mode smoke — 2026-10-31T11:57:08Z
-(next start on port 3200 with DATABASE_URL, no SMS provider, NODE_ENV=production)
+# production smoke — next start (NODE_ENV=production) + real PostgreSQL — 2026-10-31T12:29:07Z
 
-$ curl -s /api/health
-{"ok":true,"schemaVersion":2,"database":"ok","rateLimitStore":"postgres","smsConfigured":false}
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3400/api/health
+  200
 
-$ curl -s -o /dev/null -w '%{http_code}' /  /builder
-/ => 200
-/builder => 200
-/report/<random-uuid> => 404
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3400/
+  200
 
-$ curl -i -X POST /api/auth (no SMS provider, NODE_ENV=production)
-HTTP/1.1 503 Service Unavailable
-{"error":"ورود با موبایل در این نصب فعال نیست: سرویس پیامک پیکربندی نشده است. استفاده از امکانات اصلی نیازمند ورود نیست."}
-$ Demo OTP must NOT be available in production even with HERMIPLAN_ALLOW_DEMO_OTP unset
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3400/builder
+  200
 
-$ curl -sI / (headers)
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3400/report/00000000-0000-4000-8000-000000000000
+  404
+
+$ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3400/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  404
+
+$ curl -s http://127.0.0.1:3400/api/health
+{"ok":true,"schemaVersion":3,"database":"ok","rateLimitStore":"postgres","smsConfigured":false}
+
+security + cache headers on a document:
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 Referrer-Policy: strict-origin-when-cross-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=()
-Cross-Origin-Opener-Policy: same-origin
 Strict-Transport-Security: max-age=31536000; includeSubDomains
+content-security-policy: default-src 'self'; script-src 'self' 'nonce-ZDE0ZDhjN2YtMjIzMS00YmJjLWIxMDQtMTNiOGQ5ZGIzNjdi' 'strict-dynamic'; style-src 's

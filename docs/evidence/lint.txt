@@ -1,3 +1,3 @@
-# eslint — 2026-10-31T12:03:28Z
+# eslint — 2026-10-31T12:36:11Z  (after a clean npm ci)
 $ npx eslint . -f json
-files 72 errors 0 warnings 0
+files 84 errors 0 warnings 0

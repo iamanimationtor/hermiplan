@@ -1,6 +1,6 @@
-# legacy db migration — 2026-10-31T12:02:13Z
-purpose: rebuild the schema of the previous release, then prove the current migrations
-         upgrade it without losing a row (and that the rollback restores the old shape).
+# legacy database migration — REAL PostgreSQL 18.6, throwaway db hermiplan_legacy — 2026-10-31T12:28:15Z
+purpose: rebuild the schema of the previous release, upgrade it with the current
+         migrations, prove no row is lost, roll back, and re-apply.
 
 $ npx tsx scripts/legacy-db-check.ts prepare
 ▶ ساخت پایگاه داده نسخه قبلی (legacy) و درج داده‌های موجود
@@ -15,14 +15,18 @@ $ npm run db:migrate
 > db:migrate
 > tsx scripts/migrate.ts
 
-Database: 127.0.0.1:5435/postgres
+Database: 127.0.0.1:5544/hermiplan_legacy
   → 0001_baseline (pending)
   → 0002_security_hardening (pending)
+  → 0003_share_tokens (pending)
 
 ▶ applying 0001_baseline
   ✓ applied
 
 ▶ applying 0002_security_hardening
+  ✓ applied
+
+▶ applying 0003_share_tokens
   ✓ applied
 
 All migrations applied.
@@ -49,12 +53,18 @@ $ npx tsx scripts/legacy-db-check.ts verify
   ✓ ایندکس otp_phone_created_idx ساخته شد
   ✓ ایندکس project_events_project_kind_idx ساخته شد
   ✓ ایندکس rate_limits_window_idx ساخته شد
-  ✓ دفتر مهاجرت هر دو فایل را ثبت کرد
+  ✓ دفتر مهاجرت هر سه فایل را ثبت کرد
+  ✓ جدول project_share_tokens ساخته شد
+  ✓ حذف پروژه، لینک‌های اشتراک آن را پاک می‌کند (CASCADE)
+  ✓ ایندکس یکتای هش توکن ساخته شد
+  ✓ مهاجرت ۰۰۰۳ هیچ پروژه‌ای را حذف نکرد
 
-✔ مرحله «verify» با 21 بررسی موفق
+✔ مرحله «verify» با 25 بررسی موفق
 
-$ npx tsx scripts/legacy-db-check.ts rollback   # drizzle/0002_security_hardening.rollback.sql
-▶ اجرای rollback رسمی 0002
+$ npx tsx scripts/legacy-db-check.ts rollback
+▶ اجرای rollback رسمی 0003_share_tokens.rollback.sql
+  ✓ rollback اجرا شد
+▶ اجرای rollback رسمی 0002_security_hardening.rollback.sql
   ✓ rollback اجرا شد
 
 ✔ مرحله «rollback» با 0 بررسی موفق
@@ -66,29 +76,6 @@ $ npx tsx scripts/legacy-db-check.ts verify-rollback
   ✓ پیش‌فرض is_public به مقدار قبلی بازگشت
   ✓ پروژه‌ها در rollback حذف نشدند
   ✓ rollback عمداً پروژه را دوباره عمومی نکرد (حفاظت از داده)
+  ✓ جدول لینک‌های اشتراک در rollback حذف شد
 
-✔ مرحله «verify-rollback» با 5 بررسی موفق
-
-# --- re-apply after rollback (documented step: remove the ledger row, then migrate) ---
-$ node -e "delete from _hermiplan_migrations where version='0002_security_hardening'"
-ledger row removed: 1
-
-$ npm run db:migrate
-
-> db:migrate
-> tsx scripts/migrate.ts
-
-Database: 127.0.0.1:5435/postgres
-  ✓ 0001_baseline (applied)
-  → 0002_security_hardening (pending)
-
-▶ applying 0002_security_hardening
-  ✓ applied
-
-All migrations applied.
-
-$ npx tsx scripts/legacy-db-check.ts verify
-  ✓ ایندکس rate_limits_window_idx ساخته شد
-  ✓ دفتر مهاجرت هر دو فایل را ثبت کرد
-
-✔ مرحله «verify» با 21 بررسی موفق
+✔ مرحله «verify-rollback» با 6 بررسی موفق

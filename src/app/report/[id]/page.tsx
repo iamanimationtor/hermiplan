@@ -3,12 +3,10 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
-import { analyzeProject } from "@/lib/engine/analysis";
-import { DEFAULT_REPORT_SECTIONS, parseProjectInput, reportOptionsSchema, type ReportOptions } from "@/lib/validation";
 import { ReportView } from "@/components/report/ReportView";
 import { getCurrentUser, getGuestToken, isProjectOwner } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/http";
-import type { ProjectInput } from "@/lib/engine/types";
+import { buildLoadedReport } from "@/lib/server/report-loader";
 
 export const dynamic = "force-dynamic";
 
@@ -35,64 +33,27 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const isOwner = isProjectOwner(row, { user, guestToken });
 
   /**
-   * Access rules:
-   *  • the owner always has access;
-   *  • everyone else needs an explicitly published project whose share link
-   *    has not expired. The UUID alone is an identifier, never a credential.
+   * Access rule: **owner only**.
+   *
+   * This route used to serve any published project to anyone who knew the UUID.
+   * A UUID is an identifier, not a credential, so shared viewing now happens
+   * exclusively through `/s/<token>` (see `lib/server/share-token.ts`). The
+   * owner still lands here after saving, and a shared visitor who guesses this
+   * URL gets a 404 — the project's existence is never confirmed.
    */
-  // Server component: the page is rendered per request, so reading the clock
-  // here is intentional (and never causes a hydration mismatch).
-  // eslint-disable-next-line react-hooks/purity
-  const shareExpired = row.shareExpiresAt !== null && row.shareExpiresAt.getTime() <= Date.now();
-  const shareable = row.isPublic && !shareExpired;
-  if (!isOwner && !shareable) notFound();
+  if (!isOwner) notFound();
 
-  // Defensive parsing: stored payloads were validated on write, but a legacy or
-  // corrupted row must never crash the page.
-  let input: ProjectInput;
-  try {
-    input = parseProjectInput(row.input ?? {});
-  } catch {
-    input = {
-      meta: {
-        name: "پروژه بدون نام",
-        type: "general",
-        currency: "IRR",
-        startDate: new Date().toISOString().slice(0, 10),
-        statusDate: new Date().toISOString().slice(0, 10),
-      },
-      calendar: { workDays: [6, 0, 1, 2, 3], holidays: [], hoursPerDay: 8 },
-      activities: [],
-      resources: [],
-      milestones: [],
-      risks: [],
-      baseline: null,
-    };
-  }
-  const analysis = analyzeProject(input);
-
-  let options: ReportOptions;
-  try {
-    options = reportOptionsSchema.parse(row.reportOptions ?? {});
-  } catch {
-    options = {
-      sections: DEFAULT_REPORT_SECTIONS,
-      includeNotes: true,
-      includeGanttDependencyArrows: true,
-      ganttScale: "day",
-      theme: "print",
-    };
-  }
+  const report = buildLoadedReport(row);
 
   return (
     <ReportView
-      projectId={row.id}
-      project={input}
-      analysis={analysis}
-      options={options}
-      isPublic={row.isPublic}
-      shareExpiresAt={row.shareExpiresAt ? row.shareExpiresAt.toISOString() : null}
-      canManage={isOwner}
+      projectId={report.id}
+      project={report.input}
+      analysis={report.analysis}
+      options={report.options}
+      isPublic={report.isPublic}
+      shareExpiresAt={report.shareExpiresAt ? report.shareExpiresAt.toISOString() : null}
+      canManage
     />
   );
 }

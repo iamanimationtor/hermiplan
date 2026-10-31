@@ -1,0 +1,21 @@
+# local load test — 2026-10-31T12:28:26Z
+# NOTE: rate limits raised on THIS instance only (RATE_LIMIT_ANALYZE=1000000) so that the
+#       measurement shows engine/SSR capacity instead of the limiter. The limiter itself is
+#       covered by api-integration §9 and db-integrity §1.
+$ BASE_URL=http://127.0.0.1:3600 CONCURRENCY=12 DURATION_MS=8000 npm run test:load
+▶ آزمون بار محلی — http://127.0.0.1:3600
+   حجم بدنه: 10.4 KB · هم‌زمانی: 12 · مدت هر سنجش: 8000 ms
+   node v22.22.3 · linux/x64
+
+▶ POST /api/analyze (موتور CPM + EVM)
+   درخواست: 1558 · موفق: 1558 · ناموفق: 0
+   تأخیر (ms): p50=55.7 p95=92.2 p99=180.8 max=210.6
+   توان عبور: 194.8 درخواست/ثانیه با هم‌زمانی 12
+▶ GET /builder (SSR + CSP nonce)
+   درخواست: 888 · موفق: 888 · ناموفق: 0
+   تأخیر (ms): p50=100.7 p95=143.3 p99=278.3 max=285.6
+   توان عبور: 111.0 درخواست/ثانیه با هم‌زمانی 12
+
+✔ آزمون بار پایان یافت — 2446 درخواست، بدون خطا
+  این عدد ظرفیت یک پروسه روی این ماشین است، نه تضمین ظرفیت Netlify.
+EXIT=0

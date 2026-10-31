@@ -69,9 +69,16 @@ scope variables to Builds only, requests will fail at runtime.
 ## 4. Production database and safe migrations
 
 The schema lives in `src/db/schema.ts`; the versioned SQL lives in `drizzle/`
-(`0001_baseline.sql`, `0002_security_hardening.sql`, each with a matching
-`*.rollback.sql`). They are applied by **`scripts/migrate.ts`**, never during
-the site build, so a deploy cannot alter data automatically.
+(`0001_baseline.sql`, `0002_security_hardening.sql`, `0003_share_tokens.sql`, each
+with a matching `*.rollback.sql`). They are applied by **`scripts/migrate.ts`**,
+never during the site build, so a deploy cannot alter data automatically.
+
+`0003_share_tokens` is **purely additive**: it creates the table
+`project_share_tokens` (hashed share links) and touches no existing row. Until it
+is applied, the `/s/<token>` route returns 404 — reports stay owner-only, which
+is the safe direction. It has been rehearsed end-to-end on a real PostgreSQL 18.6
+server rebuilt from the previous release's schema (`docs/evidence/legacy-db.txt`:
+prepare → migrate 0001+0002+0003 → 25 checks → rollback 0003+0002 → 6 checks).
 
 ```bash
 # 1. inspect what would run (no writes)
@@ -96,9 +103,11 @@ How the runner protects you:
 * `--dry-run` prints the statements that would be executed.
 
 **Rollback:** every migration ships with a paired `*.rollback.sql` that removes
-exactly what it added. Review it, apply it manually (`psql "$DATABASE_URL" -f
-drizzle/0002_security_hardening.rollback.sql`) and then delete the corresponding
-row from `_hermiplan_migrations`.
+exactly what it added. Apply the newest first
+(`drizzle/0003_share_tokens.rollback.sql`, then
+`drizzle/0002_security_hardening.rollback.sql`) and then delete the corresponding
+rows from `_hermiplan_migrations`. Dropping `project_share_tokens` invalidates
+every share link; projects, their data and their ownership are untouched.
 
 The schema has no destructive statement: `0001` creates tables `IF NOT EXISTS`,
 `0002` only adds tables/columns/constraints/indexes. Nothing is dropped or
@@ -113,6 +122,24 @@ Connection guidance:
   `DATABASE_POOL_MAX=1`.
 * `idleTimeoutMillis` is 10 s and idle-client errors are logged rather than
   thrown, so frozen serverless containers do not surface stale connections.
+
+---
+
+## 4b. Share links (`/s/<token>`) and the CSP
+
+* Report sharing uses a 256-bit token (`crypto.randomBytes(32)`, base64url) whose
+  **SHA-256 digest** is the only thing stored. Set `NEXT_PUBLIC_SITE_URL` to the
+  public origin so a generated link never contains an internal bind address
+  (`http://0.0.0.0:3000`) when the app runs behind a proxy or on serverless.
+* `/report/<uuid>` is owner-only; a visitor without the cookie gets 404. Do not
+  publish UUID-based links — they no longer work, by design.
+* Revoking: `DELETE /api/projects/:id/share?tokenId=…`, all at once with
+  `?all=1`, or implicitly by `PATCH { isPublic: false }`.
+* The CSP is issued per request by `src/middleware.ts` with a nonce, so **do not**
+  add a static `Content-Security-Policy` header in `next.config.ts` or at the CDN:
+  it would conflict and drop the nonce. If you front the site with a CDN, make
+  sure it passes response headers through unchanged. Verify after each deploy:
+  `BASE_URL=https://your-domain npm run test:csp`.
 
 ---
 

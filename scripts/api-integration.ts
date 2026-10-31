@@ -206,36 +206,89 @@ async function main() {
   const badId = await call(owner, "/api/projects/not-a-uuid");
   ok(badId.status === 400, "شناسه نامعتبر ⇒ ۴۰۰");
 
-  /* ---------------- 3. گزارش: خصوصی به‌صورت پیش‌فرض + انتشار قابل بازگشت ---------------- */
-  console.log("\n▶ ۳. گزارش خصوصی، انتشار صریح و لغو انتشار");
+  /* ---------------- 3. گزارش: خصوصی به‌صورت پیش‌فرض + لینک اشتراک با توکن ---------------- */
+  console.log("\n▶ ۳. گزارش خصوصی، لینک اشتراک توکنی و ابطال");
   const defaultReport = await call(new Jar(), `/report/${id}`);
   ok(defaultReport.status === 404, "گزارش به‌صورت پیش‌فرض خصوصی است (غریبه ⇒ ۴۰۴)", `got ${defaultReport.status}`);
   const ownerReportDefault = await call(owner, `/report/${id}`);
   ok(ownerReportDefault.status === 200, "مالک گزارش خصوصی خود را می‌بیند", `got ${ownerReportDefault.status}`);
 
-  const publish = await call(owner, `/api/projects/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify({ isPublic: true }),
+  const strangerShare = await call(stranger, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
+  ok(strangerShare.status === 404, "غریبه نمی‌تواند لینک اشتراک بسازد ⇒ ۴۰۴", `got ${strangerShare.status}`);
+
+  const crossOriginShare = await call(owner, `/api/projects/${id}/share`, {
+    method: "POST",
+    body: "{}",
+    headers: { origin: "https://evil.example" },
   });
-  ok(publish.status === 200, "مالک می‌تواند گزارش را منتشر کند", publish.body.slice(0, 120));
+  ok(crossOriginShare.status === 403, "ساخت لینک از دامنه دیگر رد می‌شود (CSRF) ⇒ ۴۰۳", `got ${crossOriginShare.status}`);
 
-  const publicReport = await call(new Jar(), `/report/${id}`);
-  ok(publicReport.status === 200, "پس از انتشار، گزارش برای غریبه قابل مشاهده است", `got ${publicReport.status}`);
-
-  const rawAfterPublish = await call(stranger, `/api/projects/${id}`);
-  ok(rawAfterPublish.status === 404, "انتشار گزارش، دسترسی به داده خام را باز نمی‌کند", `got ${rawAfterPublish.status}`);
-
-  const privatise = await call(owner, `/api/projects/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify({ isPublic: false }),
+  const badExpiry = await call(owner, `/api/projects/${id}/share`, {
+    method: "POST",
+    body: JSON.stringify({ expiresAt: "2020-01-01T00:00:00.000Z" }),
   });
-  ok(privatise.status === 200, "مالک می‌تواند انتشار را لغو کند");
+  ok(badExpiry.status === 422, "تاریخ انقضای گذشته پذیرفته نمی‌شود ⇒ ۴۲۲", `got ${badExpiry.status}`);
 
-  const privateReport = await call(new Jar(), `/report/${id}`);
-  ok(privateReport.status === 404, "گزارش لغو‌شده برای غریبه ⇒ ۴۰۴", `got ${privateReport.status}`);
+  const share = await call(owner, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
+  ok(share.status === 201, "مالک لینک اشتراک می‌سازد ⇒ ۲۰۱", share.body.slice(0, 160));
+  const shareBody = JSON.parse(share.body || "{}") as { token?: string; url?: string; tokenId?: string };
+  const shareToken = shareBody.token ?? "";
+  ok(shareToken.length === 43 && /^[A-Za-z0-9_-]+$/.test(shareToken), "توکن ۲۵۶ بیت base64url است (۴۳ نویسه)");
+  ok(
+    shareToken !== id && !shareToken.includes(id.replace(/-/g, "")),
+    "توکن از شناسه پروژه مشتق نشده است",
+  );
+  ok((shareBody.url ?? "").includes(`/s/${shareToken}`), "آدرس عمومی لینک روی /s/<token> است");
+
+  // The token itself must never be stored: only its SHA-256 digest.
+  const storedHash = await dbQuery("select token_hash from project_share_tokens where id = $1", [shareBody.tokenId]);
+  ok(storedHash.length === 64 && storedHash !== shareToken, "در پایگاه داده فقط هش SHA-256 ذخیره شده است");
+  const auditRows = await dbQuery(
+    "select count(*) from project_events where project_id = $1 and kind = 'share-created'",
+    [id],
+  );
+  ok(Number(auditRows) >= 1, "ساخت لینک در دفتر رخدادها ثبت شده است");
+
+  const sharedReport = await call(new Jar(), `/s/${shareToken}`);
+  ok(sharedReport.status === 200, "لینک اشتراک گزارش را برای غریبه باز می‌کند", `got ${sharedReport.status}`);
+
+  const uuidStillForbidden = await call(new Jar(), `/report/${id}`);
+  ok(
+    uuidStillForbidden.status === 404,
+    "دانستن UUID حتی پس از ساخت لینک، مجوز نیست ⇒ ۴۰۴",
+    `got ${uuidStillForbidden.status}`,
+  );
+
+  const rawAfterShare = await call(stranger, `/api/projects/${id}`);
+  ok(rawAfterShare.status === 404, "لینک اشتراک دسترسی به داده خام را باز نمی‌کند", `got ${rawAfterShare.status}`);
+  const editAfterShare = await call(stranger, `/api/projects/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ project: JSON.parse(projectJson) }),
+  });
+  ok(editAfterShare.status === 404, "لینک اشتراک حق ویرایش نمی‌دهد", `got ${editAfterShare.status}`);
+
+  const metadata = await call(owner, `/api/projects/${id}/share`);
+  ok(metadata.status === 200, "مالک فهرست لینک‌ها را می‌بیند", `got ${metadata.status}`);
+  ok(!metadata.body.includes(shareToken), "فهرست لینک‌ها توکن خام را افشا نمی‌کند");
+
+  const revoked = await call(owner, `/api/projects/${id}/share?tokenId=${shareBody.tokenId}`, { method: "DELETE" });
+  ok(revoked.status === 200, "ابطال یک لینک ⇒ ۲۰۰", `got ${revoked.status}`);
+  const afterRevoke = await call(new Jar(), `/s/${shareToken}`);
+  ok(afterRevoke.status === 404, "لینک باطل‌شده فوراً ⇒ ۴۰۴", `got ${afterRevoke.status}`);
+
+  const second = await call(owner, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
+  const secondToken = (JSON.parse(second.body || "{}") as { token?: string }).token ?? "";
+  ok(second.status === 201 && secondToken.length === 43, "ساخت لینک دوم موفق است");
+  const revokeAll = await call(owner, `/api/projects/${id}/share?all=1`, { method: "DELETE" });
+  ok(revokeAll.status === 200, "ابطال همه لینک‌ها ⇒ ۲۰۰");
+  const afterRevokeAll = await call(new Jar(), `/s/${secondToken}`);
+  ok(afterRevokeAll.status === 404, "پس از ابطال همه، لینک دوم ⇒ ۴۰۴", `got ${afterRevokeAll.status}`);
+
+  const publicFlag = await dbQuery("select case when is_public then 't' else 'f' end from projects where id = $1", [id]);
+  ok(publicFlag === "f", "پس از ابطال همه لینک‌ها، پروژه دوباره خصوصی است");
+
   const ownerReport = await call(owner, `/report/${id}`);
   ok(ownerReport.status === 200, "مالک همچنان گزارش را می‌بیند");
-
   const apiAfterPrivate = await call(stranger, `/api/projects/${id}`);
   ok(apiAfterPrivate.status === 404, "داده خام پس از خصوصی‌سازی هم محدود است");
 

@@ -14,6 +14,8 @@ import { normalizePricing } from "../src/lib/market/engine";
 import { constraintOffset } from "../src/lib/engine/schedule";
 import { ensureViableCalendar } from "../src/lib/engine/calendar";
 import { buildReportHtml } from "../src/lib/report/html";
+import { roundMoney, sumMoney, percentOfMoney, moneyEquals } from "../src/lib/engine/money";
+import { computeCostBreakdown } from "../src/lib/market/engine";
 import type { ActivityInput, MilestoneInput, ProjectInput } from "../src/lib/engine/types";
 
 let failures = 0;
@@ -796,6 +798,51 @@ console.log("▶ ۱۴. گزارش خروجی HTML: نرخ با فراداده، 
     buildReportHtml(zeroBudget, zHtml, "").includes("پیشرفت مالی"),
     "برچسب «پیشرفت مالی» مستقل از «پیشرفت فیزیکی» در گزارش چاپ می‌شود",
   );
+}
+
+/* ================================================================== */
+console.log("▶ ۱۵. سیاست پول: گرد کردن یک‌بار، جمع اجزای گردشده، بدون NaN");
+{
+  // half away from zero, at the second decimal
+  eq(roundMoney(2.345), 2.35, "۲٫۳۴۵ ⇒ ۲٫۳۵ (نیم به سمت دور از صفر)");
+  eq(roundMoney(-2.345), -2.35, "‎−۲٫۳۴۵ ⇒ −۲٫۳۵ (همان قاعده برای منفی)");
+  eq(roundMoney(1.005), 1.01, "۱٫۰۰۵ ⇒ ۱٫۰۱ (خطای نمایش دودویی اصلاح می‌شود)");
+  eq(roundMoney(0), 0, "صفر بدون تغییر است");
+
+  // idempotent: rounding a rounded value must not move it
+  const samples = [0.004, 0.005, 0.015, 1234.5678, 99_999.999, 1e9 + 0.333];
+  check(
+    samples.every((value) => roundMoney(roundMoney(value)) === roundMoney(value)),
+    "گرد کردن idempotent است (قاعده ۱)",
+  );
+
+  // non-finite values never leak into a report
+  eq(roundMoney(Number.NaN), 0, "NaN ⇒ ۰ (به گزارش نمی‌رسد)");
+  eq(roundMoney(Number.POSITIVE_INFINITY), 0, "Infinity ⇒ ۰");
+  eq(sumMoney([1, Number.NaN, 2]), 3, "جمع، مقدار نامعتبر را نادیده می‌گیرد");
+
+  // the total is exactly the sum of the printed components
+  const breakdown = computeCostBreakdown(12_345_678.905, 4_567.891, {
+    overheadPercent: 17,
+    profitPercent: 10,
+    contingencyPercent: 5,
+  } as never);
+  const parts = [breakdown.direct, breakdown.overhead, breakdown.profit, breakdown.contingency, breakdown.escalation];
+  check(
+    breakdown.total === sumMoney(parts),
+    "جمع کل برابر جمع دقیق اجزای چاپ‌شده است (قاعده ۲)",
+    `${breakdown.total} vs ${sumMoney(parts)}`,
+  );
+  check(parts.every((value) => Number.isFinite(value)), "هیچ جزئی NaN/Infinity نیست");
+  check(
+    parts.every((value) => roundMoney(value) === value),
+    "هر جزء حداکثر دو رقم اعشار دارد (قاعده ۱)",
+  );
+  eq(breakdown.overhead, percentOfMoney(breakdown.direct, 17), "بالاسری = ۱۷٪ مستقیم (گردشده یک‌بار)");
+
+  // money equality helper is symmetric and tolerant only to display rounding
+  check(moneyEquals(1000.001, 1000), "تفاوت کوچک‌تر از آخرین رقم اعشار برابر حساب می‌شود");
+  check(!moneyEquals(1000.01, 1000), "تفاوت یک صدم، نابرابری واقعی است");
 }
 
 /* ================================================================== */

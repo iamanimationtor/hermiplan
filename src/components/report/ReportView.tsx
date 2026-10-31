@@ -160,6 +160,7 @@ export function ReportView({
   isPublic = false,
   shareExpiresAt = null,
   canManage = false,
+  shared = false,
 }: {
   projectId: string;
   project: ProjectInput;
@@ -169,6 +170,8 @@ export function ReportView({
   /** ISO timestamp after which the public link stops working (null = no expiry). */
   shareExpiresAt?: string | null;
   canManage?: boolean;
+  /** true when the page was opened through a share token (`/s/…`) */
+  shared?: boolean;
 }) {
   const [sections, setSections] = useState<string[]>(options.sections);
   const has = (key: string) => sections.includes(key);
@@ -177,24 +180,80 @@ export function ReportView({
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [busyFormat, setBusyFormat] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [publicLink, setPublicLink] = useState(isPublic);
-  const [visibilityBusy, setVisibilityBusy] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareLinks, setShareLinks] = useState<
+    { id: string; createdAt: string; expiresAt: string | null; revokedAt: string | null; lastUsedAt: string | null; useCount: number; active: boolean }[]
+  >([]);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [freshLink, setFreshLink] = useState<string | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
 
-  async function toggleVisibility() {
-    if (!canManage) return;
-    setVisibilityBusy(true);
+  /**
+   * Share links are managed server-side (hashed token, revocable). The plaintext
+   * link is shown exactly once, immediately after creation, and is never stored
+   * in the browser or in the database.
+   */
+  async function loadShares() {
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isPublic: !publicLink }),
-      });
-      if (response.ok) setPublicLink((value) => !value);
+      const response = await fetch(`/api/projects/${projectId}/share`, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = (await response.json()) as { tokens?: typeof shareLinks };
+      setShareLinks(data.tokens ?? []);
     } catch {
-      /* the link state stays unchanged — no fake feedback */
-    } finally {
-      setVisibilityBusy(false);
+      /* a failed refresh leaves the last known list; no invented state */
     }
+  }
+
+  async function createShare() {
+    if (!canManage) return;
+    setShareBusy(true);
+    setShareError(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        setShareError(body.error ?? "ساخت لینک ناموفق بود");
+        return;
+      }
+      const data = (await response.json()) as { url?: string };
+      setFreshLink(data.url ?? null);
+      await loadShares();
+    } catch {
+      setShareError("ساخت لینک ناموفق بود");
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  async function revokeShare(tokenId?: string) {
+    if (!canManage) return;
+    setShareBusy(true);
+    try {
+      const query = tokenId ? `?tokenId=${encodeURIComponent(tokenId)}` : "?all=1";
+      const response = await fetch(`/api/projects/${projectId}/share${query}`, { method: "DELETE" });
+      if (response.ok) {
+        setFreshLink(null);
+        await loadShares();
+      } else {
+        setShareError("ابطال لینک ناموفق بود");
+      }
+    } catch {
+      setShareError("ابطال لینک ناموفق بود");
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  /** Opening the panel is also the moment the link list is refreshed. */
+  function toggleSharePanel() {
+    setShareOpen((open) => {
+      if (!open) void loadShares();
+      return !open;
+    });
   }
 
   async function copyLink() {
@@ -314,17 +373,14 @@ export function ReportView({
             <Button
               variant="secondary"
               size="sm"
-              onClick={toggleVisibility}
-              disabled={visibilityBusy}
+              onClick={toggleSharePanel}
               title={
-                publicLink
-                  ? `این گزارش برای هر دارنده لینک قابل مشاهده است${
-                      shareExpiresAt ? ` تا ${formatJalali(shareExpiresAt.slice(0, 10))}` : ""
-                    }`
+                shareLinks.some((link) => link.active)
+                  ? "این گزارش با لینک اشتراک قابل مشاهده است؛ هر لینک جداگانه قابل ابطال است"
                   : "فقط شما می‌توانید این گزارش را ببینید"
               }
             >
-              {publicLink ? "🔓 منتشرشده (عمومی)" : "🔒 خصوصی"}
+              {shareLinks.some((link) => link.active) ? "🔗 لینک اشتراک فعال" : "🔒 خصوصی"}
             </Button>
           ) : null}
           <Button variant="accent" size="sm" onClick={() => setDownloadOpen(true)}>
@@ -355,6 +411,140 @@ export function ReportView({
           })}
         </div>
       </div>
+
+      {/* ------------------------ share link panel ------------------------ */}
+      {canManage && shareOpen ? (
+        <div className="no-print mx-auto max-w-[1180px] px-3 pt-3 sm:px-4">
+          <div className="hp-card space-y-3 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-[13px] font-bold text-ink-900">لینک اشتراک گزارش</p>
+                <p className="mt-1 text-[11.5px] leading-6 text-slate-500">
+                  شناسه پروژه به‌تنهایی دسترسی نمی‌دهد. هر لینک یک رمز ۲۵۶ بیتی تصادفی است که فقط
+                  در همین لحظه یک‌بار نمایش داده می‌شود (در پایگاه داده فقط هش آن ذخیره است) و
+                  هر زمان می‌توانید آن را باطل کنید.
+                </p>
+              </div>
+              <Button size="sm" onClick={createShare} disabled={shareBusy}>
+                {shareBusy ? "در حال ساخت…" : "ساخت لینک جدید"}
+              </Button>
+            </div>
+
+            {shareError ? <p className="text-[11.5px] font-semibold text-red-600">{shareError}</p> : null}
+
+            {freshLink ? (
+              <div className="rounded-xl border border-brand-200 bg-brand-50 p-3">
+                <p className="text-[11px] font-bold text-brand-800">لینک ساخته شد — فقط همین یک‌بار نمایش داده می‌شود:</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <code dir="ltr" className="break-all rounded-lg bg-white px-2 py-1 font-mono text-[11px] text-ink-900">
+                    {freshLink}
+                  </code>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(freshLink);
+                        setCopied(true);
+                        window.setTimeout(() => setCopied(false), 2000);
+                      } catch {
+                        setCopied(false);
+                      }
+                    }}
+                  >
+                    {copied ? "✓ کپی شد" : "کپی لینک"}
+                  </Button>
+                </div>
+                <p className="mt-1.5 text-[10.5px] text-slate-500">
+                  اگر این لینک را گم کردید، لینک دیگری بسازید و این یکی را باطل کنید؛ خودِ لینک قابل بازیابی نیست.
+                </p>
+              </div>
+            ) : null}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-[11px]">
+                <thead>
+                  <tr className="text-slate-500">
+                    <th className="py-1 font-semibold">وضعیت</th>
+                    <th className="py-1 font-semibold">ساخت</th>
+                    <th className="py-1 font-semibold">انقضا</th>
+                    <th className="py-1 font-semibold">آخرین بازدید</th>
+                    <th className="py-1 font-semibold">بازدید</th>
+                    <th className="py-1 font-semibold">اقدام</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shareLinks.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-2 text-slate-400">
+                        هنوز لینکی ساخته نشده است؛ گزارش فعلاً فقط برای شما قابل مشاهده است.
+                      </td>
+                    </tr>
+                  ) : (
+                    shareLinks.map((link) => (
+                      <tr key={link.id} className="border-t border-slate-100">
+                        <td className="py-1.5">
+                          {link.active ? (
+                            <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-700">فعال</span>
+                          ) : (
+                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-500">باطل‌شده</span>
+                          )}
+                        </td>
+                        <td className="py-1.5 text-slate-600">{formatJalali(link.createdAt.slice(0, 10), { withMonthName: false })}</td>
+                        <td className="py-1.5 text-slate-600">
+                          {link.expiresAt ? formatJalali(link.expiresAt.slice(0, 10), { withMonthName: false }) : "بدون انقضا"}
+                        </td>
+                        <td className="py-1.5 text-slate-600">
+                          {link.lastUsedAt ? formatJalali(link.lastUsedAt.slice(0, 10), { withMonthName: false }) : "—"}
+                        </td>
+                        <td className="py-1.5 text-slate-600">{toPersianDigits(link.useCount)}</td>
+                        <td className="py-1.5">
+                          {link.active ? (
+                            <button
+                              type="button"
+                              onClick={() => revokeShare(link.id)}
+                              disabled={shareBusy}
+                              className="rounded-md border border-red-200 px-2 py-0.5 text-[10.5px] font-semibold text-red-600 hover:bg-red-50"
+                            >
+                              ابطال
+                            </button>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {shareLinks.some((link) => link.active) ? (
+              <button
+                type="button"
+                onClick={() => revokeShare()}
+                disabled={shareBusy}
+                className="text-[11px] font-semibold text-red-600 hover:underline"
+              >
+                ابطال همه لینک‌ها (گزارش دوباره خصوصی می‌شود)
+              </button>
+            ) : null}
+            {shareExpiresAt ? (
+              <p className="text-[10.5px] text-slate-500">
+                آخرین انقضای ثبت‌شده روی پروژه: {formatJalali(shareExpiresAt.slice(0, 10))}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {shared ? (
+        <div className="mx-auto max-w-[1180px] px-3 pt-3 sm:px-4">
+          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+            این گزارش از طریق یک لینک اشتراک نمایش داده می‌شود؛ دسترسی شما فقط‌خواندنی است و صاحب
+            گزارش می‌تواند همین لینک را در هر لحظه باطل کند.
+          </p>
+        </div>
+      ) : null}
 
       {/* -------------------------- download center -------------------------- */}
       <Modal open={downloadOpen} onClose={() => setDownloadOpen(false)} title="مرکز دریافت خروجی" wide>

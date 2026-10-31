@@ -5,6 +5,7 @@ import { projectEvents, projects } from "@/db/schema";
 import { analyzeProject } from "@/lib/engine/analysis";
 import { parseProjectInput, reportOptionsSchema } from "@/lib/validation";
 import { getCurrentUser, getGuestToken, isProjectOwner } from "@/lib/server/auth";
+import { revokeAllShareTokens } from "@/lib/server/share-token";
 import { checkRateLimit, RATE_RULES, clientKey, retryAfterHeaders } from "@/lib/server/rate-limit";
 import {
   csrfRejection,
@@ -138,9 +139,13 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
         updatedAt: new Date(),
       })
       .where(eq(projects.id, id));
+    // Turning sharing off must actually turn it off: every outstanding link is
+    // revoked in the same request, so an old link cannot outlive the decision.
+    if (!nextPublic) await revokeAllShareTokens(id);
     await logEvent(id, "visibility", {
       isPublic: nextPublic,
       shareExpiresAt: (expiry === undefined ? row.shareExpiresAt : expiry)?.toISOString() ?? null,
+      revokedLinks: nextPublic ? 0 : true,
     });
     return jsonOk({
       id,
@@ -182,6 +187,8 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   } catch (error) {
     return internalErrorResponse(error, "projects/:id", "ذخیره پروژه ناموفق بود");
   }
+
+  if (body.isPublic === false) await revokeAllShareTokens(id);
 
   await logEvent(id, "update", {
     activities: input.activities.length,

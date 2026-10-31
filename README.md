@@ -85,12 +85,17 @@ npm run dev                     # یا: npm run build && npm start
 | `npm run lint` | ESLint (بدون خطا/هشدار) |
 | `npm test` | کل مجموعه‌های بدون پایگاه‌داده (۷ مجموعه) |
 | `npm run test:engine` | ۸۱ بررسی مستقل با مقادیر محاسبه‌شده دستی |
-| `npm run test:engine:regressions` | ۱۷۷ رگرسیون محدودیت/Milestone/Baseline/EVM/تاریخ وضعیت/سیاست گرد کردن |
+| `npm run test:engine:regressions` | ۱۹۱ رگرسیون: محدودیت/Milestone/Baseline/EVM/تاریخ وضعیت/گرد کردن/سیاست پول |
 | `npm run test:smoke` | دود موتور روی همه قالب‌ها |
 | `npm run test:edge` | ممیزی موارد مرزی + هر ۵ مسیر خروجی |
-| `npm run test:security` | ۲۴۹ بررسی: شماره موبایل، OTP، CSRF، محدودیت نرخ |
+| `npm run test:security` | ۲۶۱ بررسی: شماره موبایل، OTP، CSRF، محدودیت نرخ، توکن اشتراک |
 | `npx tsx scripts/legacy-db-check.ts prepare\|verify\|rollback` | مهاجرت روی پایگاه داده نسخه قبل بدون از دست رفتن داده |
-| `npm run test:api` | ۵۱ سناریوی یکپارچگی روی سرور واقعی (نیازمند سرور و پایگاه داده) |
+| `npm run test:api` | ۶۷ سناریوی یکپارچگی روی سرور واقعی و PostgreSQL واقعی |
+| `npm run test:legacy-db` | مهاجرت/rollback روی پایگاه نسخه قبل (`prepare\|verify\|rollback\|verify-rollback`) |
+| `npm run test:csp` | هدر CSP، nonce روی همه اسکریپت‌های inline و مجاز بودن منابع بیرونی |
+| `npm run test:layout` | رندر واقعی نمودار (پیکسل)، قواعد چاپ A4 و پیش‌شرط‌های چیدمان موبایل |
+| `npm run test:db:integrity` | هم‌زمانی محدودیت نرخ، یکتایی/آبشاری‌شدن قیدها، `VALIDATE CONSTRAINT` |
+| `npm run test:load` | آزمون بار محلی با p50/p95/p99 و نرخ خطا |
 | `npm run build` | ساخت production |
 
 برای مجموعه یکپارچگی:
@@ -103,6 +108,21 @@ BASE_URL=http://localhost:3100 DATABASE_URL="postgres://…" npm run test:api
 اگر ورود با موبایل را هم می‌خواهید بسنجید، سرور را با `HERMIPLAN_ALLOW_DEMO_OTP=1` و
 `NODE_ENV` غیر production (مثلاً `next dev`) اجرا کنید؛ در غیر این صورت مجموعه مسیر «۵۰۳ بدون
 سرویس پیامک» را بررسی می‌کند و بقیه سناریوها اجرا می‌شوند.
+
+### PostgreSQL واقعی (بدون Docker و بدون root)
+
+برای آزمون یکپارچگی، `puppeteer`-style وابستگی خارجی لازم نیست: باینری واقعی PostgreSQL از
+devDependency `embedded-postgres` اجرا می‌شود.
+
+```bash
+npx tsx scripts/pg-dev-server.ts &            # PostgreSQL واقعی روی ۱۲۷٫۰٫۰٫۱:۵۵۴۴
+export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5544/postgres
+npm run db:migrate
+npm run build && npx next start -p 3400 &      # NODE_ENV=production
+BASE_URL=http://127.0.0.1:3400 npm run test:api        # ۶۷ سناریو
+npm run test:db:integrity                              # هم‌زمانی و قیدها
+npm run test:csp                                       # سیاست امنیتی محتوا
+```
 
 ## متغیرهای محیطی
 
@@ -117,6 +137,7 @@ BASE_URL=http://localhost:3100 DATABASE_URL="postgres://…" npm run test:api
 | `SMS_PROVIDER_URL` / `SMS_PROVIDER_SENDER` | ✖ | برای `SMS_PROVIDER=http` |
 | `HERMIPLAN_ALLOW_DEMO_OTP` | ✖ | فقط خارج از production و با مقدار `1`: کد در پاسخ برمی‌گردد |
 | `HERMIPLAN_MARKET_FEED` / `_KEY` | ✖ | فید نرخ بازار (JSON) با توکن Bearer |
+| `NEXT_PUBLIC_SITE_URL` | ✖** | دامنه عمومی برای ساختن لینک `/s/<token>` (**بدون آن، Host درخواست استفاده می‌شود که پشت پراکسی می‌تواند آدرس داخلی باشد)
 | `RATE_LIMIT_*` | ✖ | بازنویسی سهمیه هر endpoint (جدول زیر) |
 
 ## محدودیت نرخ (سهمیه هر endpoint)
@@ -135,12 +156,20 @@ serverless بین نمونه‌ها مشترک باشند. در نبود پای�
 | درخواست کد OTP | شماره | ۵ / ۱۵ دقیقه (در کنار فاصله ۴۵ ثانیه‌ای) | `RATE_LIMIT_OTP_REQUEST` |
 | تأیید کد OTP | شماره و IP | ۱۰ / ۱۵ دقیقه | `RATE_LIMIT_OTP_VERIFY` |
 | ارسال مجدد کد | شماره | ۱ / ۴۵ ثانیه | — |
+| `POST /api/projects/:id/share` (ساخت لینک) | IP | ۱۰ / ساعت | `RATE_LIMIT_SHARE_CREATE` |
+| `DELETE /api/projects/:id/share` (ابطال) | IP | ۳۰ / دقیقه | `RATE_LIMIT_SHARE_REVOKE` |
+| `GET /s/<token>` (بازدید گزارش اشتراکی) | IP | ۲۴۰ / دقیقه | `RATE_LIMIT_SHARE_READ` |
 
 ## مدل دسترسی و امنیت
 
 - **پیش‌فرض خصوصی**: گزارش هر پروژه فقط برای مالک (کوکی مهمان یا حساب کاربری) قابل مشاهده است.
-  انتشار گزارش یک اقدام صریح و **قابل بازگشت** توسط مالک است و در `project_events`
-  (`kind = 'visibility'`) ثبت می‌شود.
+- **لینک اشتراک با توکن ۲۵۶ بیتی**: `/report/<uuid>` فقط برای مالک باز است؛ مشاهده اشتراکی از مسیر
+  `/s/<token>` انجام می‌شود. توکن با `crypto.randomBytes(32)` ساخته می‌شود و در پایگاه داده فقط
+  **هش SHA-256** آن ذخیره می‌شود، بنابراین دامپ پایگاه داده به لینک قابل استفاده تبدیل نمی‌شود.
+  هر لینک جداگانه قابل ابطال است (فوراً بی‌اثر می‌شود) و می‌تواند تاریخ انقضا داشته باشد؛
+  ساخت/ابطال در `project_events` (`share-created`/`share-revoked`) ثبت می‌شود.
+- **خاموش‌کردن اشتراک همه لینک‌ها را باطل می‌کند**: `PATCH` با `isPublic:false` در همان درخواست
+  تمام توکن‌های فعال را باطل می‌کند تا لینک قدیمی از تصمیم مالک جان سالم نبرد.
 - **شناسه UUID مجوز نیست**: درخواست غیرمالک همیشه ۴۰۴ می‌گیرد (نه ۴۰۳) تا وجود یا نبود پروژه
   افشا نشود. انتشار گزارش هم دسترسی به داده خام را باز نمی‌کند.
 - **OTP واقعی**: کد با CSPRNG ساخته می‌شود، فقط هش آن ذخیره می‌شود، ۵ دقیقه اعتبار، ۵ تلاش،
@@ -161,6 +190,12 @@ serverless بین نمونه‌ها مشترک باشند. در نبود پای�
   معتبر باشد؛ در غیر این صورت عبارت «کاتالوگ مرجع» با تاریخ مرجع دیده می‌شود.
 - تسطیح خودکار منابع پیاده‌سازی نشده است؛ بیش‌تخصیص شناسایی و گزارش می‌شود و تصمیم با برنامه‌ریز است.
 - ارجاع به استانداردها (PMBOK/ISO/AACE/فهرست‌بها) به‌معنای گواهی انطباق نیست.
+- CSP با nonce در `src/middleware.ts` اعمال می‌شود: `script-src` بدون `'unsafe-inline'` و بدون
+  `'unsafe-eval'` در production. `style-src` ناچار `'unsafe-inline'` دارد (۲۰+ ویژگی `style` در
+  React که nonce نمی‌پذیرند) — این محدودیت مستند است، نه فراموش‌شده.
+- آزمون مرورگری (اسکرین‌شات موبایل/دسکتاپ، PDF چاپی) در این محیط اجرا نشده است: باینری‌های
+  Chromium به کتابخانه‌های سیستمی `libnspr4`/`libnss3` نیاز دارند که نصبشان root می‌خواهد.
+  به‌جای ادعا، رندر پیکسلی نمودار و قواعد چاپ با `npm run test:layout` سنجیده می‌شود.
 
 ## نکات کیفی
 

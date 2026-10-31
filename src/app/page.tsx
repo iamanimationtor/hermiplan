@@ -9,6 +9,14 @@ import { RATE_CATALOG } from "@/lib/market/rates";
 import { METHODS, standardsFor } from "@/lib/standards";
 import { formatCompact, formatJalali, formatPercent, toPersianDigits } from "@/lib/date-fa";
 
+/**
+ * Rendered per request so the security middleware can attach its per-request
+ * CSP nonce to this document's inline scripts. A pre-built static page would
+ * carry a stale nonce and the policy would block its own bootstrap — see
+ * `src/middleware.ts`.
+ */
+export const dynamic = "force-dynamic";
+
 const FEATURES = [
   { icon: "🧮", title: "موتور محاسباتی CPM", body: "زمان‌بندی پیشرفته با مسیر بحرانی، شناوری کل و آزاد، وابستگی‌های FS/SS/FF/SF با Lag و تقویم کاری واقعی پروژه." },
   { icon: "📊", title: "گانت چارت حرفه‌ای", body: "نمودار گانت استاندارد با مسیر بحرانی، درصد پیشرفت، خط تاریخ وضعیت، نقاط کنترل و نمودار شبکه‌ای." },

@@ -1,4 +1,4 @@
-# npm test — 2026-10-31T12:04:15Z
+# npm test — 2026-10-31T12:36:21Z  (after a clean npm ci)
 $ npm test
 
 > test
@@ -16,7 +16,7 @@ $ npm test
 ▶ ۸. تاریخ هدف پایان و شناوری منفی
 ▶ ۹. انحراف زمان‌بندی نسبت به Baseline (تعریف صحیح)
 ▶ ۱۰. کارایی روی پروژه بزرگ
-    زمان تحلیل: 36ms برای ۵۰۰ فعالیت
+    زمان تحلیل: 29ms برای ۵۰۰ فعالیت
 
 ✔ 81 بررسی مستقل موتور — همه با محاسبه دستی تأیید شد
 
@@ -35,8 +35,9 @@ $ npm test
 ▶ ۱۲. سیاست واحد گرد کردن مدت و Lag (پایه آزمون: ۸ بررسی)
 ▶ ۱۳. هر تشخیص دارای راه‌حل عملی است (what/which/cause/remedy)
 ▶ ۱۴. گزارش خروجی HTML: نرخ با فراداده، راه‌حل تشخیص، پیشرفت مالی
+▶ ۱۵. سیاست پول: گرد کردن یک‌بار، جمع اجزای گردشده، بدون NaN
 
-✔ 177 بررسی رگرسیون موتور — همه با محاسبه دستی تأیید شد
+✔ 191 بررسی رگرسیون موتور — همه با محاسبه دستی تأیید شد
 
 ══════ موتور — دود (قالب‌ها) ══════
   ✓ construction    21 acts · 158 wd · CP 19 · budget 24359048430
@@ -59,7 +60,7 @@ ALL ENGINE CHECKS PASSED
 ══════ خروجی‌ها و موارد مرزی ══════
 
 ▶ ۱. پروژه خالی (بدون فعالیت، بدون منبع)
-  ✓ empty-project (0 acts, 0 wd, 18ms)
+  ✓ empty-project (0 acts, 0 wd, 17ms)
 
 ▶ ۲. فقط Milestone
   ✓ milestones-only (3 acts, 0 wd, 2ms)
@@ -85,18 +86,18 @@ ALL ENGINE CHECKS PASSED
 
 ▶ ۸. همه قالب‌ها × همه مسیرهای خروجی
   ✓ template:construction (21 acts, 158 wd, 2ms)
-  ✓ template:civil (14 acts, 171 wd, 4ms)
-  ✓ template:architecture (13 acts, 98 wd, 2ms)
+  ✓ template:civil (14 acts, 171 wd, 2ms)
+  ✓ template:architecture (13 acts, 98 wd, 1ms)
   ✓ template:infrastructure (11 acts, 98 wd, 1ms)
   ✓ template:software (15 acts, 92 wd, 1ms)
-  ✓ template:manufacturing (11 acts, 94 wd, 0ms)
+  ✓ template:manufacturing (11 acts, 94 wd, 1ms)
   ✓ template:research (13 acts, 126 wd, 1ms)
-  ✓ template:event (11 acts, 53 wd, 0ms)
+  ✓ template:event (11 acts, 53 wd, 1ms)
   ✓ template:renovation (11 acts, 84 wd, 2ms)
   ✓ template:general (10 acts, 37 wd, 1ms)
 
 ▶ ۹. Baseline و پیشرفت کامل/صفر
-  ✓ baseline-100% (15 acts, 92 wd, 21ms)
+  ✓ baseline-100% (15 acts, 92 wd, 18ms)
 
 ══════════ EDGE-CASE AUDIT PASSED ══════════
 
@@ -108,7 +109,9 @@ ALL ENGINE CHECKS PASSED
 ▶ ۵. اعتبارسنجی شناسه و استخراج IP
 ▶ ۶. محدودکننده نرخ (حالت جایگزین حافظه‌ای)
 
-✔ 249 بررسی امنیتی — همه موفق
+▶ توکن اشتراک گزارش
+
+✔ 261 بررسی امنیتی — همه موفق
 
 ══════ درون‌ریزی و قالب‌ها ══════
 ✔ IMPORT PARSER: ALL CHECKS PASSED

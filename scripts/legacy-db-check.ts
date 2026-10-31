@@ -214,14 +214,42 @@ async function main() {
     const ledger = await client.query<{ version: string }>(
       'select "version" from "_hermiplan_migrations" order by "version"',
     );
-    eq(ledger.rows.map((r) => r.version).join(","), "0001_baseline,0002_security_hardening", "دفتر مهاجرت هر دو فایل را ثبت کرد");
+    eq(
+      ledger.rows.map((r) => r.version).join(","),
+      "0001_baseline,0002_security_hardening,0003_share_tokens",
+      "دفتر مهاجرت هر سه فایل را ثبت کرد",
+    );
+
+    // 0003 — share tokens: additive only, so the legacy rows must be untouched.
+    const shareTable = await client.query(
+      "select 1 from information_schema.tables where table_name = 'project_share_tokens'",
+    );
+    eq(shareTable.rowCount, 1, "جدول project_share_tokens ساخته شد");
+    const shareFk = await client.query<{ delete_rule: string }>(
+      `select rc.delete_rule
+         from information_schema.referential_constraints rc
+         join information_schema.table_constraints tc
+           on tc.constraint_name = rc.constraint_name
+        where tc.table_name = 'project_share_tokens'`,
+    );
+    eq(shareFk.rows[0]?.delete_rule, "CASCADE", "حذف پروژه، لینک‌های اشتراک آن را پاک می‌کند (CASCADE)");
+    const shareIndexes = await client.query<{ indexname: string }>(
+      "select indexname from pg_indexes where tablename = 'project_share_tokens'",
+    );
+    const shareIndexNames = shareIndexes.rows.map((r) => r.indexname);
+    check(shareIndexNames.includes("project_share_tokens_hash_idx"), "ایندکس یکتای هش توکن ساخته شد");
+    const countsAfter = await client.query<{ projects: number }>('select count(*)::int as projects from "projects"');
+    eq(countsAfter.rows[0]?.projects, 2, "مهاجرت ۰۰۰۳ هیچ پروژه‌ای را حذف نکرد");
   }
 
   if (PHASE === "rollback") {
-    console.log("▶ اجرای rollback رسمی 0002");
-    const sql = readFileSync(PROCEDURE, "utf8");
-    await client.query(sql);
-    console.log("  ✓ rollback اجرا شد");
+    // Newest first: 0003, then 0002 — the order a real operator would use.
+    for (const file of ["0003_share_tokens.rollback.sql", "0002_security_hardening.rollback.sql"]) {
+      console.log(`▶ اجرای rollback رسمی ${file}`);
+      const sql = readFileSync(join(process.cwd(), "drizzle", file), "utf8");
+      await client.query(sql);
+      console.log("  ✓ rollback اجرا شد");
+    }
   }
 
   if (PHASE === "verify-rollback") {
@@ -244,6 +272,10 @@ async function main() {
       `select "is_public" from "projects" where "name" = 'پروژه قدیمی عمومی'`,
     );
     check(stillPrivate.rows[0]?.is_public === false, "rollback عمداً پروژه را دوباره عمومی نکرد (حفاظت از داده)");
+    const shareTable = await client.query(
+      "select 1 from information_schema.tables where table_name = 'project_share_tokens'",
+    );
+    eq(shareTable.rowCount, 0, "جدول لینک‌های اشتراک در rollback حذف شد");
   }
 
   await client.end();
