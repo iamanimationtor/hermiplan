@@ -97,9 +97,19 @@ export function SiteNav({ items = LANDING_ITEMS }: { items?: NavItem[] }) {
             ))}
           </nav>
 
+          {/* Sign-in entry points. Before this, the landing page offered no way
+              to reach an account at all, and the builder hid the button below
+              the `lg` breakpoint. */}
+          <Link
+            href="/builder?account=1"
+            className="ms-auto inline-flex rounded-xl border border-white/25 px-3 py-2 text-[12.5px] font-bold text-white transition hover:bg-white/10 lg:ms-0 lg:px-4 lg:text-[13px]"
+          >
+            ورود / ثبت‌نام
+          </Link>
+
           <Link
             href="/builder"
-            className="ms-auto hidden rounded-xl bg-accent-500 px-4 py-2.5 text-[13px] font-bold text-ink-950 shadow-lg shadow-accent-600/20 transition hover:bg-accent-400 lg:ms-0 lg:inline-flex"
+            className="hidden rounded-xl bg-accent-500 px-4 py-2.5 text-[13px] font-bold text-ink-950 shadow-lg shadow-accent-600/20 transition hover:bg-accent-400 lg:inline-flex"
           >
             شروع بدون ثبت‌نام
           </Link>
@@ -186,6 +196,13 @@ export function SiteNav({ items = LANDING_ITEMS }: { items?: NavItem[] }) {
                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent-500 px-4 py-3.5 text-[14px] font-bold text-ink-950 transition active:scale-[0.99]"
               >
                 🚀 ساخت پروژه و دریافت گزارش
+              </Link>
+              <Link
+                href="/builder?account=1"
+                onClick={() => setSheetOpen(false)}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[13px] font-bold text-brand-800 transition active:scale-[0.99]"
+              >
+                👤 ورود / ساخت حساب
               </Link>
               <p className="mt-3 flex items-center justify-center gap-2 text-center text-[10.5px] text-slate-500">
                 <LogoMark size="xs" /> {CREATOR_CREDIT_FULL}

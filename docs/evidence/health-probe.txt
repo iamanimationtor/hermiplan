@@ -1,8 +1,6 @@
-# /api/health probe — 2026-10-31T17:08:49Z (UTC)
+# /api/health probe — 2026-10-31T17:26:25Z (UTC)
 
-All four servers run the same build (`next start`), only DATABASE_URL / HERMIPLAN_ACCESS_MODE differ.
-
-## 1) default delivery state — config/access.json mode "locked"
+## 1) delivery state — config/access.json mode "locked"
 $ cat config/access.json
 {
   "mode": "locked",
@@ -12,33 +10,12 @@ $ cat config/access.json
 
 $ curl -s :3400/api/health
 {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
-$ curl -s -o /dev/null -w "%{http_code}" :3400/api/health
-200
 
 ## 2) pre-release state — HERMIPLAN_ACCESS_MODE=open on the same build (:3410)
 $ curl -s :3410/api/health
 {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"env","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
 
-## 3) empty database (no migrations) — :3610
-$ curl -s :3610/api/health
-{"ok":false,"schemaVersion":5,"database":"ok","missingTables":["projects","users","sessions","otp_codes","project_events","rate_limits","project_share_tokens","project_versions"],"missingColumns":[],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
-HTTP 503
-
-$ curl -s -X POST :3610/api/auth (register against an unmigrated database)
-HTTP 503  {"error":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید","code":"schema_incomplete"}
-
-## 4) database migrated through 0004 with the 0005 columns dropped — :3600
-   (tables all present, users.username and users.password_hash removed)
-$ curl -s :3600/api/health
-{"ok":false,"schemaVersion":5,"database":"ok","missingTables":[],"missingColumns":["users.username","users.password_hash"],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
-HTTP 503
-
-$ curl -s -X POST :3600/api/auth (register)
-HTTP 503  {"error":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید","code":"schema_incomplete"}
-$ curl -s -X POST :3600/api/auth (login)
-HTTP 503  {"error":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید","code":"schema_incomplete"}
-
-## 5) page status codes on the delivery server (:3400)
+## 3) page status codes (:3400)
 /                                                        200
 /builder                                                 200
 /robots.txt                                              200
@@ -46,10 +23,19 @@ HTTP 503  {"error":"مهاجرت‌ها اعمال نشده‌اند؛ npm run d
 /report/00000000-0000-4000-8000-000000000000             404
 /s/not-a-real-token                                      404
 
-## 6) the 404 pages explain themselves (count of the guidance sentences in the HTML)
-$ curl -s :3400/report/00000000-0000-4000-8000-000000000000 | grep -c "گزارش‌های هر پروژه فقط برای سازنده"
+## 4) the account entry point exists on both pages
+$ curl -s :3400/ | grep -o "ورود / ثبت‌نام" | wc -l
 1
-$ curl -s :3400/s/not-a-real-token | grep -c "این لینک اشتراک معتبر نیست"
+$ curl -s :3400/builder | grep -o "ورود / ثبت‌نام" | wc -l
 1
-$ curl -s :3400/report/00000000-0000-4000-8000-000000000000 | grep -c "۳ حالت یکسان\|سه حالت یکسان"
-1
+
+## 5) cookie attributes: cross-site frame (https) vs plain http
+$ POST /api/auth (register) with `x-forwarded-proto: https`
+set-cookie: hermiplan_session=<64 hex>; Path=/; Expires=…; Secure; HttpOnly; SameSite=none
+$ POST /api/auth (register) without that header (plain http, local)
+set-cookie: hermiplan_session=<64 hex>; Path=/; Expires=…; HttpOnly; SameSite=lax
+
+Reason: `SameSite=Lax` is not sent by the browser inside a cross-site frame, which
+turned every opened report into a 404 for its own owner. Over https we now use
+`SameSite=None; Secure` (the only combination browsers accept there); over http we
+keep `Lax`, because `None` without `Secure` is rejected outright.

@@ -38,6 +38,21 @@ interface SavedProject {
   name: string;
   projectType: string;
   updatedAt: string;
+  /** Capability key for the report page — see `lib/server/view-key.ts`. */
+  viewKey?: string;
+}
+
+/**
+ * Report URL for a project the server just confirmed we own.
+ *
+ * The `k` parameter is the capability key, so the report opens even when the
+ * browser does not send our cookie back (third-party cookie blocking, embedded
+ * preview, or the same link opened in another browser). Without it the owner
+ * could create a project and immediately be told it does not exist.
+ */
+function reportUrl(projectId: string, viewKey?: string): string {
+  const base = `/report/${projectId}?deliver=1`;
+  return viewKey ? `${base}&k=${encodeURIComponent(viewKey)}` : base;
 }
 
 export function BuilderApp({
@@ -67,7 +82,7 @@ export function BuilderApp({
    * project is revised in place: the revision number is sent with the save so a
    * concurrent edit is refused instead of overwritten.
    */
-  const [serverProject, setServerProject] = useState<{ id: string; version: number } | null>(null);
+  const [serverProject, setServerProject] = useState<{ id: string; version: number; viewKey?: string } | null>(null);
   const [stepsOpen, setStepsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -161,9 +176,9 @@ export function BuilderApp({
         }),
       });
       if (!response.ok) throw new Error("failed");
-      const data = (await response.json()) as { id: string; version?: number };
-      setServerProject({ id: data.id, version: data.version ?? 1 });
-      router.push(`/report/${data.id}?deliver=1`);
+      const data = (await response.json()) as { id: string; version?: number; viewKey?: string };
+      setServerProject({ id: data.id, version: data.version ?? 1, viewKey: data.viewKey });
+      router.push(reportUrl(data.id, data.viewKey));
     } catch {
       setError("تولید گزارش ناموفق بود. لطفاً دوباره تلاش کنید.");
       setBusy(false);
@@ -206,9 +221,9 @@ export function BuilderApp({
         return;
       }
       if (!response.ok) throw new Error("failed");
-      const data = (await response.json()) as { version?: number };
-      setServerProject({ id: serverProject.id, version: data.version ?? serverProject.version });
-      router.push(`/report/${serverProject.id}?deliver=1`);
+      const data = (await response.json()) as { version?: number; viewKey?: string };
+      setServerProject({ id: serverProject.id, version: data.version ?? serverProject.version, viewKey: data.viewKey });
+      router.push(reportUrl(serverProject.id, data.viewKey));
     } catch {
       setError("ذخیره پروژه ناموفق بود. لطفاً دوباره تلاش کنید.");
     } finally {
@@ -353,7 +368,7 @@ export function BuilderApp({
             ) : null}
           </div>
           <div className="flex items-center gap-2">
-            <span className="hidden lg:inline-flex"><AuthMenu /></span>
+            <span className="inline-flex"><AuthMenu /></span>
             <span className="hidden items-center gap-1 md:inline-flex">
               <button
                 type="button"

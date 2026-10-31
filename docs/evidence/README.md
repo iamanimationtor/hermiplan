@@ -11,12 +11,12 @@
 | `tests.txt` | `npm test` | **۱۲ مجموعه** سبز، `EXIT=0` — هیچ سرور/دیتابیسی لازم نیست |
 | `build.txt` | `npm run build` | `✓ Compiled successfully` |
 | `real-postgres.txt` | `db:status` + `select version()` | PostgreSQL واقعی ۱۸٫۶، هر پنج مهاجرت اعمال‌شده |
-| `api-integration.txt` | `npm run test:api` روی build تولیدی + PostgreSQL واقعی، حالت `locked` | **۲۲۳ موفق / ۰ ناموفق / ۶ نادیده** (۶ نادیده = مسیر OTP که در production بسته است) |
-| `api-integration-open.txt` | همان build با `HERMIPLAN_ACCESS_MODE=open` روی `:3410` | **۲۲۱ موفق / ۰ ناموفق / ۷ نادیده** — سهمیه‌های محصول برداشته شده (۲۰۱ به‌جای ۴۰۹ برای لینک یازدهم، بدون ۴۲۹) |
+| `api-integration.txt` | `npm run test:api` روی build تولیدی + PostgreSQL واقعی، حالت `locked` | **۲۳۷ موفق / ۰ ناموفق / ۶ نادیده** (۶ نادیده = مسیر OTP که در production بسته است؛ §۱۰ = باز شدن گزارش مالک بدون کوکی) |
+| `api-integration-open.txt` | همان build با `HERMIPLAN_ACCESS_MODE=open` روی `:3410` | **۲۳۵ موفق / ۰ ناموفق / ۷ نادیده** — سهمیه‌های محصول برداشته شده (۲۰۱ به‌جای ۴۰۹ برای لینک یازدهم، بدون ۴۲۹) |
 | `password.txt` | `npm run test:password` (خالص) | **۴۵ بررسی**: هش scrypt، نمک، هش خراب، سیاست رمز، نرمال‌سازی/یکتایی نام کاربری |
 | `journey.txt` | `npm run test:journey` (روی build تولیدی) | **۷۹ بررسی**: ثبت‌نام → تعریف پروژه → ویرایش → باز کردن واقعی هر ۷ خروجی (XLSX پارس‌شده، CSV، MSPDI، سند چاپی، ZIP) → اشتراک → حذف |
 | `access-mode.txt` | `npm run access:status` + `npm run test:access` + `/api/health` و نشان سازنده در هر دو حالت | **۵۲ بررسی**؛ `locked` از `config/access.json` (سقف ۱۰، تاریخچه ۲۰/۸MB) و همان build با `HERMIPLAN_ACCESS_MODE=open` ⇒ `source:"env"`، سقف ۱۰۰٬۰۰۰، تاریخچه ۱۰۰/۳۲MB؛ نشان «بدون سهمیه» فقط در `open` |
-| `api-integration-otp.txt` | همان، روی `next dev` با `HERMIPLAN_ALLOW_DEMO_OTP=1` | **۲۲۸ موفق / ۰ ناموفق / ۰ نادیده** (شامل ۶ سناریوی OTP و ۲۵ سناریوی نام کاربری/رمز) |
+| `api-integration-otp.txt` | همان، روی `next dev` با `HERMIPLAN_ALLOW_DEMO_OTP=1` | **۲۴۲ موفق / ۰ ناموفق / ۰ نادیده** (شامل ۶ سناریوی OTP و ۳۱ سناریوی نام کاربری/رمز و ۱۴ سناریوی کلید قابلیت) |
 | `versions.txt` | برش بخش‌های تاریخچه، مقایسه و اعتبارسنجی پارامترها از `npm run test:api` | **۷۵ بررسی** (۴۲ + ۱۴ + ۱۹): ایجاد، ذخیره، ذخیره تکراری، ۴۰۹، بازگردانی، هرس، مسابقه دو نویسنده، بازسازی نسخه گمشده، تفاوت نسخه‌ها و ۴۰۴ مقایسه |
 | `version-diff.txt` | `npm run test:versions` (خالص، بدون سرور) | **۴۱ بررسی** تفاوت نسخه‌ها |
 | `legacy-db.txt` | چرخه کامل روی پایگاه نسخه قبل (PostgreSQL واقعی) | prepare ۲ · migrate `0001`–`0005` · verify **۳۱** · rollback · verify-rollback **۹** |
@@ -26,16 +26,16 @@
 | `db-integrity.txt` | `npm run test:db:integrity` | **۲۰ بررسی**: هم‌زمانی محدودیت نرخ، یکتایی هش، CASCADE، `VALIDATE CONSTRAINT`، سازگاری لینک قدیمی، **یکتایی نسخه + ۲۴ نویسنده هم‌زمان + آبشار تاریخچه** |
 | `load.txt` | `npm run test:load` (۸ ثانیه، هم‌زمانی ۱۲، با سهمیه‌های بالا فقط برای همین سنجش) | ۲٬۳۷۵ درخواست، ۰ خطا؛ تحلیل ۱۸۴٫۶ rps (p95 ۸۹٫۹ms)، SSR ۱۱۲٫۳ rps (p95 ۱۴۰٫۲ms) — ظرفیت محلی، نه Netlify |
 | `production-smoke.txt` | `next start` + `curl` | health (`schemaVersion:5`, `access.mode:"locked"`)، صفحه‌های ۲۰۰، ثبت‌نام/ورود با نام کاربری (۲۰۱/۴۰۱/۲۰۰)، رد Origin بیگانه (۴۰۳)، پیامک بدون کلید (۵۰۳)، هدرهای امنیتی |
-| `api-integration-review.txt` | خلاصه اجراهای `test:api` (build تولیدی `locked`/`open` و dev) | **۲۲۳/۰/۶**، **۲۲۱/۰/۷** و **۲۲۸/۰/۰** — شامل انقضا، ابطال مستقل، سقف ۱۰ لینک، CSRF، افشا، لینک قدیمی، CASCADE، **تاریخچه/بازگردانی/مقایسه/اعتبارسنجی/۴۰۹** |
+| `api-integration-review.txt` | خلاصه اجراهای `test:api` (build تولیدی `locked`/`open` و dev) | **۲۳۷/۰/۶**، **۲۳۵/۰/۷** و **۲۴۲/۰/۰** — شامل انقضا، ابطال مستقل، سقف ۱۰ لینک، CSRF، افشا، لینک قدیمی، CASCADE، **تاریخچه/بازگردانی/مقایسه/اعتبارسنجی/۴۰۹** |
 | `csp-review.txt` | `test:csp` با مسیرهای واقعی (`share-fixture.ts`: کوکی مالک + لینک زنده/باطل/ناشناس + UUID بیگانه) | **۹۲ بررسی** روی ۷ مسیر واقعی (بازتولید در همین دور) |
 | `csp-real-routes.txt` | `BASE_URL=… bash scripts/csp-real-routes.sh` | **۷۸ بررسی** روی ۶ مسیر واقعی: `/`, `/builder`, `/report/<uuid>` با کوکی مالک، لینک زندهٔ اشتراک، و دو مسیر ۴۰۴ — شامل nonce یکتا، بدون `unsafe-inline`، و عدم افشای توکن با Referrer |
 | `db-integrity-review.txt` | `test:db:integrity` — اجرای قدیمی‌تر | **۱۴ بررسی**؛ نسخه کامل‌تر و جاری: `db-integrity.txt` (۲۰ بررسی) |
-| `health-probe.txt` | `curl /api/health` در سه وضعیت (locked، open با env، پایگاه بدون مهاجرت / فقط تا ۰۰۰۴) + کد وضعیت مسیرها | ۲۰۰ + `schemaVersion:5` + `access`؛ پایگاه خالی ⇒ ۵۰۳ + `missingTables`؛ پایگاه تا ۰۰۰۴ ⇒ ۵۰۳ + `missingColumns`؛ مسیرهای ۴۰۴ متن راهنما دارند |
+| `health-probe.txt` | `curl /api/health` + کد صفحه‌ها + وجود دکمهٔ ورود + صفت‌های کوکی در سه وضعیت (locked، open با env، پایگاه بدون مهاجرت / فقط تا ۰۰۰۴) + کد وضعیت مسیرها | ۲۰۰ + `schemaVersion:5` + `access`؛ پایگاه خالی ⇒ ۵۰۳ + `missingTables`؛ پایگاه تا ۰۰۰۴ ⇒ ۵۰۳ + `missingColumns`؛ مسیرهای ۴۰۴ متن راهنما دارند |
 | `migration-review.txt` | اجرای دوباره `db:migrate` و دست‌کاری checksum | بیکار بودن اجرای دوباره و رد شدن drift |
 | `share-audit.txt` | `npm run db:share-audit` | فهرست لینک‌های فعال و علامت‌خوردن پروژه «منتشرشده پیش از مهاجرت» |
 | `migration-safety.txt` | `npm run db:migration-safety` (با `MIGRATION_SAFETY_ROLLBACK=1`) | **۴۵ بررسی**: جفت بازگشت هر مهاجرت، no-op بودن اجرای دوم، رد شدن drift، قفل بازگشت پایه، بازگشت کامل و بازسازی هم‌ساختار، و §۸ = تشخیص پایگاه مهاجرت‌نشده (`isSchemaError`) |
 | `preflight.txt` | `npm run db:preflight` (+ `--json`) | پیش‌بررسی فقط‌خواندنی: مهاجرت‌های در انتظار، drift، یتیم مالکیت، لینک قدیمی، حجم |
-| `export.txt` | `npm run test:export` (با `BASE_URL`) | **۸۰ بررسی** روی XLSX/CSV/HTML/بسته/MSProject + امضای بایتی هر ۷ فرمت سرویس‌شده + **اعتبار ساختار Workbook** (`row` استاندارد، rels، content-types، autoFilter، قالب عددی) |
+| `export.txt` | `npm run test:export` (با `BASE_URL`) | **۹۱ با سرور / ۷۳ بدون سرور**: XLSX/CSV/HTML/بسته/MSProject، امضای بایتی هر ۷ فرمت، **اعتبار ساختار Workbook**، و **well-formed بودن هر جزء XML + ساختار MSPDI** (مدت ISO، UID یکتا) |
 | `a11y.txt` | `npm run test:a11y` | **۳۲ بررسی** روی HTML سرو‌شده (زبان، جهت، landmark،‏ h1، برچسب ورودی‌ها، alt) |
 | `bundle.txt` | `npm run test:bundle` | بودجه‌ی gzip هر مسیر؛ سنگین‌ترین `/builder` با ۱۷۵٫۹KB |
 | `project-file.txt` | `npm run test:project-file` | **۳۱ بررسی**: رفت‌وبرگشت کامل داده، رد فایل خراب/بی‌پروژه/نسخهٔ آینده، پاک‌سازی بخش‌های ناشناخته |

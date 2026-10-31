@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Badge, Button, Field, Input, Modal } from "@/components/ui";
 
 /**
@@ -21,7 +22,18 @@ interface SessionUser {
 const label = (user: SessionUser) => user.displayName?.trim() || user.username || user.phone || "کاربر";
 
 export function AuthMenu() {
-  const [open, setOpen] = useState(false);
+  /**
+   * The panel opens on arrival when the URL says `?account=1` — that is how the
+   * landing page hands a visitor over to sign-in. It is *derived* from the URL
+   * rather than copied into state inside an effect (which would mean a cascading
+   * render, and eslint is right to refuse it): `openState === null` means "follow
+   * the URL", any click sets an explicit value that wins from then on.
+   */
+  const searchParams = useSearchParams();
+  const wantsAccount = searchParams.get("account") === "1";
+  const [openState, setOpenState] = useState<boolean | null>(null);
+  const open = openState ?? wantsAccount;
+  const setOpen = (next: boolean) => setOpenState(next);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -37,6 +49,14 @@ export function AuthMenu() {
       .then((r) => r.json())
       .then((data: { user: SessionUser | null }) => setUser(data.user))
       .catch(() => setUser(null));
+  }, []);
+
+  /** Drops `?account=1` from the address bar so a refresh does not reopen the panel. */
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("account") !== "1") return;
+    url.searchParams.delete("account");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
   function reset() {

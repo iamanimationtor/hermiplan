@@ -1,3 +1,4 @@
+import { projectViewKey } from "@/lib/server/view-key";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -76,6 +77,8 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
 
   return jsonOk({
     id: row.id,
+    // Same reasoning as the list: the caller just proved ownership.
+    viewKey: projectViewKey(row.id),
     project: row.input,
     analysis: row.analysis ?? analyzeProject(row.input),
     reportOptions: row.reportOptions,
@@ -220,6 +223,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
 
   return jsonOk({
     id,
+    viewKey: projectViewKey(id),
     ok: analysis.errors.length === 0,
     isPublic: body.isPublic ?? row.isPublic,
     shareExpiresAt: expiry === undefined ? row.shareExpiresAt : expiry,

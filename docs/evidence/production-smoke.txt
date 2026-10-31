@@ -1,20 +1,27 @@
-# production smoke — next start, real PostgreSQL — 2026-10-31T17:11:36Z
+# production smoke — next start + real PostgreSQL — 2026-10-31T17:26:40Z
 
 $ curl -s http://127.0.0.1:3400/api/health
 {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
 
-## pages
-/                                              200
-/builder                                       200
-/robots.txt                                    200
-/sitemap.xml                                   200
+## pages (and the account entry)
+/                        200  ورود / ثبت‌نام
 
-## account flow (username + password; no SMS provider on this host)
-POST /api/auth register                        201  {"ok":true,"claimedProjects":0,"user":{"id":"fc89edce-8660-463e-9cec-2cf8f330a1fd","username":"smoke171136","phone":null,"displayName":null}}
-POST /api/auth login (wrong password)          401  {"error":"نام کاربری یا رمز عبور نادرست است"}
-POST /api/auth login (unique username, again)  200  {"ok":true,"claimedProjects":0,"user":{"id":"fc89edce-8660-463e-9cec-2cf8f330a1fd","username":"smoke171136","phone":null
-POST /api/auth with foreign Origin             403
-POST /api/auth OTP request (no SMS key)        503  {"error":"ورود با پیامک در این نصب فعال نیست (سرویس پیامک پیکربندی نشده است). با نام کارب
+/builder                 200  ورود / ثبت‌نام
+
+/robots.txt              200  
+/sitemap.xml             200  
+
+## account flow
+register                                     201  {"ok":true,"claimedProjects":0,"user":{"id":"f2222aee-e254-4e65-8679-000bcc94d9b4","username":"smoke172640","phone":null,"displayName":null}}
+login with UPPERCASE username                200  {"ok":true,"claimedProjects":0,"user":{"id":"f2222aee-e254-4e65-8679-000bcc94d9b4","username":"smoke172640","p
+duplicate username (different case)          409  {"error":"این نام کاربری قبلاً گرفته شده است"}
+wrong password                               401  {"error":"نام کاربری یا رمز عبور نادرست است"}
+foreign Origin                               403
+
+## report page: owner path without any cookie (capability key)
+POST /api/projects (no account)              201  id=dd53cb01… viewKey=yes
+GET /report/<id>?k=<viewKey>  (no cookie)    200
+GET /report/<id>              (no cookie)    404
 
 ## security headers on /
 X-Content-Type-Options: nosniff
@@ -22,4 +29,4 @@ X-Frame-Options: DENY
 Referrer-Policy: strict-origin-when-cross-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=()
 Strict-Transport-Security: max-age=31536000; includeSubDomains
-content-security-policy: default-src 'self'; script-src 'self' 'nonce-ODM3ZjVlMzUtMzgwMS00YTk0LWE0Nz
+content-security-policy: default-src 'self'; script-src 'self' 'nonce-ZjVjMTNiODUtM2IzOS00MTBjLTg2N2UtM2E4ZDVj

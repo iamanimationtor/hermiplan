@@ -1,3 +1,4 @@
+import { projectViewKey } from "@/lib/server/view-key";
 import { NextResponse } from "next/server";
 import { desc, eq, or, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -83,7 +84,15 @@ export async function GET(request: Request) {
 
     const total = Number(counted[0]?.count ?? rows.length);
     const nextOffset = offset + rows.length < total ? offset + rows.length : null;
-    return jsonOk({ projects: rows, total, hasMore: nextOffset !== null, nextOffset });
+    return jsonOk({
+      // The list is already owner-scoped, so handing out the view key here is
+      // not a new capability — it is what makes "my projects → open report"
+      // work in a browser that stores no cookie for us.
+      projects: rows.map((row) => ({ ...row, viewKey: projectViewKey(row.id) })),
+      total,
+      hasMore: nextOffset !== null,
+      nextOffset,
+    });
   } catch (error) {
     return internalErrorResponse(error, "projects", "خواندن فهرست پروژه‌ها ناموفق بود");
   }
@@ -151,7 +160,10 @@ export async function POST(request: Request) {
       userId: user?.id ?? null,
     });
 
-    return jsonOk({ id: row.id, ok: analysis.errors.length === 0, isPublic: false, version: 1 }, 201);
+    return jsonOk(
+      { id: row.id, ok: analysis.errors.length === 0, isPublic: false, version: 1, viewKey: projectViewKey(row.id) },
+      201,
+    );
   } catch (error) {
     return internalErrorResponse(error, "projects", "ذخیره پروژه ناموفق بود");
   }

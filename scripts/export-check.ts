@@ -19,9 +19,14 @@
  *      policy exists to prevent, so it is asserted here.
  *   5. Package: six entries, valid CRCs, and its embedded files equal the
  *      standalone ones.
- *   6. When `BASE_URL` is set: `/api/export?format=pdf` returns a real PDF
- *      (`%PDF-` … `%%EOF`, at least one page object) and `msproject` returns
- *      parseable XML with a `<Project>` root.
+ *   6. When `BASE_URL` is set: every download-centre format returns real bytes
+ *      with the right magic number and content type, `pdf` returns the
+ *      print-ready HTML document (never a fake PDF byte stream) and `msproject`
+ *      returns parseable XML with a `<Project>` root.
+ *   7. Structural validity of the XML inside the artifacts: every XLSX part and
+ *      the MS Project document is well-formed, element names are lower-case as
+ *      the OOXML schema requires, and every sheet part referenced by the
+ *      workbook/rels/content-types actually exists.
  *
  * Values are computed by hand where possible (the template's activity count and
  * total duration are read from the analysis, then compared across artifacts,
@@ -41,6 +46,7 @@ import { renderGanttSvg } from "../src/lib/report/gantt-svg";
 import { toPersianDigits } from "../src/lib/date-fa";
 import { roundMoney } from "../src/lib/engine/money";
 import { readZip } from "./lib/zip-read";
+import { xmlProblemText } from "./lib/xml-check";
 
 let passed = 0;
 let failed = 0;
@@ -357,6 +363,57 @@ async function main(): Promise<void> {
   } else {
     console.log("\n▶ ۸. خروجی‌های HTTP — نادیده (BASE_URL تنظیم نشده)");
   }
+
+  /* ---------------- ۹. اعتبار ساختاری XML ---------------- */
+  console.log("\n▶ ۹. اعتبار ساختاری XML خروجی‌ها");
+
+  // The checker itself must be able to fail, otherwise the assertions below
+  // prove nothing.
+  check(xmlProblemText("<a><b/></a>") === null, "بررسی‌کننده XML: سند درست را قبول می‌کند");
+  check(xmlProblemText("<a><b></a>") !== null, "بررسی‌کننده XML: تگ جفت‌نشده را رد می‌کند");
+  check(xmlProblemText("<a>x & y</a>") !== null, "بررسی‌کننده XML: & بدون escape را رد می‌کند");
+
+  const xmlParts = xlsxZip.filter((entry) => entry.name.endsWith(".xml"));
+  const brokenParts = xmlParts
+    .map((entry) => ({ name: entry.name, problem: xmlProblemText(entry.data.toString("utf8")) }))
+    .filter((item) => item.problem !== null);
+  check(
+    xmlParts.length >= 10 && brokenParts.length === 0,
+    "همه اجزای XML کارپوشه well-formed هستند",
+    brokenParts.map((item) => `${item.name}: ${item.problem}`).join(" | "),
+  );
+
+  const monotonic = sheetXmls.every(({ xml }) => {
+    const rows = [...xml.matchAll(/<row r="(\d+)"/g)].map((match) => Number(match[1]));
+    return rows.length > 0 && rows.every((value, index) => value === index + 1);
+  });
+  check(monotonic, "شماره سطرها از ۱ پیوسته و بدون تکرار است");
+
+  const mspText = buildMsProjectXml(input, analysis);
+  const mspProblem = xmlProblemText(mspText);
+  check(mspText.startsWith("<?xml") && mspProblem === null, "XML پروژه (MSPDI) well-formed است", mspProblem ?? "");
+  check(
+    mspText.includes('<Project xmlns="http://schemas.microsoft.com/project">'),
+    "XML پروژه فضای‌نام استاندارد MS Project را دارد",
+  );
+  const durations = [...mspText.matchAll(/<Duration>([^<]*)<\/Duration>/g)].map((match) => match[1]);
+  const badDurations = durations.filter((value) => !/^PT\d+H\d+M\d+S$/.test(value));
+  check(
+    durations.length > 0 && badDurations.length === 0,
+    "مدت‌ها قالب کامل ISO-8601 دارند (PT#H#M#S)",
+    badDurations.slice(0, 3).join(", "),
+  );
+  const tasks = [...mspText.matchAll(/<Task>([\s\S]*?)<\/Task>/g)].map((match) => match[1]);
+  check(tasks.length > 0, "کاربرگ شامل وظیفه‌هاست", String(tasks.length));
+  check(
+    tasks.every((task) => /<UID>\d+<\/UID>/.test(task) && /<Name>/.test(task) && /<Duration>/.test(task)),
+    "هر وظیفه UID، نام و مدت دارد",
+  );
+  const uids = tasks.map((task) => Number(/<UID>(\d+)<\/UID>/.exec(task)?.[1] ?? "NaN"));
+  check(
+    uids.length > 0 && new Set(uids).size === uids.length && uids.every((uid) => Number.isFinite(uid)),
+    "UID وظیفه‌ها یکتاست",
+  );
 
   console.log(`\n${failed === 0 ? "✔" : "✗"} ${passed} موفق / ${failed} ناموفق`);
   if (failed) {

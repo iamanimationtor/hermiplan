@@ -1282,6 +1282,63 @@ async function main() {
     ok(otherClient.status === 200, "محدودیت به‌ازای هر IP است، نه سراسری", `got ${otherClient.status}`);
   }
 
+  // ---------------------------------------------------------------- 🔑 §۱۰
+  //
+  // The report page used to be reachable *only* with our cookie. A browser that
+  // does not send it (third-party cookie blocking, an embedded preview, a link
+  // copied into another browser) got "این گزارش برای این مرورگر یا حساب در
+  // دسترس نیست" on a project it had just created itself. That is the exact
+  // failure this section must make impossible to reintroduce.
+  console.log("\n▶ ۱۰. باز کردن گزارش بدون اتکا به کوکی (کلید قابلیت)");
+  await readAccessMode();
+
+  const projJar = new Jar();
+  const createdForView = await call(projJar, "/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ project: JSON.parse(MINIMAL_PROJECT), reportOptions: {} }),
+  });
+  ok(createdForView.status === 201, "ساخت پروژه برای آزمون کلید قابلیت ⇒ ۲۰۱", `got ${createdForView.status}`);
+  const createdBody = JSON.parse(createdForView.body) as { id?: string; viewKey?: string };
+  const viewId = createdBody.id ?? "";
+  const viewKey = createdBody.viewKey ?? "";
+  ok(viewId.length > 0, "پاسخ ساخت پروژه شناسه دارد");
+  ok(/^[A-Za-z0-9_-]{43}$/.test(viewKey), "پاسخ ساخت پروژه کلید قابلیت ۲۵۶ بیتی دارد", viewKey);
+
+  const withKey = await call(null, `/report/${viewId}?k=${encodeURIComponent(viewKey)}`);
+  ok(withKey.status === 200, "گزارش با کلید قابلیت و بدون هیچ کوکی باز می‌شود ⇒ ۲۰۰", `got ${withKey.status}`);
+  ok(withKey.body.includes("حداقلی"), "صفحه گزارش نام پروژه را نشان می‌دهد");
+
+  const withoutKey = await call(null, `/report/${viewId}`);
+  ok(withoutKey.status === 404, "بدون کوکی و بدون کلید ⇒ ۴۰۴ (افشای وجود پروژه نداریم)", `got ${withoutKey.status}`);
+
+  const foreignJar = new Jar();
+  ok(foreignJar.header() === "", "مرورگر غریبه هیچ کوکی ندارد");
+  const foreign = await call(foreignJar, `/report/${viewId}?k=${encodeURIComponent(viewKey)}`);
+  ok(foreign.status === 200, "کلید قابلیت مستقل از مرورگر است (دستگاه دیگر هم باز می‌کند)");
+
+  const tampered = `${viewKey.slice(0, -1)}${viewKey.endsWith("A") ? "B" : "A"}`;
+  const tamperedPage = await call(null, `/report/${viewId}?k=${encodeURIComponent(tampered)}`);
+  ok(tamperedPage.status === 404, "کلید دست‌کاری‌شده رد می‌شود ⇒ ۴۰۴", `got ${tamperedPage.status}`);
+
+  const otherProject = await call(projJar, "/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ project: JSON.parse(MINIMAL_PROJECT), reportOptions: {} }),
+  });
+  const otherBody = JSON.parse(otherProject.body) as { id?: string; viewKey?: string };
+  const crossKey = await call(null, `/report/${viewId}?k=${encodeURIComponent(otherBody.viewKey ?? "")}`);
+  ok(crossKey.status === 404, "کلید پروژه دیگر برای این پروژه کار نمی‌کند ⇒ ۴۰۴", `got ${crossKey.status}`);
+
+  const listForOwner = await call(projJar, "/api/projects?limit=20");
+  ok(listForOwner.status === 200, "فهرست پروژه‌های مالک ⇒ ۲۰۰");
+  const listedView = JSON.parse(listForOwner.body) as { projects?: { id: string; viewKey?: string }[] };
+  const listedItem = (listedView.projects ?? []).find((item) => item.id === viewId);
+  ok(Boolean(listedItem?.viewKey), "فهرست هم برای هر پروژه کلید می‌دهد (لینک «پروژه‌های من»)");
+  ok(listedItem?.viewKey === viewKey, "کلید فهرست با کلید ساخت یکسان است (قطعیت)");
+
+  const anonymousList = await call(null, "/api/projects?limit=20");
+  const anonymousProjects = (JSON.parse(anonymousList.body) as { projects?: unknown[] }).projects ?? [];
+  ok(anonymousProjects.length === 0, "فهرست بدون کوکی خالی است — کلید از هیچ‌جا لو نمی‌رود");
+
   console.log(`\n══════════ نتیجه: ${passed} موفق / ${failed} ناموفق / ${skipped} نادیده ══════════`);
   if (failures.length) failures.forEach((message) => console.error(`  • ${message}`));
   await closeDb();

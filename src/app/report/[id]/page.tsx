@@ -7,6 +7,7 @@ import { ReportView } from "@/components/report/ReportView";
 import { getCurrentUser, getGuestToken, isProjectOwner } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/http";
 import { buildLoadedReport } from "@/lib/server/report-loader";
+import { verifyProjectViewKey } from "@/lib/server/view-key";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
-export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ReportPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ k?: string }>;
+}) {
   const { id } = await params;
+  const { k } = await searchParams;
   if (!isUuid(id)) notFound();
 
   const rows = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
@@ -30,7 +38,17 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   if (!row) notFound();
 
   const [user, guestToken] = await Promise.all([getCurrentUser(), getGuestToken()]);
-  const isOwner = isProjectOwner(row, { user, guestToken });
+  /**
+   * Owner, or the holder of this project's capability key.
+   *
+   * The cookie check alone left a real user stranded: a browser that does not
+   * send our cookie (third-party cookie blocking, an embedded preview, a link
+   * opened in another browser) saw "این گزارش در دسترس نیست" on a project it
+   * had just created. The key is an HMAC over the project id, issued only to
+   * someone the server already accepted as the owner, so it neither leaks nor
+   * transfers: it is a link to *this* report, nothing else.
+   */
+  const isOwner = isProjectOwner(row, { user, guestToken }) || verifyProjectViewKey(id, k);
 
   /**
    * Access rule: **owner only**.

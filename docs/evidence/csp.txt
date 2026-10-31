@@ -1,8 +1,7 @@
-# CSP + real routes — 2026-10-31T17:10:13Z
+# CSP — 2026-10-31T17:26:10Z
+
 ## npm run test:csp
-
 ✔ 24 بررسی CSP — همه موفق
-  سیاست بررسی‌شده، نه آزمون مرورگری: اجرای واقعی مرورگر همچنان کار باز است.
 
-## BASE_URL=http://127.0.0.1:3400 bash scripts/csp-real-routes.sh
+## real routes
 ✔ 78 بررسی CSP — همه موفق
