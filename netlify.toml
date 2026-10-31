@@ -1,0 +1,52 @@
+# HERMIPLAN — Netlify configuration
+# Docs: https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/
+#
+# Next.js support on Netlify is provided by the automatically-installed
+# OpenNext adapter (opennextjs-netlify). It is intentionally NOT pinned or
+# listed under [[plugins]] here — pinning opts out of automatic updates.
+#
+# Required environment variables are documented in DEPLOYMENT.md and
+# .env.example. Never place secrets in this file: values in netlify.toml
+# cannot reference environment variables, so they would be committed in
+# plain text. Configure them in the Netlify UI instead.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # Netlify runs `npm install` because only package-lock.json is committed.
+  NPM_FLAGS = "--no-audit --no-fund"
+
+# ---------------------------------------------------------------------------
+# Migrations
+# ---------------------------------------------------------------------------
+# Schema changes are run explicitly and manually — never as part of the site
+# build, so a deploy can never alter production data automatically:
+#   DATABASE_URL="postgres://…" npx drizzle-kit migrate     (if using SQL files)
+#   DATABASE_URL="postgres://…" npx drizzle-kit push        (current workflow)
+# See DEPLOYMENT.md → "Production database and safe migrations".
+
+# ---------------------------------------------------------------------------
+# Deploy Previews
+# ---------------------------------------------------------------------------
+# Previews build the same way as production. Point them at a staging database
+# (or the same one) through the Netlify UI; the app itself needs no change.
+[context.deploy-preview]
+  command = "npm run build"
+
+# ---------------------------------------------------------------------------
+# Functions runtime
+# ---------------------------------------------------------------------------
+# The Next.js runtime provisions all server functions. No [[plugins]] or
+# [functions] configuration is required — adding the plugin manually would
+# pin the adapter and disable automatic updates.
+
+# ---------------------------------------------------------------------------
+# Security headers / caching
+# ---------------------------------------------------------------------------
+# Headers are set in next.config.ts so they apply to every deployment target
+# (including local `next start`), and are inherited by the Netlify runtime.
+# Dynamic routes are all `force-dynamic`, so no public caching is configured
+# for user-specific responses.
