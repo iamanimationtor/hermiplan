@@ -25,7 +25,7 @@
 | `layout.txt` | `npm run test:layout` | رندر پیکسلی نمودار، قواعد چاپ، پیش‌شرط‌های موبایل |
 | `db-integrity.txt` | `npm run test:db:integrity` | **۲۰ بررسی**: هم‌زمانی محدودیت نرخ، یکتایی هش، CASCADE، `VALIDATE CONSTRAINT`، سازگاری لینک قدیمی، **یکتایی نسخه + ۲۴ نویسنده هم‌زمان + آبشار تاریخچه** |
 | `load.txt` | `npm run test:load` (۸ ثانیه، هم‌زمانی ۱۲، با سهمیه‌های بالا فقط برای همین سنجش) | ۲٬۳۷۵ درخواست، ۰ خطا؛ تحلیل ۱۸۴٫۶ rps (p95 ۸۹٫۹ms)، SSR ۱۱۲٫۳ rps (p95 ۱۴۰٫۲ms) — ظرفیت محلی، نه Netlify |
-| `production-smoke.txt` | `next start` + `curl` | health، کدهای ۲۰۰/۴۰۴، `robots.txt`، هدرهای امنیتی، فونت خودمیزبان |
+| `production-smoke.txt` | `next start` + `curl` | health (`schemaVersion:5`, `access.mode:"locked"`)، صفحه‌های ۲۰۰، ثبت‌نام/ورود با نام کاربری (۲۰۱/۴۰۱/۲۰۰)، رد Origin بیگانه (۴۰۳)، پیامک بدون کلید (۵۰۳)، هدرهای امنیتی |
 | `api-integration-review.txt` | خلاصه اجراهای `test:api` (build تولیدی `locked`/`open` و dev) | **۲۲۳/۰/۶**، **۲۲۱/۰/۷** و **۲۲۸/۰/۰** — شامل انقضا، ابطال مستقل، سقف ۱۰ لینک، CSRF، افشا، لینک قدیمی، CASCADE، **تاریخچه/بازگردانی/مقایسه/اعتبارسنجی/۴۰۹** |
 | `csp-review.txt` | `test:csp` با مسیرهای واقعی (`share-fixture.ts`: کوکی مالک + لینک زنده/باطل/ناشناس + UUID بیگانه) | **۹۲ بررسی** روی ۷ مسیر واقعی (بازتولید در همین دور) |
 | `csp-real-routes.txt` | `BASE_URL=… bash scripts/csp-real-routes.sh` | **۷۸ بررسی** روی ۶ مسیر واقعی: `/`, `/builder`, `/report/<uuid>` با کوکی مالک، لینک زندهٔ اشتراک، و دو مسیر ۴۰۴ — شامل nonce یکتا، بدون `unsafe-inline`، و عدم افشای توکن با Referrer |
@@ -33,7 +33,7 @@
 | `health-probe.txt` | `curl /api/health` در سه وضعیت (locked، open با env، پایگاه بدون مهاجرت / فقط تا ۰۰۰۴) + کد وضعیت مسیرها | ۲۰۰ + `schemaVersion:5` + `access`؛ پایگاه خالی ⇒ ۵۰۳ + `missingTables`؛ پایگاه تا ۰۰۰۴ ⇒ ۵۰۳ + `missingColumns`؛ مسیرهای ۴۰۴ متن راهنما دارند |
 | `migration-review.txt` | اجرای دوباره `db:migrate` و دست‌کاری checksum | بیکار بودن اجرای دوباره و رد شدن drift |
 | `share-audit.txt` | `npm run db:share-audit` | فهرست لینک‌های فعال و علامت‌خوردن پروژه «منتشرشده پیش از مهاجرت» |
-| `migration-safety.txt` | `npm run db:migration-safety` (با `MIGRATION_SAFETY_ROLLBACK=1`) | **۳۹ بررسی**: جفت بازگشت هر مهاجرت، no-op بودن اجرای دوم، رد شدن drift، قفل بازگشت پایه، بازگشت کامل و بازسازی هم‌ساختار |
+| `migration-safety.txt` | `npm run db:migration-safety` (با `MIGRATION_SAFETY_ROLLBACK=1`) | **۴۵ بررسی**: جفت بازگشت هر مهاجرت، no-op بودن اجرای دوم، رد شدن drift، قفل بازگشت پایه، بازگشت کامل و بازسازی هم‌ساختار، و §۸ = تشخیص پایگاه مهاجرت‌نشده (`isSchemaError`) |
 | `preflight.txt` | `npm run db:preflight` (+ `--json`) | پیش‌بررسی فقط‌خواندنی: مهاجرت‌های در انتظار، drift، یتیم مالکیت، لینک قدیمی، حجم |
 | `export.txt` | `npm run test:export` (با `BASE_URL`) | **۸۰ بررسی** روی XLSX/CSV/HTML/بسته/MSProject + امضای بایتی هر ۷ فرمت سرویس‌شده + **اعتبار ساختار Workbook** (`row` استاندارد، rels، content-types، autoFilter، قالب عددی) |
 | `a11y.txt` | `npm run test:a11y` | **۳۲ بررسی** روی HTML سرو‌شده (زبان، جهت، landmark،‏ h1، برچسب ورودی‌ها، alt) |

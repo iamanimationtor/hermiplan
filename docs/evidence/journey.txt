@@ -1,5 +1,5 @@
-# npm run test:journey (account → project → every export format, contents opened) — 2026-10-31T16:54:16Z
-▶ سرور: http://127.0.0.1:3400 · کاربر: journey690690
+# journey — account → project → real files in seven formats — 2026-10-31T17:09:56Z
+▶ سرور: http://127.0.0.1:3400 · کاربر: journey609693
 
 ▶ ۱. ساخت حساب با نام کاربری و رمز عبور
   ✓ ثبت‌نام ⇒ ۲۰۱

@@ -1,37 +1,55 @@
-# health probe — 2026-10-31T16:59:58Z
+# /api/health probe — 2026-10-31T17:08:49Z (UTC)
 
-## migrated database, access mode locked (config/access.json)
-$ curl -s -w "%{http_code}" :3400/api/health
+All four servers run the same build (`next start`), only DATABASE_URL / HERMIPLAN_ACCESS_MODE differ.
+
+## 1) default delivery state — config/access.json mode "locked"
+$ cat config/access.json
+{
+  "mode": "locked",
+  "updatedAt": "2026-10-31",
+  "note": "تحویل واقعی: محدودیت‌های مستندشده فعال است (سهمیهٔ هر endpoint و سقف ۱۰ لینک اشتراک)."
+}
+
+$ curl -s :3400/api/health
 {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
-HTTP 200
+$ curl -s -o /dev/null -w "%{http_code}" :3400/api/health
+200
 
-## same build, HERMIPLAN_ACCESS_MODE=open — no rebuild
+## 2) pre-release state — HERMIPLAN_ACCESS_MODE=open on the same build (:3410)
 $ curl -s :3410/api/health
 {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"env","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
-HTTP 200
 
-## empty database (migrations not applied)
-$ DATABASE_URL=…empty_check next start :3600
+## 3) empty database (no migrations) — :3610
+$ curl -s :3610/api/health
 {"ok":false,"schemaVersion":5,"database":"ok","missingTables":["projects","users","sessions","otp_codes","project_events","rate_limits","project_share_tokens","project_versions"],"missingColumns":[],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
 HTTP 503
 
-## database migrated only through 0004 (tables present, 0005 columns missing)
-$ DATABASE_URL=…partial_check next start :3600   # users.username/password_hash dropped
+$ curl -s -X POST :3610/api/auth (register against an unmigrated database)
+HTTP 503  {"error":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید","code":"schema_incomplete"}
+
+## 4) database migrated through 0004 with the 0005 columns dropped — :3600
+   (tables all present, users.username and users.password_hash removed)
+$ curl -s :3600/api/health
 {"ok":false,"schemaVersion":5,"database":"ok","missingTables":[],"missingColumns":["users.username","users.password_hash"],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
 HTTP 503
 
-## pages on :3400
-/                                                    200
-/builder                                             200
-/robots.txt                                          200
-/sitemap.xml                                         200
-/report/00000000-0000-4000-8000-000000000000         404
-/s/not-a-real-token                                  404
+$ curl -s -X POST :3600/api/auth (register)
+HTTP 503  {"error":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید","code":"schema_incomplete"}
+$ curl -s -X POST :3600/api/auth (login)
+HTTP 503  {"error":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید","code":"schema_incomplete"}
 
-## 404 page for an unknown report actually explains what to do
-$ curl -s :3400/report/00000000-0000-4000-8000-000000000000 | grep -c "گزارش برای این مرورگر یا حساب"
+## 5) page status codes on the delivery server (:3400)
+/                                                        200
+/builder                                                 200
+/robots.txt                                              200
+/sitemap.xml                                             200
+/report/00000000-0000-4000-8000-000000000000             404
+/s/not-a-real-token                                      404
+
+## 6) the 404 pages explain themselves (count of the guidance sentences in the HTML)
+$ curl -s :3400/report/00000000-0000-4000-8000-000000000000 | grep -c "گزارش‌های هر پروژه فقط برای سازنده"
 1
-
-## 404 page for an invalid share link
-$ curl -s :3400/s/not-a-real-token | grep -c "لینک اشتراک معتبر نیست"
+$ curl -s :3400/s/not-a-real-token | grep -c "این لینک اشتراک معتبر نیست"
+1
+$ curl -s :3400/report/00000000-0000-4000-8000-000000000000 | grep -c "۳ حالت یکسان\|سه حالت یکسان"
 1

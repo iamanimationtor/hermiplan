@@ -1,2 +1,6 @@
-# npx tsc --noEmit — 2026-10-31T16:53:47Z
+# typecheck + lint — 2026-10-31T17:10:42Z
+$ npx tsc --noEmit
 EXIT=0
+
+$ npx eslint . -f json | summary
+files 117 · errors 0 warnings 0

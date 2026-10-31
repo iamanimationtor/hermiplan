@@ -1,12 +1,10 @@
-# access mode — 2026-10-31T17:02:03Z
-$ cat config/access.json
+# access mode + security + password + db integrity — 2026-10-31T17:10:23Z
+## access state
 {
   "mode": "locked",
   "updatedAt": "2026-10-31",
   "note": "تحویل واقعی: محدودیت‌های مستندشده فعال است (سهمیهٔ هر endpoint و سقف ۱۰ لینک اشتراک)."
 }
-
-$ npm run access:status
 حالت فعال: locked  (منبع: config/access.json)
 سقف لینک فعال هر پروژه: ۱۰
 تاریخچهٔ هر پروژه: 20 نسخه / 8 مگابایت
@@ -16,75 +14,14 @@ $ npm run access:status
 آخرین تغییر فایل: 2026-10-31
 یادداشت: تحویل واقعی: محدودیت‌های مستندشده فعال است (سهمیهٔ هر endpoint و سقف ۱۰ لینک اشتراک).
 
-$ npm run test:access
-  ✓ پروفایل locked
-  ✓ سقف لینک اشتراک ۱۰ است
-  ✓ تاریخچه ۲۰ نسخه / ۸MB
-  ✓ locked: سهمیهٔ «analyze» اعمال می‌شود
-  ✓ locked: سهمیهٔ «export» اعمال می‌شود
-  ✓ locked: سهمیهٔ «projects» اعمال می‌شود
-  ✓ locked: سهمیهٔ «projectRead» اعمال می‌شود
-  ✓ locked: سهمیهٔ «projectsList» اعمال می‌شود
-  ✓ locked: سهمیهٔ «shareCreate» اعمال می‌شود
-  ✓ locked: سهمیهٔ «shareRevoke» اعمال می‌شود
-  ✓ locked: سهمیهٔ «shareRead» اعمال می‌شود
-  ✓ locked: سهمیهٔ «versionRead» اعمال می‌شود
-  ✓ locked: سهمیهٔ «versionRestore» اعمال می‌شود
-  ✓ locked: سهمیهٔ «auth» اعمال می‌شود
-  ✓ locked: سهمیهٔ «otpRequest» اعمال می‌شود
-  ✓ locked: سهمیهٔ «otpVerify» اعمال می‌شود
-
-▶ ۳. حالت open (پیش از انتشار)
-  ✓ پروفایل open
-  ✓ سقف محصول برداشته شده (فقط سقف فنی بالاست)
-  ✓ تاریخچهٔ بلندتر می‌شود
-  ✓ open: سهمیهٔ محصول «analyze» برداشته می‌شود
-  ✓ open: سهمیهٔ محصول «export» برداشته می‌شود
-  ✓ open: سهمیهٔ محصول «projects» برداشته می‌شود
-  ✓ open: سهمیهٔ محصول «projectRead» برداشته می‌شود
-  ✓ open: سهمیهٔ محصول «projectsList» برداشته می‌شود
-  ✓ open: سهمیهٔ محصول «shareCreate» برداشته می‌شود
-  ✓ open: سهمیهٔ محصول «shareRevoke» برداشته می‌شود
-  ✓ open: سهمیهٔ محصول «shareRead» برداشته می‌شود
-  ✓ open: سهمیهٔ محصول «versionRead» برداشته می‌شود
-  ✓ open: سهمیهٔ محصول «versionRestore» برداشته می‌شود
-
-▶ ۴. سدهای امنیتی در حالت open دست‌نخورده
-  ✓ open: سهمیهٔ امنیتی «auth» همچنان اعمال می‌شود
-  ✓ open: سهمیهٔ امنیتی «otpRequest» همچنان اعمال می‌شود
-  ✓ open: سهمیهٔ امنیتی «otpVerify» همچنان اعمال می‌شود
-  ✓ otpVerify هرگز در فهرست سهمیه‌های محصول نیست
-  ✓ auth هرگز در فهرست سهمیه‌های محصول نیست
-
-▶ ۵. هر کلید واقعی سهمیه با فهرست محصول/امنیت هم‌خوان است
-  ✓ کلیدهای سهمیه از کد مسیرها خوانده شدند
-  ✓ هیچ کلید سهمیه‌ای بیرون از فهرست محصول/امنیت نیست (وگرنه در open بی‌صدا می‌ماند)
-  ✓ سد امنیتی «auth» واقعاً استفاده شده و در فهرست محصول نیست
-  ✓ سد امنیتی «otp» واقعاً استفاده شده و در فهرست محصول نیست
-  ✓ سهمیه‌های بیرونی (market) در فهرست محصول نیستند
-  ✓ کلید سهمیه هیچ فراخوانی‌ای را درون خود جای نمی‌دهد (await فراموش‌شده ⇒ باکت مشترک)
-
-▶ ۶. مقدار نامعتبر نباید بی‌صدا «باز» شود
-  ✓ «open» پذیرفته می‌شود
-  ✓ «locked» پذیرفته می‌شود
-  ✓ مقدار نامعتبر "OPEN" ⇒ locked
-  ✓ مقدار نامعتبر "true" ⇒ locked
-  ✓ مقدار نامعتبر "" ⇒ locked
-  ✓ مقدار نامعتبر undefined ⇒ locked
-  ✓ مقدار نامعتبر null ⇒ locked
-  ✓ مقدار نامعتبر 1 ⇒ locked
-  ✓ مقدار نامعتبر {} ⇒ locked
-  ✓ مقدار نامعتبر "unlimited" ⇒ locked
-
+## test:access
 ✔ 52 بررسی حالت دسترسی — همه موفق
 
-$ curl -s :3400/api/health (config → locked)
-{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
+## test:security
+✔ 291 بررسی امنیتی — همه موفق
 
-$ curl -s :3410/api/health (HERMIPLAN_ACCESS_MODE=open, same build)
-{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"env","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
+## test:password
+✔ 45 بررسی رمز عبور/نام کاربری — همه موفق
 
-$ curl -s :3400/builder | grep -c "بدون سهمیه"  (badge hidden in locked)
-0
-$ curl -s :3410/builder | grep -c "بدون سهمیه"  (badge shown in open)
-1
+## test:db:integrity
+✔ 20 بررسی یکپارچگی/هم‌زمانی — همه موفق

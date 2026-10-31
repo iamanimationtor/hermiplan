@@ -10,7 +10,14 @@ import {
 } from "@/lib/server/otp";
 import { checkRateLimit, RATE_RULES, clientIp, retryAfterHeaders } from "@/lib/server/rate-limit";
 import { demoOtpAllowed, readSmsConfig, sendOtpSms } from "@/lib/server/sms";
-import { csrfRejection, isSameOriginRequest, jsonError, jsonOk, readJson } from "@/lib/server/http";
+import {
+  csrfRejection,
+  isSameOriginRequest,
+  jsonError,
+  jsonOk,
+  readJson,
+  schemaRejection,
+} from "@/lib/server/http";
 import {
   canonicalUsername,
   hashPassword,
@@ -45,6 +52,19 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // A database that is missing `users.username`/`users.password_hash` (a deploy
+  // that skipped `npm run db:migrate`) must say so — 503 with the migration
+  // instruction — instead of a bare 500 from the first query.
+  try {
+    return await handlePost(request);
+  } catch (error) {
+    const rejection = schemaRejection(error);
+    if (rejection) return rejection;
+    throw error;
+  }
+}
+
+async function handlePost(request: Request) {
   if (!isSameOriginRequest(request)) return csrfRejection();
 
   const ip = clientIp(request);
@@ -177,7 +197,7 @@ async function handleRequestCode(phone: string) {
     console.error(`[auth] OTP request rejected — ${sms.reason}`);
     return jsonError(
       503,
-      "ورود با موبایل در این نصب فعال نیست: سرویس پیامک پیکربندی نشده است. استفاده از امکانات اصلی نیازمند ورود نیست.",
+      "ورود با پیامک در این نصب فعال نیست (سرویس پیامک پیکربندی نشده است). با نام کاربری و رمز عبور وارد شوید یا حساب بسازید.",
       {},
     );
   }

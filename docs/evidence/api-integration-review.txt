@@ -1,13 +1,5 @@
-# API integration — three configurations (summary) — 2026-10-31T17:03:35Z
-
-## production build :3400 — access mode locked
-══════════ نتیجه: 223 موفق / 0 ناموفق / 6 نادیده ══════════
-
-## production build :3410 — access mode open (env override, same build)
-══════════ نتیجه: 221 موفق / 0 ناموفق / 7 نادیده ══════════
-
-## next dev :3500 — HERMIPLAN_ALLOW_DEMO_OTP=1 (full OTP path)
-══════════ نتیجه: 228 موفق / 0 ناموفق / 0 نادیده ══════════
-
-## journey (account → project → every export) on :3400
-✔ 79 بررسی سفر کامل (حساب → پروژه → خروجی) — همه موفق
+| پیکربندی | نتیجه |
+| --- | --- |
+| locked (:3400, default config) | نتیجه: 223 موفق / 0 ناموفق / 6 نادیده |
+| open (:3410, same build, HERMIPLAN_ACCESS_MODE=open) | نتیجه: 221 موفق / 0 ناموفق / 7 نادیده |
+| next dev (:3500, HERMIPLAN_ALLOW_DEMO_OTP=1) | نتیجه: 228 موفق / 0 ناموفق / 0 نادیده |

@@ -8,7 +8,7 @@
 | شاخه | `arena/2f8571d5-hermiplan` |
 | کامیت‌های این دور | `96312f1` → `19f41a6` → `ccd9c13` → `061e18e` (همه push شده) |
 | build | `next build` موفق، ۲۰ مسیر |
-| آزمون‌ها | ۱۱ مجموعه واحد/رگرسیون + ۱۹۲ سناریوی یکپارچگی روی build تولیدی در `locked` / ۱۹۰ در `open` + ۱۹۶ روی `next dev` |
+| آزمون‌ها | ۱۲ مجموعه واحد/رگرسیون + ۲۲۳ سناریوی یکپارچگی روی build تولیدی در `locked` / ۲۲۱ در `open` + ۲۲۸ روی `next dev` |
 | پایگاه | PostgreSQL 18.6 واقعی روی `127.0.0.1:5544` (چهار مهاجرت `0001`–`0004`) |
 | شواهد | `docs/evidence/` (۴۰ فایل) — همه در همین دور از نو ساخته شد |
 
@@ -76,20 +76,20 @@
 | --- | --- | --- | --- |
 | build | `next build` | ✅ ۲۰ مسیر، ۰ خطا | `evidence/build.txt` |
 | نوع‌ها / لینت | `tsc --noEmit` / `eslint .` | ۰ / ۰ | `evidence/typecheck.txt`، `evidence/lint.txt` |
-| `npm test` | ۱۱ مجموعه | ✅ ۱۱/۱۱ (۳۱ بررسی فایل پشتیبان و ۵۱ بررسی حالت دسترسی هم داخل آن) | `evidence/tests.txt` |
-| API روی build تولیدی | `BASE_URL=…:3400 npm run test:api` | ✅ **۱۹۰ / ۰ / ۷** (`open`) و **۱۹۲ / ۰ / ۶** (`locked`) | `evidence/api-integration.txt` |
-| API روی `next dev` + OTP دمو | `BASE_URL=…:3500 …` | ✅ **۱۹۶ / ۰ / ۰** | `evidence/api-integration-otp.txt` |
+| `npm test` | ۱۲ مجموعه | ✅ ۱۲/۱۲ (۳۱ بررسی فایل پشتیبان و ۵۲ بررسی حالت دسترسی هم داخل آن) | `evidence/tests.txt` |
+| API روی build تولیدی | `BASE_URL=…:3400 npm run test:api` | ✅ **۲۲۳ / ۰ / ۶** (`locked`، پیش‌فرض) و **۲۲۱ / ۰ / ۷** (`open`) | `evidence/api-integration.txt`, `…-open.txt` |
+| API روی `next dev` + OTP دمو | `BASE_URL=…:3500 …` | ✅ **۲۲۸ / ۰ / ۰** | `evidence/api-integration-otp.txt` |
 | برش تاریخچه/مقایسه/اعتبارسنجی | §۴-ب، §۴-ج، §۴-د | ✅ **۷۵** | `evidence/versions.txt` |
 | تفاوت نسخه‌ها (خالص) | `npm run test:versions` | ✅ ۴۱ | `evidence/final-checks.txt` |
 | دسترس‌پذیری / چیدمان | `test:a11y` / `test:layout` | ✅ ۳۲ / ۲۴ | `evidence/final-checks.txt` |
-| صحت خروجی‌ها | `BASE_URL=… npm run test:export` | ✅ **۶۴** (۵۴ بدون سرویس) | `evidence/export.txt` |
+| صحت خروجی‌ها | `BASE_URL=… npm run test:export` | ✅ **۸۰** (۶۲ بدون سرویس) | `evidence/export.txt` |
 | بودجهٔ حجم | `test:bundle` | ✅ ۶/۶، سنگین‌ترین `/builder` ۱۷۵٫۹KB (سقف ۲۱۰) | `evidence/bundle.txt` |
 | CSP | `test:csp` (۲ صفحه) / ۷ مسیر واقعی | ✅ ۲۴ / **۹۲** | `evidence/csp.txt`، `evidence/csp-review.txt` |
 | امنیت | `npm run test:security` | ✅ ۲۹۱ | `evidence/security.txt` |
 | یکپارچگی/هم‌زمانی پایگاه | `test:db:integrity` روی `hermiplan_conc12` | ✅ ۲۰ | `evidence/db-integrity.txt` |
 | ایمنی مهاجرت + تمرین بازگشت کامل | `MIGRATION_SAFETY_ROLLBACK=1` روی `hermiplan_ms12` | ✅ ۳۳ | `evidence/migration-safety.txt` |
 | پایگاه نسخهٔ قبل | prepare/migrate/verify/rollback/verify-rollback روی `hermiplan_legacy12` | ✅ ۲ / ۳۱ / ۹ | `evidence/legacy-db.txt` |
-| سلامت سرویس | `/api/health` روی پایگاه مهاجرت‌شده و پایگاه خالی | ۲۰۰ + `schemaVersion:4` … / ۵۰۳ با `missingTables` | `evidence/health-probe.txt` |
+| سلامت سرویس | `/api/health` روی پایگاه مهاجرت‌شده و پایگاه خالی | ۲۰۰ + `schemaVersion:5` … / ۵۰۳ با `missingTables` و `missingColumns` | `evidence/health-probe.txt` |
 | زنجیرهٔ پیامک با ارائه‌دهندهٔ محلی | `npm run test:otp` | ✅ ۳۹ | `evidence/otp-sms.txt` |
 | دود تولیدی | `curl` روی مسیرهای واقعی | ۲۰۰/۴۰۴ درست + هدرهای امنیتی | `evidence/production-smoke.txt` |
 
@@ -108,11 +108,11 @@
 ```
 
 ```text
-{"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres",
+{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres",
  "shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false}
 ```
 
-> ۶ «نادیده» در اجرای تولیدی، مسیرهای OTP دمو هستند که در production عامدانه بسته‌اند؛ همین مسیرها در اجرای `next dev` (۱۹۲/۰/۰) اجرا و تأیید می‌شوند.
+> ۶ «نادیده» در اجرای تولیدی، مسیرهای OTP دمو هستند که در production عامدانه بسته‌اند؛ همین مسیرها در اجرای `next dev` (۲۲۸/۰/۰) اجرا و تأیید می‌شوند.
 
 ---
 
@@ -125,13 +125,13 @@
 | ۵ منابع | ۲ | ۰ | ۰ |
 | ۶ EVM و پیشرفت | ۵ | ۰ | ۰ |
 | ۷ قیمت‌گذاری | ۵ | ۲ | ۱ |
-| ۸ امنیت | ۱۴ | ۱ | ۰ |
-| ۹ پایگاه داده | ۴ | ۱ | ۰ |
+| ۸ امنیت | ۱۶ | ۱ | ۰ |
+| ۹ پایگاه داده | ۵ | ۱ | ۰ |
 | ۱۰ کیفیت کد | ۴ | ۰ | ۰ |
-| ۱۱ آزمون | ۶ | ۰ | ۱ |
+| ۱۱ آزمون | ۷ | ۰ | ۱ |
 | ۱۲ تجربهٔ کاربری | ۸ | ۱ | ۰ |
 | ۱۳–۱۶ ترتیب کار/آینده/پذیرش/خروجی | ۶ | ۰ | ۰ |
-| **جمع** | **۶۴** | **۶** | **۲** |
+| **جمع** | **۶۸** | **۶** | **۲** |
 
 دقیقاً همین ۸ ردیف باز است (و هیچ ردیف دیگری):
 
@@ -148,7 +148,7 @@
 
 ### گزیدهٔ `docs/AUDIT-REPORT.md` (این دور)
 
-> «ذخیره در پروژه، نسخهٔ قبلی را بی‌بازگشت بازنویسی می‌کرد … تاریخچهٔ نسخه‌های تغییرناپذیر + بازگردانی که خودش هم قابل بازگشت است؛ محدودیت تعداد/حجم — `api` §۴-ب (۴۲ بررسی) و §۴-د (۱۹ بررسی اعتبارسنجی)، `security` (۳۰ بررسی قاعده‌های خالص)، `db-integrity` §۵ — ✅»
+> «ذخیره در پروژه، نسخهٔ قبلی را بی‌بازگشت بازنویسی می‌کرد … تاریخچهٔ نسخه‌های تغییرناپذیر + بازگردانی که خودش هم قابل بازگشت است؛ محدودیت تعداد/حجم — `api` §۴-ب (۴۷ بررسی) و §۴-د (۱۹ بررسی اعتبارسنجی)، `security` (۳۰ بررسی قاعده‌های خالص)، `db-integrity` §۵ — ✅»
 
 > «فهرست پروژه‌ها بی‌سقف و بی‌سهمیه بود … صفحه‌بندی `limit`/`offset` با سقف ۵۰، `total`/`hasMore`/`nextOffset`، سهمیهٔ ۱۲۰/دقیقه با `Retry-After` … — `api` §۴-ه (۱۴ بررسی) و §۴-و (۳ بررسی) — ✅»
 
@@ -256,10 +256,10 @@
 3. `POST /api/projects/:id/share` با بدنهٔ خالی اکنون ۲۰۱ می‌دهد (قبلاً ۴۰۰ می‌داد) و بدنهٔ ناقص
    همچنان ۴۰۰ — `api-integration` §۳-ب-۲ (۴ بررسی).
 
-**اعداد تازه بعد از این تغییرات:** API روی build تولیدی **۱۹۲/۰/۶** (`locked`) و **۱۹۰/۰/۷** (`open`)،
-روی `next dev` **۱۹۶/۰/۰**، `npm test` **۱۱/۱۱**، a11y ۳۲، export ۷۲، layout ۲۴، versions ۴۱،
-project-file ۳۱، access ۵۱، bundle ۶/۶، CSP ۲۴/۹۲/۷۸، امنیت ۲۹۱، db-integrity ۲۰،
-migration-safety ۳۳، legacy ۲/۳۱/۹.
+**اعداد تازه بعد از این تغییرات:** API روی build تولیدی **۲۲۳/۰/۶** (`locked`) و **۲۲۱/۰/۷** (`open`)،
+روی `next dev` **۲۲۸/۰/۰**، `npm test` **۱۲/۱۲**، a11y ۳۲، export ۸۰، layout ۲۴، versions ۴۱،
+project-file ۳۱، access ۵۲، bundle ۶/۶، CSP ۲۴/۹۲/۷۸، امنیت ۲۹۱، db-integrity ۲۰،
+migration-safety ۳۹، legacy ۲/۳۱/۹، journey ۷۹، password ۴۵.
 
 ---
 
@@ -270,7 +270,7 @@ migration-safety ۳۳، legacy ۲/۳۱/۹.
 | ۱. پروژه‌های «منتشرشده» با پرچم قدیمی | **پوشش کامل** | `api` §۳-ج: `is_public=true` بدون توکن ⇒ `/report/<uuid>` برای غریبه ۴۰۴، داده خام ۴۰۴، در فهرست غریبه دیده نمی‌شود | رفتار درست؛ لینک مبتنی بر UUID باز نمی‌شود |
 | ۲. کنترل دسترسی و ابطال لینک | **پوشش کامل** | `api` §۳-ب: انقضا (تغییر `expires_at` در پایگاه) ⇒ ۴۰۴، ابطال یک لینک لینک دیگر را نمی‌بندد، `?all=1` همه را می‌بندد، توکن باطل با صدور لینک تازه زنده نمی‌شود، سقف ۱۰ لینک ⇒ ۴۰۹، ابطال از دامنهٔ دیگر ⇒ ۴۰۳ | هیچ شکافی پیدا نشد |
 | ۳. CSP روی مسیرهای واقعی | **شکاف بود؛ بسته شد** | پیش‌تر فقط `/` و `/builder` آزموده می‌شد. اکنون `scripts/csp-real-routes.sh` + `scripts/share-fixture.ts`: **۷۸ بررسی روی ۶ مسیر** — جملهٔ `/report/<uuid>` با کوکی مالک و لینک زندهٔ اشتراک | nonce یکتا در هر پاسخ، بدون `unsafe-inline`، `frame-ancestors none`، و مسیرهای ۴۰۴ هم سیاست دارند |
-| ۴. سازگاری مهاجرت | **پوشش کامل** | `migration-safety` **۳۳ بررسی**: idempotency، رد drift با checksum، بازگشت کامل و بازسازی؛ `legacy-db` **۲/۳۱/۹** روی پایگاه نسخهٔ قبل | بدون تغییر |
+| ۴. سازگاری مهاجرت | **پوشش کامل** | `migration-safety` **۴۵ بررسی**: idempotency، رد drift با checksum، بازگشت کامل و بازسازی؛ `legacy-db` **۲/۳۱/۹** روی پایگاه نسخهٔ قبل | بدون تغییر |
 
 **افزودهٔ این بازبینی:** پوشش امضای بایتی هر ۷ فرمت خروجی از سرویس (xlsx/xls/csv/json/msproject/package/pdf-print)
 با بررسی `magic bytes` + `content-type` + حجم — `export-check` از ۶۴ به **۷۲** بررسی رسید، و
@@ -292,7 +292,7 @@ migration-safety ۳۳، legacy ۲/۳۱/۹.
 | سقف لینک فعال | `ACCESS.shareLinkCap` = ۱۰۰٬۰۰۰ در `open` (۱۰ در `locked`) | `api` §۳-ب: ۴۰۹ در `locked`، ۲۰۱ برای یازدهمی در `open` |
 | تاریخچه | ۱۰۰ نسخه / ۳۲MB در `open` (۲۰ / ۸MB در `locked`)، متغیر محیطی همچنان مقدم | `access-mode-check`, `project-versions-core` |
 | آنچه برداشته **نمی‌شود** | سهمیهٔ `auth`/`otpRequest`/`otpVerify`، مالکیت `/report/<id>`، انقضا/ابطال/یک‌بارمصرف توکن، سقف بدنه ۳MB و طرح Zod (۱۰۰۰ فعالیت و…) | `access-mode-check` §۳؛ `security` ۲۹۱؛ `api` §۲/§۳/§۵ |
-| بازگشت به سهمیه‌ها | `npm run access:locked` (نیازمند build) یا `HERMIPLAN_ACCESS_MODE=locked` (بدون build) | `api` روی `:3410` با env ⇒ ۱۹۲/۰/۶ |
+| بازگشت به سهمیه‌ها | `npm run access:locked` (نیازمند build) یا `HERMIPLAN_ACCESS_MODE=locked` (بدون build) | `api` روی همان build با `HERMIPLAN_ACCESS_MODE=locked` ⇒ ۲۲۳/۰/۶ |
 
 نشان وضعیت هم به‌صورت اختیاری زیر سربرگ سازنده نمایش داده می‌شود (`BuilderApp` prop `accessBadge`،
 مقدارش را سرور تعیین می‌کند) تا کاربر بداند چرا سهمیه‌ای نمی‌بیند.
@@ -307,7 +307,7 @@ migration-safety ۳۳، legacy ۲/۳۱/۹.
 
 | کار | جزئیات | آزمون |
 | --- | --- | --- |
-| مهاجرت ۰۰۰۵ | `users.username` (یکتای جزئی روی `lower(username)`)، `users.password_hash`، `phone` اکنون nullable، قید «دست‌کم یک راه ورود»؛ فایل بازگشت با قید امن (اگر حساب بدون شماره باشد، بازگشت متوقف می‌شود) | `migration-safety` (**۳۹ بررسی**) |
+| مهاجرت ۰۰۰۵ | `users.username` (یکتای جزئی روی `lower(username)`)، `users.password_hash`، `phone` اکنون nullable، قید «دست‌کم یک راه ورود»؛ فایل بازگشت با قید امن (اگر حساب بدون شماره باشد، بازگشت متوقف می‌شود) | `migration-safety` (**۴۵ بررسی**) |
 | هش رمز | scrypt با نمک تصادفی و پارامترهای همراه هش؛ مقایسه با `timingSafeEqual`؛ هش خراب ⇒ رد (نه خطا) | `password-check` (۴۵) |
 | یکتایی نام کاربری | تصمیم با ایندکس یکتا (`23505` ⇒ ۴۰۹)، نه `SELECT` سپس `INSERT` | `api` §۶-ب |
 | ورود | پیام یکسان برای «رمز غلط» و «کاربر ناشناس» + scrypt ساختگی برای نام ناموجود (بدون نشت زمانی)؛ سقف ۱۰/۱۵دقیقه برای هر نام کاربری | `api` §۶-ب (۴۰۱/۴۲۹) |
@@ -315,12 +315,15 @@ migration-safety ۳۳، legacy ۲/۳۱/۹.
 | بازگشت سهمیه‌ها | `config/access.json` روی `locked` | `api` ۲۲۳/۰/۶ (locked) و ۲۲۱/۰/۷ (open) |
 | باگ خروجی که پیدا و رفع شد | برگه‌های XLSX با `<Row>` نوشته می‌شدند، اما اسکیمای SpreadsheetML `<row>` می‌خواهد؛ اکسل چنین فایلی را «خراب» می‌داند. اکنون همهٔ عناصر نام استاندارد دارند؛ مدت MS Project به شکل کامل `PT#H#M#S` و هزینهٔ هر وظیفه هم درج می‌شود | `export-check` (۸ بررسی ساختاری تازه) و `journey` |
 | باگ سهمیهٔ OTP که پیدا و رفع شد | یک `await` فراموش‌شده کلید `otp:verify:ip:${clientIpFromHeaders()}` را به یک باکت مشترک (`[object Promise]`) تبدیل می‌کرد و همهٔ کاربران را ۴۲۹ می‌داد؛ اکنون کلید از متغیر ساخته می‌شود و آزمون، هر فراخوانی درون کلید را رد می‌کند | `api` روی `next dev` (۲۲۸/۰/۰) و `access-mode-check` §۵ |
+| پایگاه مهاجرت‌نشده | نسخهٔ اولِ همین دور روی چنین پایگاهی «۵۰۰» با بدنهٔ خالی می‌داد. اکنون `isSchemaError` (`42703`/`42P01`/`42P02`/`3F000`) در مسیرهای نوشتن هم اعمال می‌شود و پاسخ **۵۰۳** با همان پیام `/api/health` و `code:"schema_incomplete"` است | `migration-safety` §۸ (۶ بررسی) + `health-probe.txt` |
+| متن‌های کهنهٔ ورود | صفحهٔ ۴۰۴ و پیام «پیامک پیکربندی نشده» هنوز «با شماره موبایل وارد شوید» می‌گفتند؛ هر دو به «نام کاربری و رمز عبور» اصلاح شدند | `production-smoke.txt` (grep متن) |
+| بازبینی تشخیص ستون | اجرای اولِ کاوش، `missingColumns` را نشان نمی‌داد؛ علت، پروسهٔ `next start` قدیمی روی پورت بود، نه کد. با build جاری: پایگاه تا ۰۰۰۴ ⇒ `missingColumns:["users.username","users.password_hash"]` و کد ۵۰۳ | `health-probe.txt` |
 | سفر کامل | `scripts/journey-check.ts`: ثبت‌نام → تعریف پروژه → ویرایش → باز کردن **واقعی** همهٔ ۷ خروجی → اشتراک → حذف | ۷۹ بررسی |
 
 **اعداد این دور (از اجرای واقعی):** `npm test` **۱۲/۱۲** · `api` **۲۲۳/۰/۶** (locked)،
 **۲۲۱/۰/۷** (open)، **۲۲۸/۰/۰** (dev با دمو) · `journey` **۷۹** · `export` **۶۲** بدون سرور /
 **۸۰** با سرور · `password` **۴۵** · `access` **۵۲** · `security` **۲۹۱** ·
-`migration-safety` **۳۹** · `db-integrity` **۲۰** · `legacy` **۲/۳۱/۹** · `otp` **۳۹** ·
+`migration-safety` **۴۵** · `db-integrity` **۲۰** · `legacy` **۲/۳۱/۹** · `otp` **۳۹** ·
 `a11y` ۳۲ · `layout` ۲۴ · `bundle` ۶/۶ · CSP ۲۴/۹۲/۷۸ · `tsc` ۰ · `eslint` ۰.
 
 ---

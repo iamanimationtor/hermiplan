@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { SCHEMA_VERSION } from "@/db/schema";
 import { describeAccessMode } from "@/lib/server/access-mode";
+import { MIGRATION_MESSAGE } from "@/lib/server/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +81,7 @@ export async function GET() {
           database: "ok",
           missingTables: missing,
           missingColumns,
-          message: "مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید",
+          message: MIGRATION_MESSAGE,
         },
         { status: 503, headers: { "Cache-Control": "no-store" } },
       );

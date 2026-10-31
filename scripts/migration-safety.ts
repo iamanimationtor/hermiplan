@@ -28,6 +28,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client } from "pg";
 import { SCHEMA_VERSION } from "../src/db/schema";
+import { MIGRATION_MESSAGE, isSchemaError } from "../src/lib/server/schema";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -75,6 +76,22 @@ async function main(): Promise<void> {
     SCHEMA_VERSION === numbers[numbers.length - 1],
     "SCHEMA_VERSION با آخرین مهاجرت هم‌خوان است",
     `${SCHEMA_VERSION} در برابر ${numbers[numbers.length - 1]}`,
+  );
+
+  // A deploy that skipped `db:migrate` must be reported as such, not as a bug.
+  // The classifier is what turns "column users.username does not exist" into a
+  // 503 with the migration instruction, so it is tested here alongside the
+  // runner that creates those columns in the first place.
+  console.log("\n▶ ۸. تشخیص پایگاه مهاجرت‌نشده (نقشهٔ خطای اسکیما)");
+  check(isSchemaError({ code: "42703" }), "ستون ناموجود (42703) اسکیما شناسایی می‌شود");
+  check(isSchemaError({ code: "42P01" }), "جدول ناموجود (42P01) اسکیما شناسایی می‌شود");
+  check(isSchemaError({ cause: { cause: { code: "42703" } } }), "خطای پیچیده‌شده در cause هم شناسایی می‌شود");
+  check(!isSchemaError({ code: "23505" }), "نقض یکتایی (23505) اسکیما نیست و مسیر ۴۰۹ خودش را نگه می‌دارد");
+  check(!isSchemaError(null) && !isSchemaError("boom") && !isSchemaError({ code: 42 }), "مقادیر غیرخطا اسکیما شمرده نمی‌شوند");
+  check(
+    MIGRATION_MESSAGE.includes("db:migrate") && MIGRATION_MESSAGE.length > 20,
+    "پیام راهنما شامل فرمان اجراست و خالی نیست",
+    MIGRATION_MESSAGE,
   );
 
   const client = new Client({ connectionString: url });

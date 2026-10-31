@@ -102,7 +102,7 @@ git push origin main            # یا از طریق PR؛ Netlify خودش build
 
 ```bash
 curl -s https://hermiplan.netlify.app/api/health
-# انتظار: {"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres",
+# انتظار: {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres",
 #          "shareLinks":"postgres","smsConfigured":false}
 # اگر ۵۰۳ با "missingTables" دیدید: مهاجرت اعمال نشده — به گام ۳ برگردید.
 ```
@@ -113,7 +113,7 @@ curl -s https://hermiplan.netlify.app/api/health
 
 | بررسی | فرمان | انتظار |
 | --- | --- | --- |
-| سلامت + نسخه schema | `curl -s …/api/health` | `ok:true`، `schemaVersion:4` |
+| سلامت + نسخه schema | `curl -s …/api/health` | `ok:true`، `schemaVersion:5` |
 | صفحه اصلی و بیلدر | `curl -o /dev/null -w '%{http_code}' …/` و `…/builder` | `200` |
 | گزارش با UUID (بدون کوکی) | `curl -o /dev/null -w '%{http_code}' …/report/<uuid>` | `404` (UUID مجوز نیست) |
 | لینک اشتراک نامعتبر | `curl … /s/<۴۳ کاراکتر>` | `404` + هدرهای `no-store`/`noindex` |

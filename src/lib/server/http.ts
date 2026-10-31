@@ -8,6 +8,7 @@
  */
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { MIGRATION_MESSAGE, isSchemaError } from "./schema";
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -36,6 +37,8 @@ export interface ApiErrorBody {
   retryAfterSeconds?: number;
   /** present on 409 responses: the revision the server currently holds */
   currentVersion?: number;
+  /** machine-readable reason, e.g. `schema_incomplete` for an unmigrated database */
+  code?: string;
 }
 
 export function jsonError(
@@ -69,7 +72,23 @@ export function validationErrorResponse(error: unknown, scope: string): NextResp
   return jsonError(422, "داده پروژه نامعتبر است");
 }
 
+/**
+ * A database that is missing tables or columns is a *deployment* state, not a
+ * bug: answer 503 with the same wording `/api/health` uses, instead of a 500
+ * that hides the real instruction. Returns `null` when the error is something
+ * else, so the caller keeps its own handling.
+ */
+export function schemaRejection(error: unknown): NextResponse<ApiErrorBody> | null {
+  if (!isSchemaError(error)) return null;
+  console.error("[schema] the database is missing objects — migrations have not been applied:", error);
+  return jsonError(503, MIGRATION_MESSAGE, { code: "schema_incomplete" });
+}
+
 export function internalErrorResponse(error: unknown, scope: string, message: string): NextResponse<ApiErrorBody> {
+  if (isSchemaError(error)) {
+    console.error(`[${scope}] is running against an unmigrated database:`, error);
+    return jsonError(503, MIGRATION_MESSAGE, { code: "schema_incomplete" });
+  }
   console.error(`[${scope}]`, error);
   return jsonError(500, message);
 }

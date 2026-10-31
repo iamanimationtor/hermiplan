@@ -262,7 +262,7 @@ Run these against the production URL:
 
 ```bash
 curl -s https://<site>/api/health
-# {"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres",
+# {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres",
 #  "shareLinks":"postgres","smsConfigured":false}
 # 503 with "missingTables" means the migrations were not applied yet.
 curl -s -o /dev/null -w '%{http_code}\n' https://<site>/            # 200
