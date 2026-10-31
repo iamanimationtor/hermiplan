@@ -43,6 +43,7 @@ export function buildSheets(analysis: ProjectAnalysis, input: ProjectInput): She
       ["هزینه واقعی تا امروز", a.costs.actual],
       ["پیشرفت زمان‌محور — مدت‌وزنی (٪)", a.progress.timeBased],
       ["پیشرفت فیزیکی — مقدار اجرا (٪)", a.progress.physical ?? "ثبت نشده"],
+      ["پیشرفت مالی — EV/BAC (٪)", a.progress.financial ?? "قابل محاسبه نیست"],
       ["پوشش پیشرفت فیزیکی (٪ بودجه)", a.progress.physicalCoverage],
       ["پیشرفت برنامه‌ای (٪)", a.progress.planned],
       ["SPI (EV/PV)", a.evm.spi ?? "قابل محاسبه نیست"],
@@ -219,6 +220,21 @@ export function buildSheets(analysis: ProjectAnalysis, input: ProjectInput): She
     headers: ["کد", "عنوان استاندارد", "سطح", "شرح"],
     rows: a.standards.map((s2) => [s2.code, s2.title, s2.scope === "national" ? "ملی" : "بین‌المللی", s2.body]),
   });
+
+  if (a.diagnostics.length) {
+    sheets.push({
+      name: "Diagnostics",
+      headers: ["شدت", "دسته", "کد", "پیام", "فعالیت‌های متأثر", "راه‌حل"],
+      rows: a.diagnostics.map((d) => [
+        d.severity === "error" ? "خطا" : "هشدار",
+        d.kind,
+        d.code,
+        d.message,
+        (d.activityIds ?? []).join("، "),
+        d.remedy ?? "",
+      ]),
+    });
+  }
 
   if (a.baseline.available) {
     sheets.push({

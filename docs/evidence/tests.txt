@@ -1,0 +1,131 @@
+# npm test — 2026-10-31T12:04:15Z
+$ npm test
+
+> test
+> tsx scripts/run-tests.ts
+
+
+══════ موتور — بررسی مستقل (محاسبه دستی) ══════
+▶ ۱. مسیر بحرانی، شناوری کل و آزاد (محاسبه دستی)
+▶ ۲. روابط SS / FF / SF و Lag
+▶ ۳. تقویم کاری، تعطیلات و تاریخ‌ها
+▶ ۴. تخصیص منابع، ظرفیت و بیش‌تخصیص
+▶ ۵. مدیریت ارزش کسب‌شده (EVM) با اعداد دستی
+▶ ۶. تعدیل قیمت بر پایه کارکرد ماهانه
+▶ ۷. ساختار برآورد هزینه
+▶ ۸. تاریخ هدف پایان و شناوری منفی
+▶ ۹. انحراف زمان‌بندی نسبت به Baseline (تعریف صحیح)
+▶ ۱۰. کارایی روی پروژه بزرگ
+    زمان تحلیل: 36ms برای ۵۰۰ فعالیت
+
+✔ 81 بررسی مستقل موتور — همه با محاسبه دستی تأیید شد
+
+══════ موتور — رگرسیون محدودیت/مبنا/EVM ══════
+▶ ۱. محدودیت FNLT (پایان نه دیرتر از)
+▶ ۲. محدودیت MSO (باید در تاریخ مشخص شروع شود)
+▶ ۳. نقاط عطف (Milestones)
+▶ ۴. انحراف برنامه مبنا (شروع و پایان مستقل)
+▶ ۵. پیشرفت مقداری (فیزیکی) در برابر پیشرفت زمان‌محور
+▶ ۶. شاخص‌های EVM و مدیریت تقسیم بر صفر
+▶ ۷. تاریخ تعدیل و انتخاب دوره شاخص
+▶ ۸. مدت اعشاری، چرخه‌ها و پیش‌نیاز نامعتبر
+▶ ۹. روابط چهارگانه با تقویم دارای تعطیلی
+▶ ۱۰. فراخوانی مستقیم موتور (بدون لایه تحلیل)
+▶ ۱۱. موقعیت تاریخ وضعیت (چهار حالت مرزی)
+▶ ۱۲. سیاست واحد گرد کردن مدت و Lag (پایه آزمون: ۸ بررسی)
+▶ ۱۳. هر تشخیص دارای راه‌حل عملی است (what/which/cause/remedy)
+▶ ۱۴. گزارش خروجی HTML: نرخ با فراداده، راه‌حل تشخیص، پیشرفت مالی
+
+✔ 177 بررسی رگرسیون موتور — همه با محاسبه دستی تأیید شد
+
+══════ موتور — دود (قالب‌ها) ══════
+  ✓ construction    21 acts · 158 wd · CP 19 · budget 24359048430
+  ✓ civil           14 acts · 171 wd · CP 14 · budget 152080552670
+  ✓ architecture    13 acts · 98 wd · CP 11 · budget 4460190240
+  ✓ infrastructure  11 acts · 98 wd · CP 11 · budget 18009000000
+  ✓ software        15 acts · 92 wd · CP 14 · budget 8804500000
+  ✓ manufacturing   11 acts · 94 wd · CP 10 · budget 33476044000
+  ✓ research        13 acts · 126 wd · CP 13 · budget 5301000000
+  ✓ event           11 acts · 53 wd · CP 9 · budget 4079098605
+  ✓ renovation      11 acts · 84 wd · CP 11 · budget 10494662280
+  ✓ general         10 acts · 37 wd · CP 10 · budget 1833236095
+  ✓ circular dependency detection
+  ✓ calendar arithmetic (Sat–Wed working week)
+  ✓ earned value at data date
+  ✓ market pricing, escalation and standards basis
+
+ALL ENGINE CHECKS PASSED
+
+══════ خروجی‌ها و موارد مرزی ══════
+
+▶ ۱. پروژه خالی (بدون فعالیت، بدون منبع)
+  ✓ empty-project (0 acts, 0 wd, 18ms)
+
+▶ ۲. فقط Milestone
+  ✓ milestones-only (3 acts, 0 wd, 2ms)
+
+▶ ۳. حلقه وابستگی و ارجاع نامعتبر
+  ✓ cycle detection → 2 error(s), 1 warning(s)
+  ✓ cyclic-project (1 acts, 5 wd, 1ms)
+
+▶ ۴. تقویم‌های خاص
+  ✓ holidays-blocked-week (10 acts, 37 wd, 3ms)
+  ✓ empty workDays falls back to the default working week
+  ✓ single-working-day (10 acts, 37 wd, 2ms)
+  ✓ very-long-project (10 acts, 216 wd, 3ms)
+
+▶ ۵. انواع وابستگی، Lag منفی و محدودیت‌ها
+  ✓ mixed-dependencies (8 acts, 12 wd, 2ms)
+
+▶ ۶. قیمت‌گذاری و تعدیل
+  ✓ pricing & escalation (direct 56148223000 → total 81216716879)
+
+▶ ۷. تاریخ هجری شمسی
+  ✓ jalali brute-force round-trip over 6210 days (2020–2036)
+
+▶ ۸. همه قالب‌ها × همه مسیرهای خروجی
+  ✓ template:construction (21 acts, 158 wd, 2ms)
+  ✓ template:civil (14 acts, 171 wd, 4ms)
+  ✓ template:architecture (13 acts, 98 wd, 2ms)
+  ✓ template:infrastructure (11 acts, 98 wd, 1ms)
+  ✓ template:software (15 acts, 92 wd, 1ms)
+  ✓ template:manufacturing (11 acts, 94 wd, 0ms)
+  ✓ template:research (13 acts, 126 wd, 1ms)
+  ✓ template:event (11 acts, 53 wd, 0ms)
+  ✓ template:renovation (11 acts, 84 wd, 2ms)
+  ✓ template:general (10 acts, 37 wd, 1ms)
+
+▶ ۹. Baseline و پیشرفت کامل/صفر
+  ✓ baseline-100% (15 acts, 92 wd, 21ms)
+
+══════════ EDGE-CASE AUDIT PASSED ══════════
+
+══════ امنیت — توابع پایه ══════
+▶ ۱. نرمال‌سازی شماره موبایل
+▶ ۲. تولید و هش OTP
+▶ ۳. پیکربندی پیامک و حالت نمایشی
+▶ ۴. محافظت CSRF (هم‌مبدأ بودن درخواست)
+▶ ۵. اعتبارسنجی شناسه و استخراج IP
+▶ ۶. محدودکننده نرخ (حالت جایگزین حافظه‌ای)
+
+✔ 249 بررسی امنیتی — همه موفق
+
+══════ درون‌ریزی و قالب‌ها ══════
+✔ IMPORT PARSER: ALL CHECKS PASSED
+
+══════ رگرسیون قالب‌ها ══════
+  construction   acts: 21  wd: 158  CP: 19  ✓
+  civil          acts: 14  wd: 171  CP: 14  ✓
+  architecture   acts: 13  wd:  98  CP: 11  ✓
+  infrastructure acts: 11  wd:  98  CP: 11  ✓
+  software       acts: 15  wd:  92  CP: 14  ✓
+  manufacturing  acts: 11  wd:  94  CP: 10  ✓
+  research       acts: 13  wd: 126  CP: 13  ✓
+  event          acts: 11  wd:  53  CP:  9  ✓
+  renovation     acts: 11  wd:  84  CP: 11  ✓
+  general        acts: 10  wd:  37  CP: 10  ✓
+
+✔ ALL 10 TEMPLATES CLEAN
+
+══════ همه 7 مجموعه تست موفق بودند ══════
+EXIT=0

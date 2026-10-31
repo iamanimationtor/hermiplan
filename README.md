@@ -29,8 +29,10 @@
 | تحلیل سناریو | What-if: تأخیر فعالیت‌های بحرانی، تغییر سرعت اجرا و اثر سناریوی افزایش هزینه بر برآورد نهایی |
 | خروجی | ۷ فرمت: PDF (A4)، XLSX، XLS، CSV، JSON، MS Project XML، بسته کامل ZIP |
 
-> تعریف دقیق همه سنجه‌ها (مبنای زمانی، فرمول‌ها، مدل EAC، رفتار محدودیت‌ها) در
-> [`docs/ENGINE.md`](docs/ENGINE.md) آمده است. هیچ عددی در گزارش بدون تعریف مکتوب نیست.
+> تعریف دقیق همه سنجه‌ها (مبنای زمانی، فرمول‌ها، مدل EAC، رفتار محدودیت‌ها، سه سنجه پیشرفت) در
+> [`docs/ENGINE.md`](docs/ENGINE.md) است. جدول تطبیق معیارهای مأموریت با شواهد در
+> [`docs/PROMPT-COMPLIANCE.md`](docs/PROMPT-COMPLIANCE.md) و خروجی خام آزمون‌ها در
+> [`docs/evidence/`](docs/evidence/) قرار دارد. هیچ عددی در گزارش بدون تعریف مکتوب نیست.
 
 ## معماری
 
@@ -83,10 +85,11 @@ npm run dev                     # یا: npm run build && npm start
 | `npm run lint` | ESLint (بدون خطا/هشدار) |
 | `npm test` | کل مجموعه‌های بدون پایگاه‌داده (۷ مجموعه) |
 | `npm run test:engine` | ۸۱ بررسی مستقل با مقادیر محاسبه‌شده دستی |
-| `npm run test:engine:regressions` | ۱۴۳ رگرسیون محدودیت/Milestone/Baseline/EVM/تاریخ وضعیت |
+| `npm run test:engine:regressions` | ۱۷۷ رگرسیون محدودیت/Milestone/Baseline/EVM/تاریخ وضعیت/سیاست گرد کردن |
 | `npm run test:smoke` | دود موتور روی همه قالب‌ها |
 | `npm run test:edge` | ممیزی موارد مرزی + هر ۵ مسیر خروجی |
 | `npm run test:security` | ۲۴۹ بررسی: شماره موبایل، OTP، CSRF، محدودیت نرخ |
+| `npx tsx scripts/legacy-db-check.ts prepare\|verify\|rollback` | مهاجرت روی پایگاه داده نسخه قبل بدون از دست رفتن داده |
 | `npm run test:api` | ۵۱ سناریوی یکپارچگی روی سرور واقعی (نیازمند سرور و پایگاه داده) |
 | `npm run build` | ساخت production |
 

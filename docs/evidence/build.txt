@@ -1,0 +1,38 @@
+# build — 2026-10-31T12:04:18Z
+$ npm run build
+
+> build
+> next build
+
+▲ Next.js 16.2.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 8.8s
+  Running TypeScript ...
+  Finished TypeScript in 7.4s ...
+  Collecting page data using 1 worker ...
+  Generating static pages using 1 worker (0/4) ...
+  Generating static pages using 1 worker (1/4) 
+  Generating static pages using 1 worker (2/4) 
+  Generating static pages using 1 worker (3/4) 
+✓ Generating static pages using 1 worker (4/4) in 326ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/analyze
+├ ƒ /api/auth
+├ ƒ /api/export
+├ ƒ /api/health
+├ ƒ /api/market
+├ ƒ /api/projects
+├ ƒ /api/projects/[id]
+├ ○ /builder
+└ ƒ /report/[id]
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+EXIT=0

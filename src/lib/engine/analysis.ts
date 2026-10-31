@@ -11,6 +11,7 @@ import {
 } from "./calendar";
 import { computeAllocations, computeSchedule, type Allocation, type ScheduleResult } from "./schedule";
 import { normalizeActivityInputs } from "./normalize-input";
+import { withRemedy } from "./diagnostics";
 import { formatJalali, toPersianDigits } from "@/lib/date-fa";
 import { computePricing } from "@/lib/market/engine";
 import { standardsFor } from "@/lib/standards";
@@ -643,11 +644,22 @@ function analyzeProjectUnchecked(rawInput: ProjectInput): ProjectAnalysis {
    */
   const elapsedDays = Math.min(Math.max(Math.round(statusOffset), 0), schedule.duration);
 
+  /**
+   * Financial progress = EV ÷ BAC (percentage of the budget that has been
+   * earned). It is a **third** measure, deliberately separate from time-based
+   * (duration-weighted) and physical (quantity-weighted) progress: on a project
+   * with an uneven cost profile the three numbers legitimately differ, and
+   * mixing them is what made the old single "progress" figure misleading.
+   * `null` when there is no budget to earn against.
+   */
+  const financialProgress = budget > 0 ? round((earned / budget) * 100, 1) : null;
+
   const progress: ProgressResult = {
     overall,
     timeBased: overall,
     physical,
     physicalCoverage,
+    financial: financialProgress,
     planned,
     scheduleVariance: round(earned - plannedToDate),
     costVariance: round(earned - actual),
@@ -1007,6 +1019,11 @@ function analyzeProjectUnchecked(rawInput: ProjectInput): ProjectAnalysis {
   diagnostics.push(...schedule.diagnostics);
   const uniqueDiagnostics = dedupeDiagnostics(diagnostics);
 
+  // Every diagnostic leaves the engine with an actionable remedy (what / which
+  // activity / cause / consequence / how to fix).
+  const remediedDiagnostics = uniqueDiagnostics.map(withRemedy);
+  for (let i = 0; i < uniqueDiagnostics.length; i += 1) uniqueDiagnostics[i] = remediedDiagnostics[i];
+
   const hasDataError = uniqueDiagnostics.some(
     (d) => d.severity === "error" && (d.kind === "data" || d.kind === "cycle" || d.kind === "calendar"),
   );
@@ -1133,12 +1150,12 @@ function failedAnalysis(input: ProjectInput): ProjectAnalysis {
     costDataCoverage: 0,
     notes: ["محاسبه انجام نشده است"],
   };
-  const diagnostic: Diagnostic = {
+  const diagnostic: Diagnostic = withRemedy({
     kind: "data",
     severity: "error",
     code: "internal-error",
     message: "محاسبه تحلیل با خطای داخلی متوقف شد؛ اعداد این گزارش قابل استناد نیستند",
-  };
+  });
 
   return {
     generatedAt: new Date().toISOString(),
@@ -1181,6 +1198,7 @@ function failedAnalysis(input: ProjectInput): ProjectAnalysis {
       timeBased: 0,
       physical: null,
       physicalCoverage: 0,
+      financial: null,
       planned: 0,
       scheduleVariance: 0,
       costVariance: 0,

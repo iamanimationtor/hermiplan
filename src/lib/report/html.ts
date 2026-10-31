@@ -7,6 +7,12 @@ import { formatCompact, formatJalali, formatNumber, formatPercent, toPersianDigi
  * report without any server dependency (File → Print → PDF).
  */
 
+const RATE_KIND_LABEL: Record<string, string> = {
+  "official-wage": "نرخ رسمی (بدون سند در سامانه)",
+  "market-quote": "بازار (نقل بازار)",
+  "reference-estimate": "برآوردی/داده مرجع",
+};
+
 /** escapes untrusted project text before it is embedded in the HTML report */
 const esc = (value: unknown): string =>
   String(value ?? "")
@@ -106,7 +112,7 @@ export function buildReportHtml(
     sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>وضعیت تحلیل و هشدارهای مهندسی</h2></div>
       <div class="callout"><b>${esc(statusLabel)}</b></div>
       ${table(
-        ["شدت", "دسته", "پیام"],
+        ["شدت", "دسته", "پیام", "راه‌حل"],
         a.diagnostics.map((d) => [
           d.severity === "error" ? "<b>خطا</b>" : "هشدار",
           d.kind === "data"
@@ -121,6 +127,7 @@ export function buildReportHtml(
                     ? "ظرفیت منابع"
                     : "تقویم",
           esc(d.message),
+          esc(d.remedy ?? "—"),
         ]),
       )}
       ${
@@ -218,6 +225,11 @@ export function buildReportHtml(
           a.progress.physical === null ? "اندازه‌گیری نشده" : `${formatPercent(a.progress.physical, 1)} (پوشش ${formatPercent(a.progress.physicalCoverage, 0)} بودجه)`,
           "Σ(مقدار اجرا ÷ مقدار برنامه) × بودجه فعالیت",
         ],
+        [
+          "پیشرفت مالی (وزن: بودجه)",
+          a.progress.financial === null ? "قابل محاسبه نیست" : formatPercent(a.progress.financial, 1),
+          "ارزش کسب‌شده ÷ بودجه کل",
+        ],
         ["پیشرفت برنامه‌ای تا تاریخ وضعیت", `${formatPercent(a.progress.planned, 1)}`, "تاریخ وضعیت = آغاز همان روز کاری"],
         ["PV / EV", `${money(a.evm.pv)} / ${money(a.evm.ev)}`, "ارزش برنامه‌ای / ارزش کسب‌شده"],
         ["AC", a.evm.ac === null ? "ثبت نشده" : money(a.evm.ac), `پوشش هزینه واقعی: ${formatPercent(a.evm.costDataCoverage, 0)} بودجه`],
@@ -289,6 +301,29 @@ export function buildReportHtml(
               money(m.escalation),
             ]),
           )
+        : ""
+    }
+    ${
+      a.pricing.rates.length
+        ? `<h3 class="h3">نرخ‌های اعمال‌شده روی منابع پروژه</h3>${table(
+            ["منبع", "نوع داده", "واحد", "ارز", "نرخ اعمال‌شده", "تاریخ مرجع", "سند / پیوند", "اعتبار منبع"],
+            a.pricing.rates.map((rate) => [
+              esc(rate.name),
+              esc(RATE_KIND_LABEL[rate.provenance?.kind ?? "reference-estimate"]),
+              esc(rate.unit ?? "—"),
+              esc(rate.provenance?.currency ?? "IRR"),
+              money(rate.rate),
+              formatJalali(rate.provenance?.asOfIso ?? a.pricing.asOf, { withMonthName: false }),
+              esc(
+                rate.provenance?.sourceRef || rate.provenance?.sourceUrl
+                  ? [rate.provenance.sourceRef, rate.provenance.sourceUrl].filter(Boolean).join(" · ")
+                  : "سند ثبت نشده",
+              ),
+              esc(rate.verified ? "تأییدشده" : "تأییدنشده (داده مرجع)"),
+            ]),
+          )}<p class="note">نرخ ستون «نرخ اعمال‌شده» همان نرخی است که در محاسبات این پروژه به‌کار رفته است؛
+            اختلاف نرخ نمایش‌داده‌شده و نرخ اعمال‌شده در این سامانه وجود ندارد. سند رسمی هیچ ردیف در سامانه
+            نگهداری نمی‌شود، بنابراین همه ردیف‌ها «تأییدنشده» علامت خورده‌اند.</p>`
         : ""
     }</div>`);
 

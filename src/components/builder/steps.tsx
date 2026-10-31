@@ -592,6 +592,9 @@ export function AnalysisAlerts({ analysis }: { analysis: ProjectAnalysis }) {
                   {diagnostic.activityIds?.length ? (
                     <span className="opacity-75"> — فعالیت: {diagnostic.activityIds.map(codeOf).join("، ")}</span>
                   ) : null}
+                  {diagnostic.remedy ? (
+                    <span className="block opacity-80">راه‌حل: {diagnostic.remedy}</span>
+                  ) : null}
                 </span>
               </li>
             ))}

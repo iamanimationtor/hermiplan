@@ -13,6 +13,7 @@ import { computeSchedule } from "../src/lib/engine/schedule";
 import { normalizePricing } from "../src/lib/market/engine";
 import { constraintOffset } from "../src/lib/engine/schedule";
 import { ensureViableCalendar } from "../src/lib/engine/calendar";
+import { buildReportHtml } from "../src/lib/report/html";
 import type { ActivityInput, MilestoneInput, ProjectInput } from "../src/lib/engine/types";
 
 let failures = 0;
@@ -355,6 +356,17 @@ console.log("▶ ۵. پیشرفت مقداری (فیزیکی) در برابر پ
   const none = analyzeProject(project([act("n", 2)]));
   eq(none.progress.physical, null, "بدون مقدار اجرا: پیشرفت فیزیکی null است");
   eq(none.progress.physicalCoverage, 0, "بدون مقدار اجرا: پوشش صفر");
+
+  // پیشرفت مالی = EV ÷ BAC (سنجه سوم، مستقل از دو سنجه دیگر)
+  // بودجه: a = 1,000,000 (پیشرفت ۵۰٪) و b = 1,000,000 (پیشرفت ۱۰٪)
+  // EV = 500,000 + 100,000 = 600,000 ⇒ 600,000 / 2,000,000 = ۳۰٪
+  eq(analysis.progress.financial, 30, "پیشرفت مالی = EV/BAC = ۳۰٪");
+  const noBudget = analyzeProject(
+    project([act("p", 2, [], { progress: 40 })], {
+      resources: [],
+    }),
+  );
+  eq(noBudget.progress.financial, null, "بودجه صفر ⇒ پیشرفت مالی null است (بدون تقسیم بر صفر)");
 }
 
 /* ================================================================== */
@@ -451,6 +463,32 @@ console.log("▶ ۷. تاریخ تعدیل و انتخاب دوره شاخص");
     meta: { ...base.meta, statusDate: "2027-06-01" },
   });
   eq(afterProject.pricing.escalation.total, 0, "تاریخ وضعیت بعد از پایان پروژه: تعدیل صفر");
+
+  /* ---- فراداده هر نرخ: نوع، واحد، واحد پول، تاریخ، اعتبار، سند ---- */
+  const withResource = analyzeProject(
+    project([act("a", 5, [], { resources: [{ resourceId: "r", units: 1 }] })], {
+      resources: [{ id: "r", name: "کارگر ساده", type: "labor", rate: 5_000_000, capacity: 1 }],
+    }),
+  );
+  const rate = withResource.pricing.rates[0];
+  if (!rate) {
+    check(false, "دست‌کم یک نرخ در خروجی قیمت‌گذاری وجود دارد");
+  } else {
+    check(Boolean(rate.provenance), "هر نرخ فراوانی/فراداده منبع دارد");
+    eq(rate.provenance?.currency, "IRR", "واحد پول هر نرخ صریح است");
+    check(Boolean(rate.provenance?.asOfIso), "تاریخ مرجع هر نرخ ثبت شده است");
+    check(Boolean(rate.provenance?.lastUpdatedIso), "تاریخ آخرین به‌روزرسانی هر نرخ ثبت شده است");
+    check(
+      rate.provenance?.sourceRef === null && rate.provenance?.sourceUrl === null,
+      "نرخ بدون سند: ارجاع و پیوند به‌صورت null (بدون جعل سند) اعلام می‌شود",
+    );
+    eq(rate.provenance?.verification, "unverified", "کاتالوگ داخلی «تأییدنشده» علامت می‌خورد");
+    eq(rate.verified, false, "نرخ کاتالوگ به‌عنوان تأییدشده نمایش داده نمی‌شود");
+    check(
+      !(rate.provenance?.kind === "official-wage" && rate.verified === false && rate.provenance?.sourceRef !== null),
+      "برچسب «رسمی» بدون ارجاع سند ممکن نیست",
+    );
+  }
 }
 
 /* ================================================================== */
@@ -668,6 +706,95 @@ console.log("▶ ۱۱. موقعیت تاریخ وضعیت (چهار حالت م�
     friday.diagnostics.some((d) => d.code === "status-date-after-finish"),
     "جمعهٔ پس از پایان ⇒ علاوه بر غیرکاری، پس‌از‌پایان هم گزارش می‌شود",
     JSON.stringify(friday.diagnostics.map((d) => d.code)),
+  );
+}
+
+/* ================================================================== */
+console.log("▶ ۱۲. سیاست واحد گرد کردن مدت و Lag (پایه آزمون: ۸ بررسی)");
+{
+  // همه انتظارها از سیاست مستندشده در docs/ENGINE.md §۳ می‌آیند:
+  // Math.round با حداقل صفر، دقیقاً یک‌بار، روی روز کاری.
+  eq(rowFor(analyzeProject(project([act("a", 2.4)])), "a").duration, 2, "۲٫۴ ⇒ ۲ روز کاری");
+  eq(rowFor(analyzeProject(project([act("b", 2.5)])), "b").duration, 3, "۲٫۵ ⇒ ۳ روز کاری (round-half-up)");
+  eq(rowFor(analyzeProject(project([act("c", 0.4)])), "c").duration, 0, "۰٫۴ ⇒ ۰ (نقطه کنترل)");
+  eq(rowFor(analyzeProject(project([act("d", -2)])), "d").duration, 0, "مدت منفی ⇒ ۰");
+
+  // Lag اعشاری در هر دو جهت
+  const lagProject = analyzeProject(
+    project([
+      act("p", 2),
+      act("q", 2, [{ predecessorId: "p", type: "FS", lag: 1.6 }]),
+      act("r", 2, [{ predecessorId: "p", type: "FS", lag: -1.6 }]),
+    ]),
+  );
+  eq(rowFor(lagProject, "q").es, 4, "Lag ۱٫۶ ⇒ ۲ روز کاری (شروع در آفست ۴)");
+  eq(rowFor(lagProject, "r").es, 0, "Lag −۱٫۶ ⇒ −۲ روز کاری و کلمپ به صفر");
+  check(
+    lagProject.diagnostics.some((d) => d.code === "fractional-lag"),
+    "گرد کردن Lag به کاربر اعلام می‌شود",
+  );
+
+  // گرد کردن یک‌بار است: مقدار گردشده دیگر تغییر نمی‌کند (idempotent)
+  const once = analyzeProject(project([act("e", 2.5)]));
+  const twice = analyzeProject(project([act("e", 3)]));
+  eq(rowFor(twice, "e").duration, 3, "گرد کردن idempotent است (۳ ⇒ ۳)");
+  eq(rowFor(twice, "e").budgetCost, rowFor(once, "e").budgetCost, "بودجه پس از گرد کردن دوباره تغییر نمی‌کند");
+  check(
+    !twice.diagnostics.some((d) => d.code === "fractional-duration"),
+    "ورودی صحیح هشدار گرد کردن تولید نمی‌کند",
+  );
+}
+
+/* ================================================================== */
+console.log("▶ ۱۳. هر تشخیص دارای راه‌حل عملی است (what/which/cause/remedy)");
+{
+  const broken = analyzeProject(
+    project([
+      act("a", 2, [{ predecessorId: "ghost", type: "FS", lag: 0 }]),
+      act("b", 0, [], { milestone: true }),
+    ]),
+  );
+  check(
+    broken.diagnostics.length >= 1,
+    "سناریوی معیوب تشخیص تولید می‌کند",
+  );
+  const missing = broken.diagnostics.filter((d) => !d.remedy);
+  check(missing.length === 0, "هیچ تشخیصی بدون راه‌حل باقی نمی‌ماند", missing.map((d) => d.code).join(","));
+  const unknown = broken.diagnostics.find((d) => d.code === "unknown-predecessor");
+  check(Boolean(unknown?.remedy && unknown.remedy.length > 10), "راه‌حل پیش‌نیاز نامعتبر متنی و عملی است");
+  eq(unknown?.kind, "data", "دسته تشخیص پیش‌نیاز نامعتبر: داده");
+  check(Boolean(unknown?.activityIds?.length), "فعالیت متأثر در تشخیص مشخص است");
+}
+
+/* ================================================================== */
+console.log("▶ ۱۴. گزارش خروجی HTML: نرخ با فراداده، راه‌حل تشخیص، پیشرفت مالی");
+{
+  const withResource = project([act("a", 3)], {
+    resources: [{ id: "r1", name: "بولدوزر", type: "equipment", unit: "روز", capacity: 1, rate: 2_500_000, rateKey: "bulldozer" }],
+    activities: [{ ...act("a", 3), resources: [{ resourceId: "r1", units: 1 }] }],
+  });
+  const html = buildReportHtml(withResource, analyzeProject(withResource), "");
+
+  check(html.includes("نرخ‌های اعمال‌شده روی منابع پروژه"), "جدول نرخ‌های اعمال‌شده در گزارش HTML هست");
+  check(html.includes("نوع داده"), "هر نرخ ستون «نوع داده» دارد");
+  check(html.includes("ارز"), "هر نرخ ستون ارز دارد");
+  check(html.includes("تاریخ مرجع"), "هر نرخ ستون تاریخ مرجع دارد");
+  check(
+    html.includes("سند ثبت نشده"),
+    "نرخ بدون سند، صریحاً «سند ثبت نشده» نمایش داده می‌شود (سند جعل نمی‌شود)",
+  );
+  check(!html.includes("مصوب رسمی قطعی"), "برچسب «رسمی» بدون سند در خروجی وجود ندارد");
+
+  const broken = project([act("a", 2, [{ predecessorId: "ghost", type: "FS", lag: 0 }])]);
+  const brokenHtml = buildReportHtml(broken, analyzeProject(broken), "");
+  check(brokenHtml.includes("راه‌حل"), "جدول تشخیص‌ها ستون راه‌حل دارد");
+
+  const zeroBudget = project([act("a", 3)], {});
+  const zHtml = analyzeProject(zeroBudget);
+  check(zHtml.progress.financial === null, "بودجه صفر ⇒ پیشرفت مالی null (نه صفر گمراه‌کننده)");
+  check(
+    buildReportHtml(zeroBudget, zHtml, "").includes("پیشرفت مالی"),
+    "برچسب «پیشرفت مالی» مستقل از «پیشرفت فیزیکی» در گزارش چاپ می‌شود",
   );
 }
 

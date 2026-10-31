@@ -1,0 +1,23 @@
+# production-mode smoke — 2026-10-31T11:57:08Z
+(next start on port 3200 with DATABASE_URL, no SMS provider, NODE_ENV=production)
+
+$ curl -s /api/health
+{"ok":true,"schemaVersion":2,"database":"ok","rateLimitStore":"postgres","smsConfigured":false}
+
+$ curl -s -o /dev/null -w '%{http_code}' /  /builder
+/ => 200
+/builder => 200
+/report/<random-uuid> => 404
+
+$ curl -i -X POST /api/auth (no SMS provider, NODE_ENV=production)
+HTTP/1.1 503 Service Unavailable
+{"error":"ورود با موبایل در این نصب فعال نیست: سرویس پیامک پیکربندی نشده است. استفاده از امکانات اصلی نیازمند ورود نیست."}
+$ Demo OTP must NOT be available in production even with HERMIPLAN_ALLOW_DEMO_OTP unset
+
+$ curl -sI / (headers)
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Cross-Origin-Opener-Policy: same-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains

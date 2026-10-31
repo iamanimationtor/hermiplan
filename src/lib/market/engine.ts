@@ -337,7 +337,13 @@ export function computePricing(
               kind: effective.provenance.kind,
               verification: effective.provenance.verification,
               source: effective.provenance.source,
+              sourceRef: effective.provenance.sourceRef,
+              sourceUrl: effective.provenance.sourceUrl,
               asOfIso: effective.provenance.asOfIso,
+              lastUpdatedIso: effective.provenance.lastUpdatedIso,
+              validUntilIso: effective.provenance.validUntilIso,
+              region: effective.provenance.region,
+              currency: effective.provenance.currency,
               note: effective.provenance.note,
             }
           : undefined,

@@ -64,6 +64,8 @@ export interface Diagnostic {
   code: string;
   message: string;
   activityIds?: string[];
+  /** actionable fix, in Persian; filled from `DIAGNOSTIC_REMEDIES` */
+  remedy?: string;
 }
 
 /**
@@ -242,7 +244,19 @@ export interface PricingResult {
     catalogRate?: number;
     source: string;
     verified: boolean;
-    provenance?: { kind: string; verification: string; source: string; asOfIso: string; note: string };
+    provenance?: {
+      kind: string;
+      verification: string;
+      source: string;
+      sourceRef: string | null;
+      sourceUrl: string | null;
+      asOfIso: string;
+      lastUpdatedIso: string;
+      validUntilIso: string | null;
+      region: string;
+      currency: string;
+      note: string;
+    };
   }[];
   /** provenance policy of the underlying catalogue (honesty contract) */
   ratePolicy?: { verification: string; note: string; asOfJalali: string; asOfIso: string };
@@ -475,6 +489,8 @@ export interface ProgressResult {
   /** quantity-based physical progress; null when not measured */
   physical: number | null;
   physicalCoverage: number;
+  /** EV ÷ BAC — financial progress; null when the budget is zero */
+  financial: number | null;
   planned: number;
   scheduleVariance: number;
   costVariance: number;

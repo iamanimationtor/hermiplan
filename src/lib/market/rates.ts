@@ -41,15 +41,34 @@ export interface RateItem {
 
 export type RateVerification = "verified" | "unverified" | "reference-estimate";
 
+/**
+ * Provenance record attached to every single rate.
+ *
+ * The mission requires each datum to carry: title, value, unit, currency,
+ * region, validity, source reference, link, validation status, type,
+ * last-updated date and a note. Title/value/unit live on `RateItem`; the rest
+ * live here. Fields whose document does not exist in this repository are
+ * explicitly `null` — never invented — so the UI can render "سند ثبت نشده"
+ * instead of a fake citation.
+ */
 export interface RateProvenance {
-  /** what the number physically is */
+  /** what the number physically is (type of the datum) */
   kind: "official-wage" | "market-quote" | "reference-estimate";
   verification: RateVerification;
   /** publisher / origin of the figure */
   source: string;
+  /** document reference (circular number, price-list row) — null when absent */
+  sourceRef: string | null;
+  /** link to the published document — null when absent */
+  sourceUrl: string | null;
   /** period the figure belongs to */
   asOfIso: string;
+  /** last calendar update of the figure in this repository */
+  lastUpdatedIso: string;
+  /** end of validity when the source publishes one — null when open-ended */
+  validUntilIso: string | null;
   region: RateRegion | "national";
+  currency: "IRR";
   note: string;
 }
 
@@ -88,8 +107,13 @@ export function rateProvenance(item: RateItem, series: RateSeries = "official-14
     source: usesOfficial
       ? "جدول دستمزد شورای عالی کار (سند در مخزن موجود نیست)"
       : "میانگین مرجع بازار (برآورد، نه نرخ معامله‌شده)",
+    sourceRef: null,
+    sourceUrl: null,
     asOfIso: MARKET_AS_OF.iso,
+    lastUpdatedIso: MARKET_AS_OF.iso,
+    validUntilIso: null,
     region: "national",
+    currency: "IRR",
     note: RATE_DATA_POLICY.note,
   };
 }

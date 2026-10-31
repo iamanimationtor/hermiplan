@@ -1,0 +1,94 @@
+# legacy db migration — 2026-10-31T12:02:13Z
+purpose: rebuild the schema of the previous release, then prove the current migrations
+         upgrade it without losing a row (and that the rollback restores the old shape).
+
+$ npx tsx scripts/legacy-db-check.ts prepare
+▶ ساخت پایگاه داده نسخه قبلی (legacy) و درج داده‌های موجود
+  ✓ پایگاه داده برای سناریوی مهاجرت خالی است
+  وضعیت اولیه: {"projects":2,"users":1,"otps":1}
+  ✓ نسخه قبل: پیش‌فرض is_public برابر true است
+
+✔ مرحله «prepare» با 2 بررسی موفق
+
+$ npm run db:migrate
+
+> db:migrate
+> tsx scripts/migrate.ts
+
+Database: 127.0.0.1:5435/postgres
+  → 0001_baseline (pending)
+  → 0002_security_hardening (pending)
+
+▶ applying 0001_baseline
+  ✓ applied
+
+▶ applying 0002_security_hardening
+  ✓ applied
+
+All migrations applied.
+
+$ npx tsx scripts/legacy-db-check.ts verify
+▶ تأیید مهاجرت روی پایگاه داده نسخه قبل (بدون از دست رفتن داده)
+  ✓ همه پروژه‌های قبلی باقی مانده‌اند
+  ✓ کاربران باقی مانده‌اند
+  ✓ کدهای OTP باقی مانده‌اند
+  ✓ نشست‌های فعال باقی مانده‌اند
+  ✓ انتشار تصادفی گذشته بسته شد (is_public = false)
+  ✓ انتشار ثبت‌شده در رخداد حفظ شد (is_public = true)
+  ✓ داده JSON پروژه بدون تغییر باقی مانده است
+  ✓ ستون attempts از text به integer تبدیل شد
+  ✓ مقدار شمارنده تلاش‌ها حفظ شد (۳)
+  ✓ ستون share_expires_at اضافه شد
+  ✓ جدول rate_limits ساخته شد
+  ✓ کلید خارجی مالکیت اضافه شد
+  ✓ کلید خارجی به‌صورت NOT VALID اضافه شد (داده معیوب قدیمی مهاجرت را نمی‌شکند)
+  ✓ ایندکس projects_owner_idx ساخته شد
+  ✓ ایندکس projects_updated_idx ساخته شد
+  ✓ ایندکس sessions_user_idx ساخته شد
+  ✓ ایندکس sessions_expires_idx ساخته شد
+  ✓ ایندکس otp_phone_created_idx ساخته شد
+  ✓ ایندکس project_events_project_kind_idx ساخته شد
+  ✓ ایندکس rate_limits_window_idx ساخته شد
+  ✓ دفتر مهاجرت هر دو فایل را ثبت کرد
+
+✔ مرحله «verify» با 21 بررسی موفق
+
+$ npx tsx scripts/legacy-db-check.ts rollback   # drizzle/0002_security_hardening.rollback.sql
+▶ اجرای rollback رسمی 0002
+  ✓ rollback اجرا شد
+
+✔ مرحله «rollback» با 0 بررسی موفق
+
+$ npx tsx scripts/legacy-db-check.ts verify-rollback
+▶ تأیید rollback: اسکیمای قبلی بازگشت و داده‌ها سالم ماندند
+  ✓ attempts به text بازگشت
+  ✓ جدول rate_limits حذف شد
+  ✓ پیش‌فرض is_public به مقدار قبلی بازگشت
+  ✓ پروژه‌ها در rollback حذف نشدند
+  ✓ rollback عمداً پروژه را دوباره عمومی نکرد (حفاظت از داده)
+
+✔ مرحله «verify-rollback» با 5 بررسی موفق
+
+# --- re-apply after rollback (documented step: remove the ledger row, then migrate) ---
+$ node -e "delete from _hermiplan_migrations where version='0002_security_hardening'"
+ledger row removed: 1
+
+$ npm run db:migrate
+
+> db:migrate
+> tsx scripts/migrate.ts
+
+Database: 127.0.0.1:5435/postgres
+  ✓ 0001_baseline (applied)
+  → 0002_security_hardening (pending)
+
+▶ applying 0002_security_hardening
+  ✓ applied
+
+All migrations applied.
+
+$ npx tsx scripts/legacy-db-check.ts verify
+  ✓ ایندکس rate_limits_window_idx ساخته شد
+  ✓ دفتر مهاجرت هر دو فایل را ثبت کرد
+
+✔ مرحله «verify» با 21 بررسی موفق

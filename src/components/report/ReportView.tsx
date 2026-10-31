@@ -448,8 +448,12 @@ export function ReportView({
                 {[
                   ["پیشرفت زمان‌محور (وزن: مدت)", formatPercent(a.progress.timeBased, 1)],
                   [
-                    a.progress.physical === null ? "پیشرفت فیزیکی (اندازه‌گیری‌نشده)" : "پیشرفت فیزیکی (وزن: بودجه)",
+                    a.progress.physical === null ? "پیشرفت فیزیکی (اندازه‌گیری‌نشده)" : "پیشرفت فیزیکی (وزن: مقدار اجرا)",
                     a.progress.physical === null ? "—" : formatPercent(a.progress.physical, 1),
+                  ],
+                  [
+                    a.progress.financial === null ? "پیشرفت مالی (بدون بودجه)" : "پیشرفت مالی (EV ÷ BAC)",
+                    a.progress.financial === null ? "—" : formatPercent(a.progress.financial, 1),
                   ],
                   ["بودجه تجمیعی", number(a.costs.budget)],
                   ["فعالیت‌ها", toPersianDigits(a.activities.length)],
@@ -502,6 +506,9 @@ export function ReportView({
                         />
                         <span className={diagnostic.severity === "error" ? "text-red-800" : "text-slate-700"}>
                           {diagnostic.message}
+                          {diagnostic.remedy ? (
+                            <span className="block text-[10px] text-slate-500">راه‌حل: {diagnostic.remedy}</span>
+                          ) : null}
                         </span>
                       </li>
                     ))}
@@ -1008,12 +1015,18 @@ export function ReportView({
               <div className="mt-3">
                 <p className="mb-1.5 text-[10.5px] font-bold text-slate-600">نرخ‌های اعمال‌شده روی منابع پروژه</p>
                 <DataTable
-                  headers={["منبع", "واحد", "نرخ اعمال‌شده", "مبنای نرخ", "اعتبار منبع"]}
+                  headers={["منبع", "واحد", "نرخ اعمال‌شده", "مبنای نرخ", "تاریخ مرجع", "سند / پیوند", "اعتبار منبع"]}
                   rows={a.pricing.rates.map((rate) => [
                     rate.name,
                     rate.unit ?? "—",
                     money(rate.rate),
                     rate.source,
+                    rate.provenance?.asOfIso
+                      ? formatJalali(rate.provenance.asOfIso, { withMonthName: false })
+                      : a.pricing.asOfJalali,
+                    rate.provenance?.sourceRef || rate.provenance?.sourceUrl
+                      ? [rate.provenance.sourceRef, rate.provenance.sourceUrl].filter(Boolean).join(" · ")
+                      : "سند ثبت نشده",
                     rate.verified ? "تأییدشده" : "تأییدنشده (داده مرجع)",
                   ])}
                 />
