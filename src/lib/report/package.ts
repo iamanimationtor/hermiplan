@@ -10,6 +10,11 @@ export interface DeliveryOptions {
   ganttSvg: string;
   reportUrl: string;
   author?: string;
+  /**
+   * Archive timestamp. Pass the project status date to get a reproducible
+   * package: the same project then yields a byte-identical ZIP.
+   */
+  modifiedAt?: Date;
 }
 
 function safeName(name: string): string {
@@ -69,7 +74,7 @@ export function buildDeliveryPackage(
     { name: "Report.html", content: buildReportHtml(project, analysis, options.ganttSvg) },
     {
       name: "Data.xlsx",
-      content: buildXlsx(sheets),
+      content: buildXlsx(sheets, options.modifiedAt),
     },
     { name: "MSProject.xml", content: buildMsProjectXml(project, analysis) },
     { name: "Project.json", content: JSON.stringify({ project, analysis }, null, 2) },
@@ -83,5 +88,5 @@ export function buildDeliveryPackage(
   void formatCompact;
   void toPersianDigits;
   void buildExcelXml;
-  return createZip(entries);
+  return createZip(entries, options.modifiedAt);
 }

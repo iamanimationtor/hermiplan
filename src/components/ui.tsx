@@ -67,15 +67,22 @@ export function Card({
   );
 }
 
+/**
+ * Card header. `level` exists so a page can keep a correct document outline: the
+ * builder's cards sit directly under its `h1`, so they render `h2` there, while
+ * cards inside the landing page's `h2` sections keep `h3`.
+ */
 export function CardHeader({
   title,
   subtitle,
   icon,
   action,
+  level = 3,
 }: {
   title: string;
   subtitle?: string;
   icon?: ReactNode;
+  level?: 2 | 3 | 4;
   action?: ReactNode;
 }) {
   return (
@@ -87,7 +94,13 @@ export function CardHeader({
           </span>
         ) : null}
         <div>
-          <h3 className="text-[15px] font-bold text-ink-900">{title}</h3>
+          {level === 2 ? (
+            <h2 className="text-[15px] font-bold text-ink-900">{title}</h2>
+          ) : level === 4 ? (
+            <h4 className="text-[15px] font-bold text-ink-900">{title}</h4>
+          ) : (
+            <h3 className="text-[15px] font-bold text-ink-900">{title}</h3>
+          )}
           {subtitle ? <p className="mt-1 text-[12.5px] leading-6 text-slate-500">{subtitle}</p> : null}
         </div>
       </div>

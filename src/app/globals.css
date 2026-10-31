@@ -1,4 +1,17 @@
-@import url("https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css");
+/*
+ * Vazirmatn is **self-hosted** (SIL OFL 1.1, `public/fonts/OFL.txt`).
+ * Why: a third-party font CDN was a runtime dependency for both the app and the
+ * exported report — one blocked request away from fallback typography, and a
+ * small privacy leak on every page view. One variable file (111 KB) covers
+ * weights 100–900, so the CSP no longer has to allow `cdn.jsdelivr.net`.
+ */
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("/fonts/Vazirmatn-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 @import "tailwindcss";
 
 /* ================================================================== */

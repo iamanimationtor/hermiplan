@@ -147,7 +147,47 @@ async function main() {
         cssOrigin,
       );
     }
+
+    /*
+     * Report and share routes carry contract/cost data behind a secret URL, so
+     * the policy is half of the contract: the response must also refuse
+     * indexing, caching and referrer leakage — and a 404 on these paths must
+     * carry the same headers as a 200, otherwise an unknown token becomes a
+     * distinguishable response.
+     */
+    if (path.startsWith("/report") || path.startsWith("/s/")) {
+      const robots = String(page.headers["x-robots-tag"] ?? "");
+      const cache = String(page.headers["cache-control"] ?? "");
+      const referrer = String(page.headers["referrer-policy"] ?? "");
+      check(/noindex/i.test(robots), `${path} هدر noindex دارد`, robots);
+      check(/no-store/i.test(cache), `${path} کش نمی‌شود`, cache);
+      if (path.startsWith("/s/")) {
+        check(referrer === "no-referrer", `${path} referrer را لو نمی‌دهد`, referrer);
+      }
+    }
   }
+
+  /*
+   * The nonce is the whole point of the policy: it must differ on every
+   * response. Two identical nonces would mean the header was computed once at
+   * build time, and the inline scripts would become forgeable.
+   */
+  const first = await fetchPath(PATHS[0] ?? "/");
+  const second = await fetchPath(PATHS[0] ?? "/");
+  const nonceOf = (page: Fetched): string => {
+    const header = Array.isArray(page.headers["content-security-policy"])
+      ? page.headers["content-security-policy"][0]
+      : page.headers["content-security-policy"];
+    return (String(header ?? "").match(/'nonce-([^']+)'/) ?? [])[1] ?? "";
+  };
+  const firstNonce = nonceOf(first);
+  const secondNonce = nonceOf(second);
+  check(Boolean(firstNonce) && Boolean(secondNonce), "دو پاسخ متوالی هر دو nonce دارند");
+  check(
+    firstNonce !== secondNonce,
+    "nonce در هر درخواست یکتاست",
+    `${firstNonce.slice(0, 8)}… / ${secondNonce.slice(0, 8)}…`,
+  );
 
   console.log(
     failures === 0

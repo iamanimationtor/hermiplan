@@ -103,7 +103,7 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </styleSheet>`;
 
 /** Builds a real .xlsx file (Uint8Array) from the report sheets. */
-export function buildXlsx(sheets: Sheet[]): Uint8Array {
+export function buildXlsx(sheets: Sheet[], modified?: Date): Uint8Array {
   const names = sheets.map((sheet, index) => sheetName(sheet.name, index));
   const entries: ZipEntry[] = [];
 
@@ -165,5 +165,5 @@ export function buildXlsx(sheets: Sheet[]): Uint8Array {
     entries.push({ name: `xl/worksheets/sheet${i + 1}.xml`, content: buildSheet(sheet, i) });
   });
 
-  return createZip(entries);
+  return createZip(entries, modified);
 }

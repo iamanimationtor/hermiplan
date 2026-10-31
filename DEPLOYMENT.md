@@ -78,9 +78,15 @@ never during the site build, so a deploy cannot alter data automatically.
 is applied, the `/s/<token>` route returns 404 — reports stay owner-only, which
 is the safe direction. It has been rehearsed end-to-end on a real PostgreSQL 18.6
 server rebuilt from the previous release's schema (`docs/evidence/legacy-db.txt`:
-prepare → migrate 0001+0002+0003 → 25 checks → rollback 0003+0002 → 6 checks).
+prepare → migrate 0001+0002+0003 → 25 checks → rollback 0003+0002 → 6 checks),
+and the runner itself is covered by `npm run db:migration-safety`
+(`docs/evidence/migration-safety.txt`: 25 checks incl. a full rollback → rebuild
+rehearsal).
 
 ```bash
+# 0. read-only preflight: pending migrations, drift, orphans, legacy links
+DATABASE_URL="postgres://…" npm run db:preflight     # exit 1 = do not start
+
 # 1. inspect what would run (no writes)
 DATABASE_URL="postgres://…" npm run db:migrate -- --dry-run
 DATABASE_URL="postgres://…" npm run db:status
@@ -105,9 +111,33 @@ How the runner protects you:
 **Rollback:** every migration ships with a paired `*.rollback.sql` that removes
 exactly what it added. Apply the newest first
 (`drizzle/0003_share_tokens.rollback.sql`, then
-`drizzle/0002_security_hardening.rollback.sql`) and then delete the corresponding
-rows from `_hermiplan_migrations`. Dropping `project_share_tokens` invalidates
-every share link; projects, their data and their ownership are untouched.
+`drizzle/0002_security_hardening.rollback.sql`). Each rollback file deletes its
+own `_hermiplan_migrations` row in the same transaction, so a later
+`npm run db:migrate` re-applies it instead of silently believing the schema is
+current. Dropping `project_share_tokens` invalidates every share link; projects,
+their data and their ownership are untouched.
+
+`drizzle/0001_baseline.rollback.sql` deletes **every** table and row. It refuses
+to run unless you first create the confirmation table shown at the top of the
+file:
+
+```sql
+CREATE TABLE "_hermiplan_rollback_baseline_ok" ();
+```
+
+That file empties the ledger too, so `db:migrate` rebuilds the schema from 0001.
+
+All of the above is verified, not assumed: `npm run db:migration-safety` checks
+that each migration has a rollback, that a second `db:migrate` is a no-op, that a
+tampered checksum aborts the run, and — with
+`MIGRATION_SAFETY_ROLLBACK=1` on a **disposable** database — that the baseline
+rollback stays blocked without the confirmation table and that
+rollback → `db:migrate` reproduces an identical schema
+(`docs/evidence/migration-safety.txt`).
+
+**Step-by-step production runbook:** `docs/RUNBOOK-PRODUCTION-MIGRATION.md`
+(preflight → backup → migrate → deploy → verify → legacy-link communication →
+rollback), with the expected output of every step.
 
 The schema has no destructive statement: `0001` creates tables `IF NOT EXISTS`,
 `0002` only adds tables/columns/constraints/indexes. Nothing is dropped or
@@ -148,6 +178,14 @@ Connection guidance:
   list the affected projects (read-only; `--json` for machines), then let each
   owner re-issue a link from the report panel. `db-integrity` §۴ and
   `docs/evidence/share-audit.txt` rehearse exactly this state.
+* The report font is **self-hosted** (`public/fonts/Vazirmatn-variable.woff2`, SIL OFL):
+  no request leaves the origin, so the policy allows no third-party
+  `style-src`/`font-src` origin. If you replace the font, update
+  `src/app/globals.css` **and** the embedded copy in `src/lib/report/html.ts`
+  (the exported HTML embeds the font so it prints offline).
+* Exports are reproducible: the archive timestamp of XLSX/ZIP comes from the
+  project's status date, so exporting the same project twice yields identical
+  bytes (safe to hash, cache or diff).
 * The CSP is issued per request by `src/middleware.ts` with a nonce, so **do not**
   add a static `Content-Security-Policy` header in `next.config.ts` or at the CDN:
   it would conflict and drop the nonce. If you front the site with a CDN, make

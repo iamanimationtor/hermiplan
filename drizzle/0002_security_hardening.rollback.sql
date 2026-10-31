@@ -37,4 +37,7 @@ ALTER TABLE "projects" ALTER COLUMN "is_public" SET DEFAULT true;
 -- Optional and NOT executed automatically (re-exposes data):
 -- UPDATE "projects" SET "is_public" = true;
 
+-- Keep the ledger honest: after this rollback `db:migrate` must re-apply 0002.
+DELETE FROM "_hermiplan_migrations" WHERE "version" = '0002_security_hardening';
+
 COMMIT;

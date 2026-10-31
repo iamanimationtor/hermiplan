@@ -107,6 +107,7 @@ export function StepBasics({ project, api }: { project: ProjectInput; api: Proje
     <div className="space-y-5">
       <Card>
         <CardHeader
+          level={2}
           title="نوع پروژه را انتخاب کنید"
           subtitle="با انتخاب هر نوع، ساختار WBS، فهرست فعالیت‌ها، منابع، نرخ‌های بازار ایران و ریسک‌های پیشنهادی به‌صورت حرفه‌ای ساخته می‌شود."
           icon={<span className="text-lg">🧩</span>}
@@ -135,15 +136,26 @@ export function StepBasics({ project, api }: { project: ProjectInput; api: Proje
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="جستجو در قالب‌ها (مثلاً پل، نوسازی، نرم‌افزار)…"
+              aria-label="جستجو در قالب‌های آماده پروژه"
               className="h-10 max-w-[280px] py-2"
             />
-            <Select value={complexity} onChange={(e) => setComplexity(e.target.value)} className="h-10 max-w-[170px] py-2">
+            <Select
+              value={complexity}
+              onChange={(e) => setComplexity(e.target.value)}
+              aria-label="فیلتر بر اساس سطح پیچیدگی قالب"
+              className="h-10 max-w-[170px] py-2"
+            >
               <option value="all">هر سطح پیچیدگی</option>
               <option value="ساده">ساده</option>
               <option value="متوسط">متوسط</option>
               <option value="پیچیده">پیچیده</option>
             </Select>
-            <Select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="h-10 max-w-[200px] py-2">
+            <Select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as typeof sort)}
+              aria-label="ترتیب نمایش قالب‌ها"
+              className="h-10 max-w-[200px] py-2"
+            >
               <option value="default">مرتب‌سازی: پیشنهادی</option>
               <option value="short">کوتاه‌ترین مدت</option>
               <option value="long">بلندترین مدت</option>
@@ -179,7 +191,7 @@ export function StepBasics({ project, api }: { project: ProjectInput; api: Proje
                   <span className="text-2xl">{template.icon}</span>
                   {active ? <Badge tone="info">قالب فعال</Badge> : <Badge>{template.complexity}</Badge>}
                 </div>
-                <h4 className="mt-3 text-[14px] font-bold text-ink-900">{template.title}</h4>
+                <h3 className="mt-3 text-[14px] font-bold text-ink-900">{template.title}</h3>
                 <p className="mt-1 text-[11.5px] leading-6 text-slate-500">{template.tagline}</p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   <Badge tone="accent">{toPersianDigits(template.typicalWorkingDays)} روز کاری</Badge>
@@ -202,7 +214,7 @@ export function StepBasics({ project, api }: { project: ProjectInput; api: Proje
       </Card>
 
       <Card>
-        <CardHeader title="مشخصات پروژه" subtitle="این اطلاعات در سربرگ و صفحات گزارش حرفه‌ای شما استفاده می‌شود." icon={<span className="text-lg">📋</span>} />
+        <CardHeader level={2} title="مشخصات پروژه" subtitle="این اطلاعات در سربرگ و صفحات گزارش حرفه‌ای شما استفاده می‌شود." icon={<span className="text-lg">📋</span>} />
         <div className="grid gap-4 p-5 md:grid-cols-2">
           <Field label="نام پروژه" className="md:col-span-2">
             <Input value={project.meta.name} onChange={(e) => api.setMeta({ name: e.target.value })} />
@@ -352,6 +364,7 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
   return (
     <Card>
       <CardHeader
+          level={2}
         title="برآورد هزینه با نرخ‌های مرجع"
         subtitle="نرخ‌های نیروی انسانی، ماشین‌آلات و مصالح از کاتالوگ مرجع داخلی (بدون سند رسمی پیوست) یا فید بازار، همراه با سناریوی افزایش هزینه."
         icon={<span className="text-lg">📈</span>}
@@ -640,6 +653,7 @@ export function StepActivities({ project, analysis, api }: { project: ProjectInp
 
       <Card>
         <CardHeader
+          level={2}
           title="فعالیت‌ها و ساختار شکست کار"
           subtitle="فقط عنوان و مدت را وارد کنید؛ زمان‌بندی، شناوری و مسیر بحرانی به‌صورت خودکار محاسبه می‌شود."
           icon={<span className="text-lg">🧱</span>}
@@ -690,7 +704,7 @@ export function StepResources({ project, analysis, api }: { project: ProjectInpu
       </div>
 
       <Card>
-        <CardHeader title="منابع پروژه" subtitle="نرخ روزانه و ظرفیت مجاز هر منبع را وارد کنید؛ هزینه‌ها و بار کاری به‌صورت خودکار محاسبه می‌شود." icon={<span className="text-lg">👷</span>} />
+        <CardHeader level={2} title="منابع پروژه" subtitle="نرخ روزانه و ظرفیت مجاز هر منبع را وارد کنید؛ هزینه‌ها و بار کاری به‌صورت خودکار محاسبه می‌شود." icon={<span className="text-lg">👷</span>} />
         <div className="p-5">
           <div className="thin-scroll overflow-x-auto">
             <table className="w-full min-w-[760px] text-[12.5px]">
@@ -781,7 +795,7 @@ export function StepResources({ project, analysis, api }: { project: ProjectInpu
       </Card>
 
       <Card>
-        <CardHeader title="تحلیل هزینه فازها" subtitle="برآورد بودجه و هزینه واقعی هر فاز به‌صورت خودکار تجمیع شده است." icon={<span className="text-lg">💰</span>} />
+        <CardHeader level={2} title="تحلیل هزینه فازها" subtitle="برآورد بودجه و هزینه واقعی هر فاز به‌صورت خودکار تجمیع شده است." icon={<span className="text-lg">💰</span>} />
         <div className="p-5">
           <table className="w-full text-[12.5px]">
             <thead>
@@ -837,7 +851,7 @@ export function StepCalendar({ project, api }: { project: ProjectInput; api: Pro
   return (
     <div className="space-y-5">
       <Card>
-        <CardHeader title="تقویم کاری پروژه" subtitle="روزهای کاری، ساعت کار و تعطیلات را تعیین کنید؛ همه محاسبات زمان‌بندی بر اساس این تقویم انجام می‌شود." icon={<span className="text-lg">🗓️</span>} />
+        <CardHeader level={2} title="تقویم کاری پروژه" subtitle="روزهای کاری، ساعت کار و تعطیلات را تعیین کنید؛ همه محاسبات زمان‌بندی بر اساس این تقویم انجام می‌شود." icon={<span className="text-lg">🗓️</span>} />
         <div className="grid gap-5 p-5 md:grid-cols-2">
           <div className="md:col-span-2">
             <span className="mb-2 block text-[12.5px] font-semibold text-slate-700">روزهای کاری هفته</span>
@@ -903,7 +917,7 @@ export function StepCalendar({ project, api }: { project: ProjectInput; api: Pro
       </Card>
 
       <Card>
-        <CardHeader title="Baseline (مبنای مقایسه)" subtitle="با ثبت Baseline، انحراف زمان‌بندی و هزینه پروژه در گزارش قابل تحلیل می‌شود." icon={<span className="text-lg">📌</span>} />
+        <CardHeader level={2} title="Baseline (مبنای مقایسه)" subtitle="با ثبت Baseline، انحراف زمان‌بندی و هزینه پروژه در گزارش قابل تحلیل می‌شود." icon={<span className="text-lg">📌</span>} />
         <div className="flex flex-wrap items-center gap-3 p-5">
           {project.baseline ? (
             <>
@@ -927,7 +941,7 @@ export function StepMilestonesRisks({ project, api }: { project: ProjectInput; a
   return (
     <div className="space-y-5">
       <Card>
-        <CardHeader title="نقاط کنترل (Milestones)" subtitle="رویدادهای کلیدی پروژه؛ با اتصال به فعالیت، تاریخ آن به‌صورت خودکار محاسبه می‌شود." icon={<span className="text-lg">🚩</span>} />
+        <CardHeader level={2} title="نقاط کنترل (Milestones)" subtitle="رویدادهای کلیدی پروژه؛ با اتصال به فعالیت، تاریخ آن به‌صورت خودکار محاسبه می‌شود." icon={<span className="text-lg">🚩</span>} />
         <div className="space-y-3 p-5">
           {project.milestones.map((milestone) => (
             <div key={milestone.id} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_220px_auto]">
@@ -958,7 +972,7 @@ export function StepMilestonesRisks({ project, api }: { project: ProjectInput; a
       </Card>
 
       <Card>
-        <CardHeader title="ریسک‌های پروژه" subtitle="احتمال و اثر را از ۱ تا ۵ انتخاب کنید؛ ماتریس ریسک و ارزش در معرض ریسک خودکار محاسبه می‌شود." icon={<span className="text-lg">⚠️</span>} />
+        <CardHeader level={2} title="ریسک‌های پروژه" subtitle="احتمال و اثر را از ۱ تا ۵ انتخاب کنید؛ ماتریس ریسک و ارزش در معرض ریسک خودکار محاسبه می‌شود." icon={<span className="text-lg">⚠️</span>} />
         <div className="thin-scroll overflow-x-auto p-5">
           <table className="w-full min-w-[820px] text-[12.5px]">
             <thead>
@@ -1031,6 +1045,7 @@ export function StepOutput({
     <div className="space-y-5">
       <Card>
         <CardHeader
+          level={2}
           title="بخش‌های گزارش را انتخاب کنید"
           subtitle="گزارش خروجی به‌صورت یک سند مهندسی استاندارد A4 با جلد، سرصفحه، جدول‌های حرفه‌ای و شماره‌گذاری تولید می‌شود."
           icon={<span className="text-lg">📄</span>}
@@ -1048,7 +1063,7 @@ export function StepOutput({
         <div className="space-y-5 p-5">
           {groups.map((group) => (
             <div key={group}>
-              <h4 className="mb-2 text-[12px] font-bold text-slate-500">{group}</h4>
+              <h3 className="mb-2 text-[12px] font-bold text-slate-500">{group}</h3>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {REPORT_SECTIONS.filter((s) => s.group === group).map((section) => {
                   const active = reportSections.includes(section.key);
@@ -1084,7 +1099,7 @@ export function StepOutput({
       <ScenarioPanel project={project} analysis={analysis} />
 
       <Card>
-        <CardHeader title="پیش‌نمایش شاخص‌های کلیدی" subtitle="این مقادیر به‌صورت خودکار از موتور محاسباتی پروژه استخراج شده‌اند." icon={<span className="text-lg">📊</span>} />
+        <CardHeader level={2} title="پیش‌نمایش شاخص‌های کلیدی" subtitle="این مقادیر به‌صورت خودکار از موتور محاسباتی پروژه استخراج شده‌اند." icon={<span className="text-lg">📊</span>} />
         <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-4">
           {analysis.kpis.slice(0, 8).map((kpi) => (
             <StatTile

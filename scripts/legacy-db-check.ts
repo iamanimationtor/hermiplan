@@ -281,7 +281,9 @@ async function main() {
   await client.end();
   console.log(
     failures === 0
-      ? `\n✔ مرحله «${PHASE}» با ${checks} بررسی موفق`
+      ? checks === 0
+        ? `\n✔ مرحله «${PHASE}» بدون خطا اجرا شد`
+        : `\n✔ مرحله «${PHASE}» با ${checks} بررسی موفق`
       : `\n✘ ${failures} خطا از ${checks} بررسی`,
   );
   process.exit(failures === 0 ? 0 : 1);

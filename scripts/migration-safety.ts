@@ -1,0 +1,190 @@
+/**
+ * HERMIPLAN — migration runner safety checks (real files, real database).
+ *
+ *   DATABASE_URL=postgres://… npx tsx scripts/migration-safety.ts
+ *
+ * These are the properties the deployment runbook relies on, tested rather than
+ * assumed:
+ *
+ *  1. every migration file has a paired `.rollback.sql` (reversibility),
+ *  2. a second `db:migrate` applies nothing and changes no timestamps
+ *     (idempotency),
+ *  3. editing an already-applied file is refused with a non-zero exit
+ *     (drift detection), and the ledger is left intact,
+ *  4. restoring the original checksum lets the runner proceed again,
+ *  5. the baseline rollback refuses to run without its confirmation table and
+ *     leaves the schema untouched when it refuses,
+ *  6. a full rollback followed by `db:migrate` rebuilds the identical schema,
+ *  7. the 0002/0003 rollbacks run and can be re-applied (steps 5–7 need
+ *     MIGRATION_SAFETY_ROLLBACK=1 because they empty the database).
+ *
+ * It deliberately runs against a **test** database: it edits the ledger row and
+ * restores it. Never point it at production.
+ */
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { Client } from "pg";
+
+const url = process.env.DATABASE_URL;
+if (!url) {
+  console.error("DATABASE_URL must point at a TEST database.");
+  process.exit(2);
+}
+
+let passed = 0;
+const failures: string[] = [];
+function check(condition: boolean, message: string, detail = ""): void {
+  if (condition) {
+    passed += 1;
+    console.log(`  ✓ ${message}`);
+  } else {
+    failures.push(message);
+    console.log(`  ✗ ${message}${detail ? ` — ${detail}` : ""}`);
+  }
+}
+
+function runMigrate(): { code: number; output: string } {
+  const result = spawnSync("npx", ["tsx", "scripts/migrate.ts"], { encoding: "utf8", env: process.env });
+  return { code: result.status ?? 1, output: `${result.stdout}${result.stderr}` };
+}
+
+async function main(): Promise<void> {
+  const dir = join(process.cwd(), "drizzle");
+  const migrations = readdirSync(dir)
+    .filter((file) => file.endsWith(".sql") && !file.endsWith(".rollback.sql"))
+    .sort();
+
+  console.log("▶ ۱. هر مهاجرت فایل بازگشت جفت‌شده دارد");
+  for (const file of migrations) {
+    const rollback = file.replace(/\.sql$/, ".rollback.sql");
+    const exists = readdirSync(dir).includes(rollback);
+    check(exists, `${file} → ${rollback}`, exists ? "" : "missing");
+  }
+
+  const client = new Client({ connectionString: url });
+  await client.connect();
+
+  console.log("\n▶ ۲. اجرای دوباره چیزی اعمال نمی‌کند (idempotency)");
+  const first = runMigrate();
+  check(first.code === 0, "اجرای اول موفق است", first.output.trim().split("\n").slice(-1)[0]);
+  const before = await client.query<{ version: string; applied_at: Date }>(
+    "select version, applied_at from _hermiplan_migrations order by version",
+  );
+  check(before.rows.length >= migrations.length, "همه مهاجرت‌ها در دفتر ثبت شده‌اند", `${before.rows.length}/${migrations.length}`);
+
+  const second = runMigrate();
+  check(second.code === 0, "اجرای دوم بدون خطاست");
+  check(/Nothing to do|up to date/i.test(second.output), "اجرای دوم «کاری برای انجام» گزارش می‌کند", second.output.trim().split("\n").slice(-1)[0]);
+  const after = await client.query<{ version: string; applied_at: Date }>(
+    "select version, applied_at from _hermiplan_migrations order by version",
+  );
+  check(
+    after.rows.length === before.rows.length &&
+      after.rows.every((row, index) => row.version === before.rows[index].version &&
+        new Date(row.applied_at).getTime() === new Date(before.rows[index].applied_at).getTime()),
+    "زمان اعمال هیچ مهاجرتی تغییر نکرد",
+  );
+
+  console.log("\n▶ ۳. تغییر فایل اعمال‌شده رد می‌شود (drift detection)");
+  const last = before.rows[before.rows.length - 1]?.version;
+  const originalChecksum = createHash("sha256")
+    .update(readFileSync(join(dir, `${last}.sql`), "utf8"))
+    .digest("hex");
+  await client.query("update _hermiplan_migrations set checksum = $1 where version = $2", ["tampered", last]);
+  const tampered = runMigrate();
+  check(tampered.code !== 0, "اجرا با checksum دست‌کاری‌شده با خطا متوقف می‌شود", `exit=${tampered.code}`);
+  check(/drift|checksum|تغییر|modified/i.test(tampered.output), "پیام خطا علت را می‌گوید", tampered.output.trim().split("\n").slice(-2).join(" "));
+
+  console.log("\n▶ ۴. بازگردانی checksum، اجرا را سالم می‌کند");
+  await client.query("update _hermiplan_migrations set checksum = $1 where version = $2", [originalChecksum, last]);
+  const restored = runMigrate();
+  check(restored.code === 0, "پس از بازگردانی، اجرا موفق است", `exit=${restored.code}`);
+  const ledger = await client.query<{ checksum: string }>(
+    "select checksum from _hermiplan_migrations where version = $1",
+    [last],
+  );
+  check(ledger.rows[0]?.checksum === originalChecksum, "checksum دفتر با فایل هم‌خوان است");
+
+  /* ---------------- 5-6. rollback rehearsal (opt-in) ---------------- */
+  if (process.env.MIGRATION_SAFETY_ROLLBACK === "1") {
+    const snapshot = async (): Promise<string> => {
+      const query = await client.query<{ table_name: string; column_name: string; data_type: string }>(`
+        SELECT c.table_name, c.column_name, c.data_type
+          FROM information_schema.columns c
+         WHERE c.table_schema = 'public' AND c.table_name <> '_hermiplan_migrations'
+         ORDER BY c.table_name, c.column_name
+      `);
+      return query.rows.map((row) => `${row.table_name}.${row.column_name}:${row.data_type}`).join("\n");
+    };
+    const beforeRollback = await snapshot();
+
+    console.log("\n▶ ۵. بازگشت بدون تأیید صریح اجرا نمی‌شود (destructive guard)");
+    const baselineRollback = readFileSync(join(dir, "0001_baseline.rollback.sql"), "utf8");
+    let guarded = false;
+    try {
+      await client.query(baselineRollback);
+    } catch (error) {
+      guarded = /Refusing to drop the HERMIPLAN baseline/.test(error instanceof Error ? error.message : "");
+      // The file opens its own transaction; the exception leaves the session in
+      // an aborted transaction, so roll it back before touching the database
+      // again (a real operator would see the same thing in psql).
+      await client.query("ROLLBACK").catch(() => undefined);
+    }
+    check(guarded, "فایل بازگشت پایه بدون جدول تأیید، خطا می‌دهد");
+    const survivors = await client.query<{ count: string }>(
+      "select count(*) from information_schema.tables where table_schema = 'public' and table_name in ('projects','users','sessions','otp_codes','project_events')",
+    );
+    check(Number(survivors.rows[0]?.count) === 5, "پس از تلاش ناموفق، جدول‌ها دست‌نخورده‌اند", `found ${survivors.rows[0]?.count}`);
+
+    console.log("\n▶ ۶. بازگشت کامل و مهاجرت دوباره، همان ساختار را می‌سازد");
+    await client.query('CREATE TABLE "_hermiplan_rollback_baseline_ok" ()');
+    await client.query(baselineRollback);
+    const afterDrop = await client.query<{ count: string }>(
+      "select count(*) from information_schema.tables where table_schema = 'public' and table_name in ('projects','users','sessions','otp_codes','project_events')",
+    );
+    check(Number(afterDrop.rows[0]?.count) === 0, "همه جدول‌های پایه حذف شدند", `left ${afterDrop.rows[0]?.count}`);
+    const ledgerAfterDrop = await client.query<{ count: string }>("select count(*) from _hermiplan_migrations");
+    check(Number(ledgerAfterDrop.rows[0]?.count) === 0, "دفتر مهاجرت خالی شد (اجرای بعدی از ۰۰۰۱ شروع می‌کند)");
+
+    const rebuild = runMigrate();
+    check(rebuild.code === 0, "اجرای دوباره مهاجرت‌ها موفق است", `exit=${rebuild.code}`);
+    const afterRebuild = await snapshot();
+    check(afterRebuild === beforeRollback, "ساختار بازسازی‌شده با ساختار پیش از بازگشت یکسان است");
+
+    console.log("\n▶ ۷. بازگشت ۰۰۰۲ و ۰۰۰۳ هم اجرا می‌شود و قابل بازاعمال است");
+    for (const version of ["0003_share_tokens", "0002_security_hardening"]) {
+      await client.query(readFileSync(join(dir, `${version}.rollback.sql`), "utf8"));
+      const row = await client.query("select 1 from _hermiplan_migrations where version = $1", [version]);
+      check(row.rowCount === 0, `${version}: ردیف دفتر حذف شد`);
+    }
+    const otpType = await client.query<{ data_type: string }>(
+      "select data_type from information_schema.columns where table_schema='public' and table_name='otp_codes' and column_name='attempts'",
+    );
+    check(otpType.rows[0]?.data_type === "text", "ستون attempts به text بازگشت", otpType.rows[0]?.data_type);
+    const defaultFlag = await client.query<{ column_default: string }>(
+      "select column_default from information_schema.columns where table_schema='public' and table_name='projects' and column_name='is_public'",
+    );
+    check(defaultFlag.rows[0]?.column_default === "true", "پیش‌فرض is_public به true بازگشت (فقط ساختار)", defaultFlag.rows[0]?.column_default);
+    const reapply = runMigrate();
+    check(reapply.code === 0, "بازاعمال ۰۰۰۲ و ۰۰۰۳ موفق است", `exit=${reapply.code}`);
+    const reapplyFlag = await client.query<{ column_default: string }>(
+      "select column_default from information_schema.columns where table_schema='public' and table_name='projects' and column_name='is_public'",
+    );
+    check(reapplyFlag.rows[0]?.column_default === "false", "پس از بازاعمال، پیش‌فرض خصوصی است", reapplyFlag.rows[0]?.column_default);
+    const rebuiltAgain = await snapshot();
+    check(rebuiltAgain === beforeRollback, "ساختار نهایی با ساختار اولیه یکسان است");
+  }
+
+  await client.end();
+
+  console.log(
+    failures.length === 0
+      ? `\n✔ ${passed} بررسی ایمنی مهاجرت — همه موفق`
+      : `\n✘ ${failures.length} خطا از ${passed + failures.length}`,
+  );
+  process.exit(failures.length === 0 ? 0 : 1);
+}
+
+void main();

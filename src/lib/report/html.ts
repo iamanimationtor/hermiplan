@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ProjectAnalysis, ProjectInput } from "@/lib/engine/types";
 import { formatCompact, formatJalali, formatNumber, formatPercent, toPersianDigits } from "@/lib/date-fa";
 
@@ -6,6 +8,34 @@ import { formatCompact, formatJalali, formatNumber, formatPercent, toPersianDigi
  * Used inside the delivery package so the recipient can view and print the
  * report without any server dependency (File → Print → PDF).
  */
+
+/**
+ * The report is meant to be printed and archived, so it must not depend on the
+ * network: the Vazirmatn variable font (SIL OFL, `public/fonts/OFL.txt`) is
+ * embedded as a data URI, exactly like a PDF embeds its fonts. Without this a
+ * recipient behind a firewall would get fallback typography, and every open of
+ * the file would call out to a third-party CDN.
+ *
+ * The base64 payload is read once per process (≈150 KB on the wire). If the file
+ * is missing — a broken deployment — the document falls back to the CDN link
+ * below rather than rendering in an unexpected typeface with no explanation.
+ */
+const EMBEDDED_FONT = (() => {
+  try {
+    const bytes = readFileSync(join(process.cwd(), "public", "fonts", "Vazirmatn-variable.woff2"));
+    return bytes.toString("base64");
+  } catch {
+    return "";
+  }
+})();
+
+const FONT_FACE_CSS = EMBEDDED_FONT
+  ? `@font-face{font-family:"Vazirmatn";src:url(data:font/woff2;base64,${EMBEDDED_FONT}) format("woff2");font-weight:100 900;font-style:normal;font-display:swap}`
+  : "";
+
+const FALLBACK_FONT_LINK: string = EMBEDDED_FONT
+  ? ""
+  : `<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css"/>`;
 
 const RATE_KIND_LABEL: Record<string, string> = {
   "official-wage": "نرخ رسمی (بدون سند در سامانه)",
@@ -24,7 +54,7 @@ const esc = (value: unknown): string =>
 
 const LOGO_MARK = `<svg width="30" height="30" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="lp" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0e2745"/><stop offset="100%" stop-color="#123a66"/></linearGradient><linearGradient id="lb" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#8ab2e3"/><stop offset="100%" stop-color="#ffffff"/></linearGradient></defs><path d="M32 2.6 57.4 17.3v29.4L32 61.4 6.6 46.7V17.3z" fill="url(#lp)"/><path d="M14.5 24.5c7.4-6.6 15.2-8.6 23.3-6" fill="none" stroke="#e2a13a" stroke-width="2.6" stroke-linecap="round"/><rect x="17" y="36" width="7.5" height="9" rx="1.8" fill="url(#lb)" opacity=".55"/><rect x="27.5" y="31" width="7.5" height="14" rx="1.8" fill="url(#lb)" opacity=".8"/><rect x="38" y="25.5" width="7.5" height="19.5" rx="1.8" fill="#eeb95c"/><rect x="17" y="47.5" width="28.5" height="2.4" rx="1.2" fill="rgba(255,255,255,.35)"/></svg>`;
 
-const CSS = `
+const CSS = `${FONT_FACE_CSS}
 :root{--navy:#12335a;--ink:#101a24;--line:#d7dee6}
 *{box-sizing:border-box}
 body{margin:0;background:#eef1f5;color:var(--ink);font-family:Vazirmatn,Tahoma,system-ui,sans-serif;font-size:11.4px;line-height:1.85;direction:rtl}
@@ -50,6 +80,7 @@ tfoot td{background:#e8eef4;font-weight:700}
 footer{position:absolute;bottom:8mm;left:14mm;right:14mm;display:flex;justify-content:space-between;border-top:1px solid #e2e8ee;padding-top:4px;font-size:9px;color:#6b7a8a}
 .badge{display:inline-block;border-radius:99px;padding:1px 8px;font-size:10px;font-weight:700}
 .g{background:#dcfce7;color:#166534}.w{background:#fef3c7;color:#92400e}.b{background:#fee2e2;color:#991b1b}
+@media screen and (max-width:720px){.sheet{width:auto;min-height:0;margin:0;padding:14px;box-shadow:none}body{font-size:12px}table{font-size:10px}}
 @media print{.no-print{display:none}@page{size:A4;margin:12mm 11mm}.sheet{width:auto;min-height:0;margin:0;padding:0;box-shadow:none;break-after:page}footer{display:none}thead{display:table-header-group}tr{break-inside:avoid}}
 `;
 
@@ -385,8 +416,10 @@ export function buildReportHtml(
 
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light"/>
 <title>گزارش ${esc(project.meta.name)} | HERMIPLAN</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css"/>
+${FALLBACK_FONT_LINK}
 <style>${CSS}</style></head>
 <body>
   <div class="no-print" style="direction:rtl;font-family:Vazirmatn,Tahoma,sans-serif;background:#0a1c37;color:#e2e8f0;padding:14px 18px;font-size:12.5px;line-height:2">

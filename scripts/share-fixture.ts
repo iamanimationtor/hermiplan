@@ -71,6 +71,10 @@ async function main() {
   await call(`/api/projects/${projectId}/share?tokenId=${doomedBody.tokenId}`, { method: "DELETE" });
 
   const unknownToken = "a".repeat(43);
+  // A well-formed UUID that belongs to nobody: knowing an id must never be the
+  // credential, not even when the requester happens to hold an owner cookie for
+  // a different project.
+  const unknownId = "00000000-0000-4000-8000-000000000000";
   const paths = [
     "/",
     "/builder",
@@ -78,8 +82,9 @@ async function main() {
     `/s/${token}`,
     `/s/${doomedBody.token}`,
     `/s/${unknownToken}`,
+    `/report/${unknownId}`,
   ].join(",");
-  const expect404 = [`/s/${doomedBody.token}`, `/s/${unknownToken}`].join(",");
+  const expect404 = [`/s/${doomedBody.token}`, `/s/${unknownToken}`, `/report/${unknownId}`].join(",");
 
   console.log(`CSP_PATHS=${paths}`);
   console.log(`CSP_EXPECT_404=${expect404}`);

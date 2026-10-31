@@ -124,17 +124,26 @@
 | فراداده نرخ فاقد ارز، ارجاع سند، پیوند، تاریخ به‌روزرسانی و اعتبار زمانی بود | متوسط | `src/lib/market/rates.ts`, `market/engine.ts`, `ReportView.tsx` | فیلدهای `currency`, `sourceRef`, `sourceUrl`, `lastUpdatedIso`, `validUntilIso` (خالی‌بودن سند با `null` و برچسب «سند ثبت نشده») | regressions §۷ |
 | آزمون مهاجرت روی داده نسخه قبل وجود نداشت | زیاد | `scripts/legacy-db-check.ts` (جدید) | بازسازی پایگاه نسخه قبل و اثبات حفظ داده | `docs/evidence/legacy-db.txt` |
 | دانستن UUID گزارش، دسترسی می‌داد (UUID مجوز نبود ولی انتشار عمومی کافی بود) | بحرانی | `drizzle/0003`, `lib/server/share-token*.ts`, `app/s/[token]`, `api/projects/[id]/share` | توکن ۲۵۶ بیتی، فقط هش در پایگاه داده، انقضا/ابطال، `/report/<uuid>` برای غیرمالک ۴۰۴ | `api-integration` §۳ (۲۰ سناریو) |
-| CSP وجود نداشت | زیاد | `src/middleware.ts` | nonce در هر درخواست، `script-src` بدون `unsafe-inline` | `npm run test:csp` (۲۲ بررسی) |
+| CSP وجود نداشت | زیاد | `src/middleware.ts` | nonce در هر درخواست، `script-src` بدون `unsafe-inline` | `npm run test:csp` (۲۴ بررسی) |
 | سیاست گرد کردن پول متمرکز و آزموده نبود | متوسط | `src/lib/engine/money.ts` | گرد کردن یک‌بار، `total = Σ اجزا`، `NaN`/`Infinity` ⇒ ۰ | رگرسیون §۱۵ (۱۱ بررسی) |
 | هیچ سنجش عملکرد یا هم‌زمانی وجود نداشت | متوسط | `scripts/load-test.ts`, `scripts/db-integrity-check.ts` | بنچمارک محلی + هم‌زمانی ۴۰ اتصال روی PostgreSQL واقعی | `load.txt`, `db-integrity.txt` |
 | `npm test` به متغیر محیطی `DATABASE_URL` وابسته بود (آزمون fallback حافظه‌ای با دیتابیس متصل شکست می‌خورد) | متوسط | `scripts/security-checks.ts` §۶ | محیط به‌صورت صریح و موقت پاک می‌شود و بازگردانده می‌شود؛ اجرای مجموعه با و بدون `DATABASE_URL` یکسان است | `tests.txt` (اجرا با `DATABASE_URL`) + ۱۰ اجرای متوالی سبز |
 | سقف «۱۰ لینک فعال» از لیست کوتاه‌شده محاسبه می‌شد ⇒ با انبوه لینک‌های باطل قابل دور زدن بود | متوسط | `src/lib/server/share-token.ts` (`countActiveShareTokens`), `api/projects/[id]/share/route.ts` | شمارش در خود SQL؛ سقف به‌صورت ثابت نام‌دار `MAX_ACTIVE_LINKS` | `api` §۳-ب (۴۰۹ پس از ۱۰ لینک) |
 | هر بازدید از لینک اشتراک یک `UPDATE` می‌زد (تقویت نوشتن روی مسیر فقط‌خواندنی) | کم | `src/lib/server/share-token.ts` | `last_used_at`/`use_count` حداکثر یک‌بار در دقیقه (شرط در SQL، مقاوم به هم‌زمانی)؛ شمارنده «دقیقه بازدید» است نه «بازدید خام» | `api` §۳-ب، `share-audit.txt` |
 | `/api/health` بدون مهاجرت هم «سبز» بود ⇒ استقرار ناقص دیده نمی‌شد | متوسط | `src/app/api/health/route.ts` | بررسی وجود هفت جدول؛ در نبودشان **۵۰۳** + `missingTables` + پیام راهنما | `health-probe.txt` |
-| CSP فقط روی `/` و `/builder` آزموده می‌شد، نه روی مسیرهای واقعی گزارش/اشتراک | متوسط | `scripts/csp-check.ts` (`CSP_PATHS`, `CSP_EXPECT_404`, `CSP_COOKIE`), `scripts/share-fixture.ts` (جدید) | شش مسیر واقعی با کوکی مالک و لینک زنده/باطل/ناشناس؛ ۴۰۴ هم باید سیاست را داشته باشد | `csp-review.txt` (۶۶ بررسی) |
+| CSP فقط روی `/` و `/builder` آزموده می‌شد، نه روی مسیرهای واقعی گزارش/اشتراک | متوسط | `scripts/csp-check.ts` (`CSP_PATHS`, `CSP_EXPECT_404`, `CSP_COOKIE`), `scripts/share-fixture.ts` (جدید) | هفت مسیر واقعی با کوکی مالک: لینک زنده، لینک باطل، توکن ناشناس، و گزارش با UUID بیگانه؛ ۴۰۴ هم باید سیاست و هدرهای عدم‌کش/عدم‌ایندکس را داشته باشد | `csp-review.txt` (۹۲ بررسی) |
 | رفتار لینک‌های قدیمی (منتشرشده پیش از ۰۰۰۳) مستند و قابل بازبینی نبود | متوسط | `scripts/share-audit.ts` (جدید), `DEPLOYMENT.md` §۴ب, `db-integrity-check.ts` §۴ | ابزار فقط‌خواندنی که پروژه‌های «لینک قدیمی» را فهرست می‌کند؛ هیچ توکنی به‌صورت خودکار ساخته نمی‌شود | `share-audit.txt`, `db-integrity-review.txt` |
 | درخواست `POST` بدون بدنه به `/share` خطای ۴۰۰ می‌داد | کم | `src/app/api/projects/[id]/share/route.ts` | بدنه خالی ⇒ پیش‌فرض‌ها | `api` §۳ (بدنه خالی) |
 | بارگذاری ماژول اشتراک در لودر گزارش به‌صورت پویا (به‌دلیل وابستگی حلقه‌ای احتمالی) | کم | `src/lib/server/report-loader.ts` | ایمپورت ایستا؛ بررسی چرخه انجام شد | `tsc`, `build` |
+| گزارش چاپی متای `viewport` نداشت ⇒ روی موبایل با عرض ثابت رندر می‌شد | متوسط | `src/lib/report/html.ts` | `viewport` + `color-scheme` + `@media screen and (max-width:720px)` | `test:export` (۲ بررسی) | ✅ |
+| گزارش تحویلی برای فونت به CDN بیرونی وابسته بود (آفلاین/حریم خصوصی) | متوسط | `public/fonts/*`, `globals.css`, `html.ts`, `middleware.ts` | فونت وزیرمتن خودمیزبان + جاسازی base64 در HTML چاپی؛ حذف `cdn.jsdelivr.net` از CSP | `test:export` + `test:csp` ۲۴/۲۴ | ✅ |
+| آرشیوهای XLSX/ZIP تکرارپذیر نبودند (مهر زمانی = لحظه صدور) | کم | `zip.ts`, `xlsx.ts`, `package.ts`, `api/export/route.ts` | مهر زمانی از تاریخ وضعیت پروژه؛ صدور دوباره بایت‌به‌بایت یکسان | `test:export` (تکرارپذیری) | ✅ |
+| نقص دسترس‌پذیری: نبود `main` در صفحه اصلی، نبود `h1` و ۳ برچسب در بیلدر، پرش سطح سرتیتر | متوسط | `app/page.tsx`, `BuilderApp.tsx`, `ui.tsx`, `steps.tsx` | landmark، `h1`، `level` در `CardHeader`، `aria-label` سه کنترل | `test:a11y` ۳۲/۳۲ | ✅ |
+| هیچ سقفی برای وزن جاوااسکریپت صفحه‌ها نبود | کم | `scripts/bundle-budget.ts` (جدید) | بودجه gzip هر مسیر + خودآزمون تشخیص نقض | `bundle.txt` | ✅ |
+| `robots.txt`/`sitemap.xml` وجود نداشت | کم | `app/robots.ts`, `app/sitemap.ts` (جدید) | مسیرهای خصوصی مسدود؛ نقشه سایت فقط دو صفحه عمومی | `production-smoke.txt` | ✅ |
+| پیش‌بررسی و دفترچه‌ی اجرای مهاجرت نبود | متوسط | `scripts/db-preflight.ts`, `docs/RUNBOOK-PRODUCTION-MIGRATION.md` (جدید) | پیش‌بررسی فقط‌خواندنی + گام‌به‌گام با خروجی انتظاری | `preflight.txt` | ✅ |
+| هشدار «لینک قدیمی غیرفعال» در محصول نبود | متوسط | `lib/share-status.ts` (جدید), `ReportView.tsx` | نشان/پیام/راه‌حل از یک قاعده‌ی خالص و آزموده | `security` (۹ بررسی) | ✅ |
+| خروجی‌های فایل فقط از نظر «وجود» آزموده می‌شدند، نه صحت عدد | متوسط | `scripts/export-check.ts` (جدید) | ساختار Office/ZIP، CRC، CSV، HTML خودکفا، برابری BAC و جمع اجزا بین شیت/CSV/HTML/JSON | `export.txt` ۶۱ بررسی | ✅ |
 
 ---
 
@@ -196,7 +205,7 @@
 | `npm run db:migrate` روی پایگاه خالی | ✅ `0001`+`0002`+`0003` اعمال شد؛ اجرای دوباره بی‌اثر |
 | بررسی حالت production (`next start`) | ✅ `/api/auth` ⇒ ۵۰۳ بدون افشای کد؛ `/api/health` ⇒ `{ok:true, schemaVersion:3, database:"ok", rateLimitStore:"postgres", shareLinks:"postgres"}` (و در نبود مهاجرت، ۵۰۳ با `missingTables`)؛ `/` و `/builder` ⇒ ۲۰۰ |
 | `npm ci` (اجرای واقعی، از صفر) | ✅ `added 406 packages` و `EXIT=0` — قفل و `package.json` هم‌خوان |
-| `npm run test:csp` روی ۶ مسیر واقعی | ✅ **۶۶ بررسی** (`csp-review.txt`) |
+| `npm run test:csp` روی ۷ مسیر واقعی | ✅ **۹۲ بررسی** (`csp-review.txt`) |
 | `npm run test:db:integrity` | ✅ **۱۴ بررسی** (`db-integrity-review.txt`) |
 | `npm run db:share-audit` | ✅ فهرست لینک‌های فعال + علامت‌خوردن پروژه «منتشرشده پیش از ۰۰۰۳» (`share-audit.txt`) |
 | `scripts/legacy-db-check.ts` (سناریوی پایگاه نسخه قبل) | ✅ مهاجرت: **۲۵ بررسی** · rollback: **۶ بررسی** · اعمال مجدد: موفق — بدون از دست رفتن هیچ ردیف |
@@ -232,7 +241,7 @@
 | CSRF (Origin/Sec-Fetch-Site) + SameSite=Lax + Secure در production | ✅ | `security` §۴ |
 | پاک‌سازی شماره موبایل (ارقام فارسی/عربی، قالب‌های بین‌المللی) | ✅ | `security` §۱ |
 | هدرهای سخت‌سازی (nosniff، DENY frame، Referrer-Policy، Permissions-Policy، HSTS، noindex گزارش) | ✅ | `curl -I` روی سرور تولیدی |
-| CSP سخت‌گیرانه با nonce | ✅ انجام شد | `src/middleware.ts`: `script-src` بدون `unsafe-inline`/`unsafe-eval` در production، `object-src 'none'`، `base-uri`، `form-action`، `frame-ancestors`؛ آزمون `npm run test:csp` روی **۶ مسیر واقعی** (شامل گزارش مالک، لینک زنده، لینک باطل، توکن ناشناس) = ۶۶ بررسی — ولی رندر مرورگری آزموده نشده |
+| CSP سخت‌گیرانه با nonce | ✅ انجام شد | `src/middleware.ts`: `script-src` بدون `unsafe-inline`/`unsafe-eval` در production، `object-src 'none'`، `base-uri`، `form-action`، `frame-ancestors`؛ آزمون `npm run test:csp` روی **۷ مسیر واقعی** (شامل گزارش مالک، لینک زنده، لینک باطل، توکن ناشناس، UUID بیگانه) = ۹۲ بررسی — ولی رندر مرورگری آزموده نشده |
 | سقف حجم بدنه و اعتبارسنجی Zod در همه مسیرهای نوشتن | ✅ | `api` §۵ |
 | کوکی مهمان بدون مجوز خواندن از JS | ✅ | `api` §۱ |
 
@@ -300,7 +309,7 @@
 | توکن اشتراک گزارش (به‌جای UUID + پرچم عمومی) | ✅ انجام شد | `0003_share_tokens` + `/s/<token>`؛ فقط هش SHA-256 ذخیره می‌شود، ابطال فوری، انقضا اختیاری |
 | آزمون یکپارچگی روی PostgreSQL واقعی | ✅ انجام شد | PostgreSQL 18.6 واقعی: ۸۰/۰/۶ API (۸۴ بررسی شامل §۳-ب)، ۲۵ بررسی مهاجرت، ۱۴ بررسی هم‌زمانی/قید (`evidence/real-postgres.txt`, `db-integrity-review.txt`) |
 | بررسی بصری موبایل/دسکتاپ و PDF چاپی | ⚠️ جزئی | رندر پیکسلی نمودار (۳۶۰/۱۱۸۰)، قواعد A4 و پیش‌شرط‌های چیدمان آزموده شد؛ مرورگر واقعی در دسترس نبود (`libnspr4`/`libnss3` + root) |
-| CSP سخت‌گیرانه | ✅ انجام شد | nonce در هر درخواست، بدون `unsafe-inline` در script؛ `npm run test:csp` (۲۲ بررسی) |
+| CSP سخت‌گیرانه | ✅ انجام شد | nonce در هر درخواست، بدون `unsafe-inline` در script؛ `npm run test:csp` (۲۴ بررسی) |
 | ارسال واقعی پیامک | ❌ آزموده نشد | کلید سرویس موجود نبود؛ مسیر کد و مسیر ۵۰۳ آزموده شد |
 | سنجش عملکرد تحت بار | 🟡 محلی انجام شد | `npm run test:load`: ۱۹۴٫۸ req/s تحلیل (p95 ۹۲ms)، ۱۱۱ req/s SSR؛ ظرفیت Netlify سنجیده نشده |
 | تست سیاست گرد کردن پول (ردیف/جمع) | ✅ انجام شد | `src/lib/engine/money.ts` + ۱۱ بررسی §۱۵: `total === Σ اجزای گردشده` |

@@ -1,12 +1,15 @@
-# CSP on every REAL route — 2026-10-31T12:51:31Z
-CSP_PATHS=/,/builder,/report/64e0bd31-1f1f-4261-90fd-adcfc3356655,/s/TdptI9K8SakPtLpuVgF3lBELBxJiZyEBo_YutcesLyI,/s/2izOVN5wmmjBT9JE7fhGVCEasjdsMSKLadRb0aKD5So,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+# CSP on every REAL route — 2026-10-31T13:28:02Z
+fx=$(BASE_URL=http://127.0.0.1:3400 npx tsx scripts/share-fixture.ts); eval "$fx"; BASE_URL=http://127.0.0.1:3400 npm run test:csp
+CSP_PATHS=/,/builder,/report/cd0d8fbe-1141-4f38-81bc-1100e1db1ce1,/s/dFg9LNSfBw7bQYpUNwaFGQpOt6_1jxsHSTmCe_IRIO0,/s/02A_twX2JyQUfbDO2eI7i4SSgvrTmCiGLqLNuo46u6g,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
 
 ▶ /
 ▶ /builder
-▶ /report/64e0bd31-1f1f-4261-90fd-adcfc3356655
-▶ /s/TdptI9K8SakPtLpuVgF3lBELBxJiZyEBo_YutcesLyI
-▶ /s/2izOVN5wmmjBT9JE7fhGVCEasjdsMSKLadRb0aKD5So
+▶ /report/cd0d8fbe-1141-4f38-81bc-1100e1db1ce1
+▶ /s/dFg9LNSfBw7bQYpUNwaFGQpOt6_1jxsHSTmCe_IRIO0
+▶ /s/02A_twX2JyQUfbDO2eI7i4SSgvrTmCiGLqLNuo46u6g
 ▶ /s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+▶ /report/00000000-0000-4000-8000-000000000000
 
-✔ 66 بررسی CSP — همه موفق
+✔ 92 بررسی CSP — همه موفق
   سیاست بررسی‌شده، نه آزمون مرورگری: اجرای واقعی مرورگر همچنان کار باز است.
+EXIT=0

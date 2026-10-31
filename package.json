@@ -13,16 +13,21 @@
     "test:smoke": "tsx scripts/engine-smoke.ts",
     "test:edge": "tsx scripts/edge-case-audit.ts",
     "test:security": "tsx scripts/security-checks.ts",
+    "test:export": "tsx scripts/export-check.ts",
     "test:api": "tsx scripts/api-integration.ts",
     "test:legacy-db": "tsx scripts/legacy-db-check.ts",
     "test:csp": "tsx scripts/csp-check.ts",
     "test:layout": "tsx scripts/layout-audit.ts",
+    "test:a11y": "tsx scripts/a11y-check.ts",
+    "test:bundle": "tsx scripts/bundle-budget.ts",
     "test:db:integrity": "tsx scripts/db-integrity-check.ts",
     "test:load": "tsx scripts/load-test.ts",
     "db:status": "tsx scripts/migrate.ts --status",
     "db:migrate": "tsx scripts/migrate.ts",
+    "db:preflight": "tsx scripts/db-preflight.ts",
     "db:dev-server": "tsx scripts/pg-dev-server.ts",
-    "db:share-audit": "tsx scripts/share-audit.ts"
+    "db:share-audit": "tsx scripts/share-audit.ts",
+    "db:migration-safety": "tsx scripts/migration-safety.ts"
   },
   "dependencies": {
     "dotenv": "17.3.1",

@@ -8,9 +8,10 @@ import "dotenv/config";
  *
  * Verifies the real user journey with real cookies and real downloaded files.
  */
-import { inflateRawSync } from "node:zlib";
 import { Client } from "pg";
 import { buildProjectFromTemplate } from "../src/lib/templates";
+import { readZip } from "./lib/zip-read";
+import { randomUUID } from "node:crypto";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3100";
 
@@ -64,49 +65,6 @@ async function closeDb(): Promise<void> {
     await client.end();
     client = null;
   }
-}
-
-/**
- * Minimal ZIP reader (central directory + inflate) used to verify that the
- * produced package is a real archive whose CRCs match. Deliberately test-local:
- * the application only ever *writes* archives, so no runtime dependency is
- * added.
- */
-function readZip(buffer: Buffer): { name: string; data: Buffer; crcOk: boolean }[] {
-  const eocd = buffer.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
-  if (eocd < 0) throw new Error("ZIP end-of-central-directory not found");
-  const count = buffer.readUInt16LE(eocd + 10);
-  let offset = buffer.readUInt32LE(eocd + 16);
-  const entries: { name: string; data: Buffer; crcOk: boolean }[] = [];
-  for (let i = 0; i < count; i += 1) {
-    if (buffer.readUInt32LE(offset) !== 0x02014b50) throw new Error("bad central directory header");
-    const method = buffer.readUInt16LE(offset + 10);
-    const crc = buffer.readUInt32LE(offset + 16);
-    const compressedSize = buffer.readUInt32LE(offset + 20);
-    const nameLength = buffer.readUInt16LE(offset + 28);
-    const extraLength = buffer.readUInt16LE(offset + 30);
-    const commentLength = buffer.readUInt16LE(offset + 32);
-    const localOffset = buffer.readUInt32LE(offset + 42);
-    const name = buffer.subarray(offset + 46, offset + 46 + nameLength).toString("utf8");
-    offset += 46 + nameLength + extraLength + commentLength;
-
-    const localNameLength = buffer.readUInt16LE(localOffset + 26);
-    const localExtraLength = buffer.readUInt16LE(localOffset + 28);
-    const dataStart = localOffset + 30 + localNameLength + localExtraLength;
-    const raw = buffer.subarray(dataStart, dataStart + compressedSize);
-    const data = method === 0 ? Buffer.from(raw) : inflateRawSync(raw);
-    entries.push({ name, data, crcOk: crc32(data) === crc });
-  }
-  return entries;
-}
-
-function crc32(data: Uint8Array): number {
-  let crc = 0xffffffff;
-  for (let i = 0; i < data.length; i += 1) {
-    crc ^= data[i];
-    for (let bit = 0; bit < 8; bit += 1) crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
-  }
-  return (crc ^ 0xffffffff) >>> 0;
 }
 
 let passed = 0;
@@ -336,10 +294,22 @@ async function main() {
   ok((await call(new Jar(), `/s/${tokenB}`)).status === 404, "لینک باطل‌شده با صدور لینک جدید زنده نمی‌شود");
   ok((await call(new Jar(), `/s/${reissuedToken}`)).status === 200, "لینک تازه کار می‌کند");
 
-  // (۳) hard cap on live links (bounded blast radius)
+  // (۳) hard cap on live links (bounded blast radius).
+  // The extra links are seeded in the database on purpose: reaching the cap
+  // through the API would first hit the "10 creations per hour" rate limit, and
+  // the test would then be measuring the limiter instead of the cap.
   for (let index = 0; index < 9; index += 1) {
-    await call(owner, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
+    await dbRun("insert into project_share_tokens (project_id, token_hash) values ($1, $2)", [
+      id,
+      `seed-${randomUUID()}-${index}`,
+    ]);
   }
+  const listed = await call(owner, `/api/projects/${id}/share`);
+  const listedBody = JSON.parse(listed.body || "{}") as { tokens?: { active: boolean }[] };
+  ok(
+    (listedBody.tokens ?? []).filter((token) => token.active).length >= 10,
+    "پایگاه اکنون ۱۰ لینک فعال دارد",
+  );
   const overCap = await call(owner, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
   ok(overCap.status === 409, "سقف ۱۰ لینک فعال اعمال می‌شود ⇒ ۴۰۹", `got ${overCap.status}`);
 
@@ -361,6 +331,50 @@ async function main() {
   await call(owner, `/api/projects/${id}/share?all=1`, { method: "DELETE" });
   const finalFlag = await dbQuery("select case when is_public then 't' else 'f' end from projects where id = $1", [id]);
   ok(finalFlag === "f", "وضعیت نهایی: پروژه خصوصی است");
+
+  /* ------ ۳-ج. سازگاری با لینک‌های قدیمی و پروژه حذف‌شده ------ */
+  console.log("\n▶ ۳-ج. لینک قدیمی (پیش از توکن)، پروژه حذف‌شده");
+
+  // A project published the old way — `is_public = true`, no token — must not be
+  // reachable, because a UUID used to be the only "credential" and that is
+  // exactly the model this release removes.
+  const legacyFlag = await call(owner, `/api/projects/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ isPublic: true }),
+  });
+  ok(legacyFlag.status === 200, "پرچم عمومی قدیمی قابل تنظیم است ⇒ ۲۰۰", `got ${legacyFlag.status}`);
+  const legacyRead = await dbQuery("select case when is_public then 't' else 'f' end from projects where id = $1", [id]);
+  ok(legacyRead === "t", "پایگاه، وضعیت «منتشرشده» را ثبت کرد");
+  const legacyStranger = await call(new Jar(), `/report/${id}`);
+  ok(legacyStranger.status === 404, "پرچم عمومی به‌تنهایی دسترسی نمی‌دهد (لینک قدیمی) ⇒ ۴۰۴", `got ${legacyStranger.status}`);
+  const legacyRaw = await call(stranger, `/api/projects/${id}`);
+  ok(legacyRaw.status === 404, "داده خام هم با پرچم عمومی قدیمی باز نمی‌شود");
+  const legacyList = await call(stranger, "/api/projects");
+  ok(!legacyList.body.includes(id), "پروژه در فهرست پروژه‌های غریبه دیده نمی‌شود");
+
+  // Revoking everything must also clear the flag, so the UI cannot claim the
+  // report is shared while nothing grants access.
+  await call(owner, `/api/projects/${id}/share?all=1`, { method: "DELETE" });
+  const flagAfterAll = await dbQuery("select case when is_public then 't' else 'f' end from projects where id = $1", [id]);
+  ok(flagAfterAll === "f", "ابطال همه، پرچم عمومی را هم برمی‌دارد");
+
+  // A token that survives its project must stop working: the row is deleted by
+  // ON DELETE CASCADE, so this also proves the foreign key is real.
+  const doomedProject = await call(owner, "/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ project: JSON.parse(projectJson), reportOptions: {} }),
+  });
+  const doomedId = (JSON.parse(doomedProject.body || "{}") as { id?: string }).id ?? "";
+  const doomedShare = await call(owner, `/api/projects/${doomedId}/share`, { method: "POST", body: "{}" });
+  const doomedToken = (JSON.parse(doomedShare.body || "{}") as { token?: string }).token ?? "";
+  ok(doomedToken.length === 43, "لینک برای پروژه‌ای که حذف خواهد شد ساخته شد");
+  ok((await call(new Jar(), `/s/${doomedToken}`)).status === 200, "لینک پیش از حذف پروژه کار می‌کند");
+  const doomedDelete = await call(owner, `/api/projects/${doomedId}`, { method: "DELETE" });
+  ok(doomedDelete.status === 200 || doomedDelete.status === 204, "حذف پروژه ⇒ ۲۰۰/۲۰۴", `got ${doomedDelete.status}`);
+  const orphanToken = await call(new Jar(), `/s/${doomedToken}`);
+  ok(orphanToken.status === 404, "لینک پروژه حذف‌شده ⇒ ۴۰۴", `got ${orphanToken.status}`);
+  const tokenRows = await dbQuery("select count(*) from project_share_tokens where project_id = $1", [doomedId]);
+  ok(Number(tokenRows) === 0, "توکن‌ها با حذف پروژه پاک شدند (CASCADE)");
 
   const ownerReport = await call(owner, `/report/${id}`);
   ok(ownerReport.status === 200, "مالک همچنان گزارش را می‌بیند");

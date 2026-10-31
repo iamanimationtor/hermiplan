@@ -432,7 +432,7 @@ function ActivityEditor({
 
       <div className="md:col-span-2 rounded-xl border border-slate-200 p-3">
         <div className="mb-2 flex items-center justify-between">
-          <h4 className="text-[13px] font-bold text-ink-900">وابستگی‌ها (پیش‌نیازها)</h4>
+          <h3 className="text-[13px] font-bold text-ink-900">وابستگی‌ها (پیش‌نیازها)</h3>
           <span className="text-[11px] text-slate-500">نوع رابطه و تأخیر (Lag) قابل تنظیم است</span>
         </div>
         <div className="space-y-2">
@@ -508,7 +508,7 @@ function ActivityEditor({
       </div>
 
       <div className="md:col-span-2 rounded-xl border border-slate-200 p-3">
-        <h4 className="mb-2 text-[13px] font-bold text-ink-900">منابع اختصاص‌یافته</h4>
+        <h3 className="mb-2 text-[13px] font-bold text-ink-900">منابع اختصاص‌یافته</h3>
         <div className="space-y-2">
           {activity.resources.map((assignment, index) => {
             const resource = project.resources.find((r) => r.id === assignment.resourceId);

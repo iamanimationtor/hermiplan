@@ -38,6 +38,17 @@ function fileHeaders(filename: string, type: string): HeadersInit {
 
 const MAX_BODY_BYTES = 3_000_000;
 
+/**
+ * Archive timestamp for reproducible exports. The same project (same status
+ * date) must produce the same bytes on any day, otherwise "is this the same
+ * file?" can never be answered. Falls back to "now" only when the project has
+ * no valid status date.
+ */
+function exportStamp(statusDate: string | undefined): Date {
+  const parsed = statusDate ? new Date(`${statusDate}T00:00:00Z`) : null;
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date();
+}
+
 export async function POST(request: Request) {
   if (!isSameOriginRequest(request)) return csrfRejection();
 
@@ -85,7 +96,7 @@ export async function POST(request: Request) {
       });
     }
     case "xlsx": {
-      const workbook = buildXlsx(buildSheets(analysis, input));
+      const workbook = buildXlsx(buildSheets(analysis, input), exportStamp(input.meta.statusDate));
       return new NextResponse(workbook as unknown as BodyInit, {
         headers: fileHeaders(`${base}-Data.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
       });
@@ -125,6 +136,7 @@ export async function POST(request: Request) {
         ganttSvg,
         reportUrl: body.reportUrl ?? "",
         author: input.meta.manager,
+        modifiedAt: exportStamp(input.meta.statusDate),
       });
       return new NextResponse(archive as unknown as BodyInit, {
         headers: fileHeaders(`${base}-Package.zip`, "application/zip"),

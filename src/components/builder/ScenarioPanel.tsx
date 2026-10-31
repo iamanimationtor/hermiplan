@@ -85,6 +85,7 @@ export function ScenarioPanel({
   return (
     <Card>
       <CardHeader
+          level={2}
         title="تحلیل سناریو (What-if)"
         subtitle="اثر هر تغییر را روی تاریخ پایان و برآورد هزینه ببینید — بدون اینکه برنامه اصلی پروژه دست بخورد."
         icon={<span className="text-lg">🔮</span>}

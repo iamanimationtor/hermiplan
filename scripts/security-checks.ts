@@ -8,6 +8,7 @@ import { demoOtpAllowed, readSmsConfig } from "../src/lib/server/sms";
 import { generateOtp, hashOtp, MAX_OTP_ATTEMPTS, OTP_LENGTH } from "../src/lib/server/otp";
 import { checkRateLimit, clientIp } from "../src/lib/server/rate-limit";
 import { isSameOriginRequest, isUuid } from "../src/lib/server/http";
+import { describeShareState } from "../src/lib/share-status";
 import {
   generateShareToken,
   hashShareToken,
@@ -213,6 +214,27 @@ async function main() {
     check(!SHARE_TOKEN_RE.test("x".repeat(44)), "توکن بلندتر رد می‌شود");
     check(!SHARE_TOKEN_RE.test("../../etc/passwd"), "ورودی مسیرگونه رد می‌شود");
     check(!SHARE_TOKEN_RE.test("00000000-0000-4000-8000-000000000000"), "UUID به‌جای توکن پذیرفته نمی‌شود");
+  }
+
+  console.log("\n▶ وضعیت اشتراک در رابط کاربری (قاعده‌ی خالص)");
+  {
+    const active = describeShareState(true, [{ active: true }]);
+    check(active.kind === "shared" && active.activeCount === 1, "لینک فعال ⇒ وضعیت «اشتراک»");
+    check(active.notice === null, "در وضعیت سالم هیچ هشداری نشان داده نمی‌شود");
+
+    const legacy = describeShareState(true, [{ active: false }, { active: false }]);
+    check(legacy.kind === "legacy-inactive", "پرچم عمومی بدون لینک فعال ⇒ «لینک قدیمی غیرفعال»");
+    check(legacy.activeCount === 0, "لینک باطل‌شده فعال شمرده نمی‌شود");
+    check(legacy.notice !== null && legacy.notice.includes("لینک تازه"), "هشدار، راه‌حل (ساخت لینک تازه) را می‌گوید");
+    check(legacy.badge.includes("غیرفعال"), "نشان وضعیت، غیرفعال‌بودن را صریح می‌گوید");
+
+    const privateState = describeShareState(false, []);
+    check(privateState.kind === "private", "بدون انتشار ⇒ «خصوصی»");
+    check(privateState.notice === null, "پروژه خصوصی هشدار لینک قدیمی نمی‌گیرد");
+
+    // A legacy project that gets a fresh link must lose the warning immediately.
+    const recovered = describeShareState(true, [{ active: false }, { active: true }]);
+    check(recovered.kind === "shared" && recovered.notice === null, "صدور لینک تازه هشدار را برمی‌دارد");
   }
 
 }

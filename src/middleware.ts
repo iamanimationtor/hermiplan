@@ -28,8 +28,6 @@ import { NextResponse, type NextRequest } from "next/server";
  * not by a real browser. A browser run is still listed as open work.
  */
 
-const FONT_CDN = "https://cdn.jsdelivr.net";
-
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV !== "production";
   const directives = [
@@ -39,8 +37,9 @@ function buildCsp(nonce: string): string {
     isDev
       ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'nonce-${nonce}'`
       : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
-    `style-src 'self' 'unsafe-inline' ${FONT_CDN}`,
-    `font-src 'self' data: ${FONT_CDN}`,
+    // The font is self-hosted now, so no third-party style/font origin is allowed.
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self' data:",
     "img-src 'self' data: blob:",
     "connect-src 'self'",
     "media-src 'self'",

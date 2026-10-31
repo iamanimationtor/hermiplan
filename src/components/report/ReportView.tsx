@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BarChart, GanttChart, HealthGauge, NetworkDiagram, ResourceHistogram } from "@/components/charts";
 import { Badge, Button } from "@/components/ui";
 import { EXPORT_FORMATS, REPORT_SECTIONS, type ReportOptions } from "@/lib/validation";
+import { describeShareState } from "@/lib/share-status";
 import { Modal } from "@/components/ui";
 import { Logo, LogoMark, CREATOR_CREDIT_FULL } from "@/components/Logo";
 import type { ProjectAnalysis, ProjectInput } from "@/lib/engine/types";
@@ -187,6 +188,13 @@ export function ReportView({
   const [shareBusy, setShareBusy] = useState(false);
   const [freshLink, setFreshLink] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+
+  /**
+   * One source of truth for "is this report shared, private, or was it shared
+   * before tokens existed". The badge and the panel both read it, so they cannot
+   * tell the owner two different stories.
+   */
+  const shareState = describeShareState(isPublic, shareLinks);
 
   /**
    * Share links are managed server-side (hashed token, revocable). The plaintext
@@ -374,13 +382,9 @@ export function ReportView({
               variant="secondary"
               size="sm"
               onClick={toggleSharePanel}
-              title={
-                shareLinks.some((link) => link.active)
-                  ? "این گزارش با لینک اشتراک قابل مشاهده است؛ هر لینک جداگانه قابل ابطال است"
-                  : "فقط شما می‌توانید این گزارش را ببینید"
-              }
+              title={shareState.hint}
             >
-              {shareLinks.some((link) => link.active) ? "🔗 لینک اشتراک فعال" : "🔒 خصوصی"}
+              {shareState.badge}
             </Button>
           ) : null}
           <Button variant="accent" size="sm" onClick={() => setDownloadOpen(true)}>
@@ -431,6 +435,13 @@ export function ReportView({
             </div>
 
             {shareError ? <p className="text-[11.5px] font-semibold text-red-600">{shareError}</p> : null}
+
+            {shareState.notice ? (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+                <p className="text-[11.5px] font-bold text-amber-900">لینک قدیمی این گزارش غیرفعال است</p>
+                <p className="mt-1 text-[11px] leading-6 text-amber-900">{shareState.notice}</p>
+              </div>
+            ) : null}
 
             {freshLink ? (
               <div className="rounded-xl border border-brand-200 bg-brand-50 p-3">

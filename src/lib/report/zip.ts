@@ -38,13 +38,20 @@ function dosDateTime(date = new Date()): { time: number; date: number } {
   return { time, date: dosDate };
 }
 
-/** Builds a valid ZIP archive as a Uint8Array. */
-export function createZip(entries: ZipEntry[]): Uint8Array {
+/**
+ * Builds a valid ZIP archive as a Uint8Array.
+ *
+ * `modified` is exposed so an archive can be **reproducible**: the same input
+ * then produces byte-identical output, which is what makes content hashing,
+ * caching and "did the file change?" checks meaningful. Callers pass the
+ * project's status date; without it the current time is used.
+ */
+export function createZip(entries: ZipEntry[], modified?: Date): Uint8Array {
   const encoder = new TextEncoder();
   const localChunks: Uint8Array[] = [];
   const centralChunks: Uint8Array[] = [];
   let offset = 0;
-  const { time, date } = dosDateTime();
+  const { time, date } = dosDateTime(modified);
 
   for (const entry of entries) {
     const nameBytes = encoder.encode(entry.name);

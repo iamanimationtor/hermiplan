@@ -57,6 +57,9 @@ export default function HomePage() {
   return (
     <div id="top" className="min-h-screen bg-white">
       <SiteNav />
+      {/* Landmark for assistive technology and the "skip to content" link on
+          other pages: without it a screen reader has no main region to jump to. */}
+      <main id="main">
 
       {/* ------------------------------- hero ------------------------------- */}
       <section className="hp-mesh hp-grid-bg relative overflow-hidden pb-24 pt-28 text-white lg:pb-28 lg:pt-36">
@@ -438,6 +441,8 @@ export default function HomePage() {
       </section>
 
       {/* ------------------------------ footer ----------------------------- */}
+      </main>
+
       <footer className="hp-bottom-safe border-t border-slate-200 bg-white py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 text-center sm:px-6">
           <Logo tagline="Project Intelligence Platform" />

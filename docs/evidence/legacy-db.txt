@@ -1,8 +1,5 @@
-# legacy database migration — REAL PostgreSQL 18.6, throwaway db hermiplan_legacy — 2026-10-31T12:28:15Z
-purpose: rebuild the schema of the previous release, upgrade it with the current
-         migrations, prove no row is lost, roll back, and re-apply.
-
-$ npx tsx scripts/legacy-db-check.ts prepare
+# legacy database rehearsal — real PostgreSQL 18.6 — 2026-10-31T13:12:39Z
+# phase 1: rebuild the pre-migration schema and insert old data
 ▶ ساخت پایگاه داده نسخه قبلی (legacy) و درج داده‌های موجود
   ✓ پایگاه داده برای سناریوی مهاجرت خالی است
   وضعیت اولیه: {"projects":2,"users":1,"otps":1}
@@ -10,12 +7,8 @@ $ npx tsx scripts/legacy-db-check.ts prepare
 
 ✔ مرحله «prepare» با 2 بررسی موفق
 
-$ npm run db:migrate
-
-> db:migrate
-> tsx scripts/migrate.ts
-
-Database: 127.0.0.1:5544/hermiplan_legacy
+# phase 2: apply the shipped migrations
+Database: 127.0.0.1:5544/hermiplan_legacy3
   → 0001_baseline (pending)
   → 0002_security_hardening (pending)
   → 0003_share_tokens (pending)
@@ -31,7 +24,7 @@ Database: 127.0.0.1:5544/hermiplan_legacy
 
 All migrations applied.
 
-$ npx tsx scripts/legacy-db-check.ts verify
+# phase 3: verify that no row was lost or rewritten unexpectedly
 ▶ تأیید مهاجرت روی پایگاه داده نسخه قبل (بدون از دست رفتن داده)
   ✓ همه پروژه‌های قبلی باقی مانده‌اند
   ✓ کاربران باقی مانده‌اند
@@ -61,15 +54,13 @@ $ npx tsx scripts/legacy-db-check.ts verify
 
 ✔ مرحله «verify» با 25 بررسی موفق
 
-$ npx tsx scripts/legacy-db-check.ts rollback
+# phase 4: run the paired rollback files and verify the schema is back
 ▶ اجرای rollback رسمی 0003_share_tokens.rollback.sql
   ✓ rollback اجرا شد
 ▶ اجرای rollback رسمی 0002_security_hardening.rollback.sql
   ✓ rollback اجرا شد
 
-✔ مرحله «rollback» با 0 بررسی موفق
-
-$ npx tsx scripts/legacy-db-check.ts verify-rollback
+✔ مرحله «rollback» بدون خطا اجرا شد
 ▶ تأیید rollback: اسکیمای قبلی بازگشت و داده‌ها سالم ماندند
   ✓ attempts به text بازگشت
   ✓ جدول rate_limits حذف شد

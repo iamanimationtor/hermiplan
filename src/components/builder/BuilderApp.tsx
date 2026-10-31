@@ -316,6 +316,10 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
         className="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 pb-32 sm:px-6 lg:grid-cols-[1fr_320px] lg:pb-8"
       >
         <div className="animate-fade-up space-y-5">
+          {/* One h1 per page: the step wizard changes the visible heading level
+              per step, so the document title lives here and is hidden visually
+              only (still announced by screen readers). */}
+          <h1 className="sr-only">ساخت و برنامه‌ریزی پروژه در HERMIPLAN</h1>
           {error ? (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12.5px] text-red-700">{error}</div>
           ) : null}

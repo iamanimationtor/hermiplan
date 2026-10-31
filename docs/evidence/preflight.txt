@@ -1,0 +1,48 @@
+# production readiness preflight — read-only — 2026-10-31T13:13:58Z
+$ DATABASE_URL=… npm run db:preflight
+EXIT=0
+▶ پیش‌بررسی پایگاه داده (فقط خواندن)
+  پایگاه: postgres · حجم: 8686 kB
+  نسخه: PostgreSQL 18.6
+
+  ✓ مهاجرت‌های در انتظار
+      هیچ — پایگاه با این نسخه کد هم‌تراز است.
+  ✓ حجم داده
+      پروژه 5 · کاربر 5 · نشست 0 · کد OTP 10 · رخداد 18 · لینک اشتراک 9 (فعال: 5)
+  ✓ یکپارچگی مالکیت
+      هیچ پروژه یتیمی وجود ندارد؛ VALIDATE CONSTRAINT قابل اجراست.
+  ✓ لینک‌های قدیمی
+      هیچ پروژه‌ای در وضعیت «منتشرشده بدون لینک» نیست.
+
+✔ هیچ مانعی نیست؛ اجرای db:migrate در پنجره تأییدشده مجاز است.
+
+## JSON form (for a ticket/log)
+{
+  "database": "postgres",
+  "version": "PostgreSQL 18.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit",
+  "size": "8686 kB",
+  "pending": [],
+  "blockers": 0,
+  "findings": [
+    {
+      "level": "ok",
+      "title": "مهاجرت‌های در انتظار",
+      "detail": "هیچ — پایگاه با این نسخه کد هم‌تراز است."
+    },
+    {
+      "level": "ok",
+      "title": "حجم داده",
+      "detail": "پروژه 5 · کاربر 5 · نشست 0 · کد OTP 10 · رخداد 18 · لینک اشتراک 9 (فعال: 5)"
+    },
+    {
+      "level": "ok",
+      "title": "یکپارچگی مالکیت",
+      "detail": "هیچ پروژه یتیمی وجود ندارد؛ VALIDATE CONSTRAINT قابل اجراست."
+    },
+    {
+      "level": "ok",
+      "title": "لینک‌های قدیمی",
+      "detail": "هیچ پروژه‌ای در وضعیت «منتشرشده بدون لینک» نیست."
+    }
+  ]
+}
