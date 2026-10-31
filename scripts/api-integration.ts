@@ -618,6 +618,26 @@ async function main() {
   const diffAnon = await call(new Jar(), `/api/projects/${historyId}/versions/1/diff`);
   ok(diffAnon.status === 404, "بدون کوکی، مقایسه نسخه‌ها ⇒ ۴۰۴", `got ${diffAnon.status}`);
 
+  /* ---- ۴-د. پارامترهای نامعتبر نباید ۲۰۰ یا ۵۰۰ بدهند ---- */
+  console.log("\n▶ ۴-د. اعتبارسنجی سخت‌گیرانه پارامترهای تاریخچه");
+  for (const [label, path] of [
+    ["نسخه اعشاری", `/api/projects/${historyId}/versions/1.5`],
+    ["نسخه با صفر ابتدایی", `/api/projects/${historyId}/versions/01`],
+    ["نسخه سرریز عددی", `/api/projects/${historyId}/versions/999999999999999999999`],
+    ["ضد مقایسه اعشاری", `/api/projects/${historyId}/versions/1/diff?against=1.5`],
+    ["ضد مقایسه سرریز", `/api/projects/${historyId}/versions/1/diff?against=999999999999999999999`],
+    ["limit صفر", `/api/projects/${historyId}/versions?limit=0`],
+    ["limit غیرعددی", `/api/projects/${historyId}/versions?limit=abc`],
+    ["limit بیش از سقف", `/api/projects/${historyId}/versions?limit=100000`],
+  ] as const) {
+    const response = await call(owner, path);
+    ok(response.status === 400, `${label} ⇒ ۴۰۰ (نه ۲۰۰/۵۰۰)`, `got ${response.status}`);
+  }
+  const limitedList = JSON.parse((await call(owner, `/api/projects/${historyId}/versions?limit=2`)).body || "{}") as {
+    versions?: unknown[];
+  };
+  ok((limitedList.versions?.length ?? 0) <= 2, "limit=۲ حداکثر دو نسخه برمی‌گرداند", String(limitedList.versions?.length));
+
   // Pruning: keep the newest HISTORY_LIMIT revisions and never lose the current one.
   const bulk = JSON.parse(JSON.stringify(historyProject));
   for (let step = 0; step < 22; step += 1) {

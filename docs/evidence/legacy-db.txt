@@ -1,5 +1,5 @@
-# legacy database upgrade — 2026-10-31T14:32:28Z
-DATABASE_URL=…/hermiplan_legacy6 (fresh disposable database)
+# legacy database upgrade — 2026-10-31T15:14:43Z
+DATABASE_URL=…/hermiplan_legacy9 (fresh disposable database)
 
 ▶ ساخت پایگاه داده نسخه قبلی (legacy) و درج داده‌های موجود
   ✓ پایگاه داده برای سناریوی مهاجرت خالی است
@@ -8,7 +8,7 @@ DATABASE_URL=…/hermiplan_legacy6 (fresh disposable database)
 
 ✔ مرحله «prepare» با 2 بررسی موفق
 
-Database: 127.0.0.1:5544/hermiplan_legacy6
+Database: 127.0.0.1:5544/hermiplan_legacy9
   → 0001_baseline (pending)
   → 0002_security_hardening (pending)
   → 0003_share_tokens (pending)

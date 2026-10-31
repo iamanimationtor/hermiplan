@@ -15,6 +15,20 @@ export function isUuid(value: string): boolean {
   return UUID_RE.test(value);
 }
 
+/**
+ * Strict positive-integer parsing for path/query parameters.
+ *
+ * `Number.parseInt` is deliberately **not** used for these: it accepts `"1.5"`,
+ * `"12abc"` and silently truncates, and a very long digit string becomes a value
+ * that overflows the database's `integer` column — a 500 instead of a 400.
+ * Returns `null` for anything that is not a plain positive integer within range.
+ */
+export function parsePositiveInt(raw: string, max = 1_000_000): number | null {
+  if (!/^[1-9]\d{0,8}$/.test(raw)) return null;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value <= max ? value : null;
+}
+
 export interface ApiErrorBody {
   error: string;
   /** field-level problems for 422 responses (message text only, no internals) */

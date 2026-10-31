@@ -6,7 +6,7 @@ import { analyzeProject } from "@/lib/engine/analysis";
 import { getCurrentUser, getGuestToken, isProjectOwner } from "@/lib/server/auth";
 import { restoreProjectVersion } from "@/lib/server/project-versions";
 import { checkRateLimit, RATE_RULES, clientKey, retryAfterHeaders } from "@/lib/server/rate-limit";
-import { csrfRejection, internalErrorResponse, isSameOriginRequest, isUuid, jsonError, jsonOk } from "@/lib/server/http";
+import { csrfRejection, internalErrorResponse, isSameOriginRequest, isUuid, jsonError, jsonOk, parsePositiveInt } from "@/lib/server/http";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +30,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
 
   const { id, version: rawVersion } = await ctx.params;
   if (!isUuid(id)) return jsonError(400, "شناسه پروژه نامعتبر است");
-  const targetVersion = Number.parseInt(rawVersion, 10);
-  if (!Number.isInteger(targetVersion) || targetVersion < 1) return jsonError(400, "شماره نسخه نامعتبر است");
+  const targetVersion = parsePositiveInt(rawVersion);
+  if (targetVersion === null) return jsonError(400, "شماره نسخه نامعتبر است");
 
   // The body is optional; when present it may carry `expectedVersion`.
   let expectedVersion: number | undefined;

@@ -1,5 +1,5 @@
-# Migration runner safety + rollback rehearsal — 2026-10-31T14:31:53Z
-DATABASE_URL=…/hermiplan_gate_ms7 MIGRATION_SAFETY_ROLLBACK=1 npm run db:migration-safety
+# Migration runner safety + rollback rehearsal — 2026-10-31T15:14:43Z
+DATABASE_URL=…/hermiplan_ms8 MIGRATION_SAFETY_ROLLBACK=1 npm run db:migration-safety
 # scratch database created for this run only; steps ۵–۷ empty it by design
 
 ▶ ۱. هر مهاجرت فایل بازگشت جفت‌شده دارد

@@ -1,9 +1,19 @@
-# production smoke — 2026-10-31T15:10:36Z
+# production smoke — next start + real PostgreSQL 18.6 — 2026-10-31T15:14:04Z
+$ curl -s http://127.0.0.1:3400/api/health
 {"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false}
-/                                                  200
-/builder                                           200
-/robots.txt                                        200
-/sitemap.xml                                       200
-/report/00000000-0000-4000-8000-000000000000       404
-/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa     404
-/api/projects                                      200
+/                                                    200
+/builder                                             200
+/robots.txt                                          200
+/sitemap.xml                                         200
+/report/00000000-0000-4000-8000-000000000000         404
+/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa       404
+/api/projects                                        200
+
+## security headers (/builder)
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+content-security-policy: default-src 'self'; script-src 'self' 'nonce-ODdmOTY2Y2EtNWI2ZC00ZDA1LWFiOWItZDQzZDI3MzBlOWRj' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'; media-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate

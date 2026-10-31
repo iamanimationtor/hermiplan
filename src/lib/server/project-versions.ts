@@ -269,7 +269,10 @@ export async function saveProjectRevision(options: {
   });
 }
 
-export async function listProjectVersions(projectId: string, limit = 50): Promise<VersionSummary[]> {
+export async function listProjectVersions(projectId: string, limit = HISTORY_LIMIT): Promise<VersionSummary[]> {
+  // A caller cannot ask for more history than the retention policy keeps, and
+  // an out-of-range value must never reach the database as-is.
+  const take = Math.min(Math.max(Math.trunc(limit) || HISTORY_LIMIT, 1), HISTORY_LIMIT);
   const current = await db
     .select({ version: projects.version })
     .from(projects)
@@ -289,7 +292,7 @@ export async function listProjectVersions(projectId: string, limit = 50): Promis
     .from(projectVersions)
     .where(eq(projectVersions.projectId, projectId))
     .orderBy(desc(projectVersions.version))
-    .limit(Math.min(Math.max(limit, 1), 100));
+    .limit(take);
 
   return rows.map((row) => ({
     version: row.version,

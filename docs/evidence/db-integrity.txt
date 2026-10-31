@@ -1,5 +1,5 @@
-# db-integrity / concurrency — 2026-10-31T14:32:35Z
-DATABASE_URL=…/hermiplan_conc4 npm run db:migrate && npm run test:db:integrity
+# db-integrity / concurrency — 2026-10-31T15:14:36Z
+DATABASE_URL=…/hermiplan_conc7 npm run db:migrate && npm run test:db:integrity
 
 ▶ بررسی یکپارچگی پایگاه داده روی PostgreSQL واقعی
   سرور: PostgreSQL 18.6

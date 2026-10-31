@@ -4,7 +4,7 @@ import { projects } from "@/db/schema";
 import { getCurrentUser, getGuestToken, isProjectOwner } from "@/lib/server/auth";
 import { getProjectVersion, versionReasonLabel } from "@/lib/server/project-versions";
 import { checkRateLimit, RATE_RULES, clientKey, retryAfterHeaders } from "@/lib/server/rate-limit";
-import { internalErrorResponse, isUuid, jsonError, jsonOk } from "@/lib/server/http";
+import { internalErrorResponse, isUuid, jsonError, jsonOk, parsePositiveInt } from "@/lib/server/http";
 import { diffRevisions } from "@/lib/report/version-diff";
 
 export const dynamic = "force-dynamic";
@@ -28,16 +28,16 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string;
 
   const { id, version: rawVersion } = await ctx.params;
   if (!isUuid(id)) return jsonError(400, "شناسه پروژه نامعتبر است");
-  const version = Number.parseInt(rawVersion, 10);
-  if (!Number.isInteger(version) || version < 1) return jsonError(400, "شماره نسخه نامعتبر است");
+  const version = parsePositiveInt(rawVersion);
+  if (version === null) return jsonError(400, "شماره نسخه نامعتبر است");
 
   const againstRaw = new URL(request.url).searchParams.get("against") ?? "current";
   let against: number | "current";
   if (againstRaw === "current") {
     against = "current";
   } else {
-    const parsed = Number.parseInt(againstRaw, 10);
-    if (!Number.isInteger(parsed) || parsed < 1) return jsonError(400, "نسخه مقایسه نامعتبر است");
+    const parsed = parsePositiveInt(againstRaw);
+    if (parsed === null) return jsonError(400, "نسخه مقایسه نامعتبر است");
     against = parsed;
   }
 

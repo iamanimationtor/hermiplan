@@ -1,13 +1,13 @@
-# CSP over real routes — 2026-10-31T15:10:43Z
+# CSP over real routes — 2026-10-31T15:14:07Z
 # fixture: BASE_URL=http://127.0.0.1:3400 npx tsx scripts/share-fixture.ts
-# CSP_PATHS=/,/builder,/report/bab0299b-8e63-4933-99d3-333442c99156,/s/RzwQDOokJp4VCzk65OFJrIkEfPcp8erNUMP8ftrL_oE,/s/t9Z-THXf1_59CErgM_D_I--BehHyopFVVRCQgbRXORA,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
-# CSP_EXPECT_404=/s/t9Z-THXf1_59CErgM_D_I--BehHyopFVVRCQgbRXORA,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
+# CSP_PATHS=/,/builder,/report/41532b8a-39c0-427c-bd0f-0f0c84241300,/s/SNBUa1GVqf2hlORnpe_DVZy2sl8YJ-QPYZgZ97Sfp3M,/s/RuLf8q4x-bKcp4fOINddDvTekFyPyh_oTZlpqANB97A,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
+# CSP_EXPECT_404=/s/RuLf8q4x-bKcp4fOINddDvTekFyPyh_oTZlpqANB97A,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
 
 ▶ /
 ▶ /builder
-▶ /report/bab0299b-8e63-4933-99d3-333442c99156
-▶ /s/RzwQDOokJp4VCzk65OFJrIkEfPcp8erNUMP8ftrL_oE
-▶ /s/t9Z-THXf1_59CErgM_D_I--BehHyopFVVRCQgbRXORA
+▶ /report/41532b8a-39c0-427c-bd0f-0f0c84241300
+▶ /s/SNBUa1GVqf2hlORnpe_DVZy2sl8YJ-QPYZgZ97Sfp3M
+▶ /s/RuLf8q4x-bKcp4fOINddDvTekFyPyh_oTZlpqANB97A
 ▶ /s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ▶ /report/00000000-0000-4000-8000-000000000000
 

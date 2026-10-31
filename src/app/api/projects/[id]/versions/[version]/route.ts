@@ -4,7 +4,7 @@ import { projects } from "@/db/schema";
 import { getCurrentUser, getGuestToken, isProjectOwner } from "@/lib/server/auth";
 import { getProjectVersion, versionReasonLabel } from "@/lib/server/project-versions";
 import { checkRateLimit, RATE_RULES, clientKey, retryAfterHeaders } from "@/lib/server/rate-limit";
-import { internalErrorResponse, isUuid, jsonError, jsonOk } from "@/lib/server/http";
+import { internalErrorResponse, isUuid, jsonError, jsonOk, parsePositiveInt } from "@/lib/server/http";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +17,8 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string;
 
   const { id, version: rawVersion } = await ctx.params;
   if (!isUuid(id)) return jsonError(400, "شناسه پروژه نامعتبر است");
-  const version = Number.parseInt(rawVersion, 10);
-  if (!Number.isInteger(version) || version < 1) return jsonError(400, "شماره نسخه نامعتبر است");
+  const version = parsePositiveInt(rawVersion);
+  if (version === null) return jsonError(400, "شماره نسخه نامعتبر است");
 
   try {
     const rows = await db

@@ -4,7 +4,7 @@ import { projects } from "@/db/schema";
 import { getCurrentUser, getGuestToken, isProjectOwner } from "@/lib/server/auth";
 import { listProjectVersions, HISTORY_LIMIT, HISTORY_BYTES_LIMIT } from "@/lib/server/project-versions";
 import { checkRateLimit, RATE_RULES, clientKey, retryAfterHeaders } from "@/lib/server/rate-limit";
-import { internalErrorResponse, isUuid, jsonError, jsonOk } from "@/lib/server/http";
+import { internalErrorResponse, isUuid, jsonError, jsonOk, parsePositiveInt } from "@/lib/server/http";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,12 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
 
   const { id } = await ctx.params;
   if (!isUuid(id)) return jsonError(400, "شناسه پروژه نامعتبر است");
+
+  // `limit` is explicit: a value that cannot be honoured is refused rather than
+  // silently ignored, and can never exceed what the retention policy keeps.
+  const rawLimit = new URL(request.url).searchParams.get("limit");
+  const limit = rawLimit === null ? HISTORY_LIMIT : parsePositiveInt(rawLimit, 100);
+  if (limit === null) return jsonError(400, "مقدار limit نامعتبر است");
 
   let row;
   try {
@@ -48,7 +54,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
   }
 
   try {
-    const versions = await listProjectVersions(id);
+    const versions = await listProjectVersions(id, limit);
     return jsonOk({
       id,
       currentVersion: row.version,

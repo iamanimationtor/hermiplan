@@ -1,4 +1,4 @@
-# security checks (static + live) — 2026-10-31T14:32:01Z
+# security checks (static + live) — 2026-10-31T15:14:36Z
 DATABASE_URL=… npm run test:security
 
 ▶ ۱. نرمال‌سازی شماره موبایل
