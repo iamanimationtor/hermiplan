@@ -55,6 +55,22 @@ export async function issueOtp(phone: string): Promise<{ code: string; expiresAt
   return { code, expiresAt };
 }
 
+/**
+ * Discards a code that could not be delivered.
+ *
+ * A code is only useful if the owner of the phone number received it. When the
+ * SMS provider fails, leaving the row behind would mean the database holds a
+ * valid, unconsumed credential for a message nobody ever saw (and every failed
+ * attempt would pile up another one). Deleting it keeps the table equal to
+ * "codes the user can actually type".
+ */
+export async function discardOtp(phone: string, code: string): Promise<number> {
+  const result = await db
+    .delete(otpCodes)
+    .where(and(eq(otpCodes.phone, phone), eq(otpCodes.codeHash, hashOtp(code))));
+  return result.rowCount ?? 0;
+}
+
 export type OtpVerifyOutcome =
   | { ok: true }
   | { ok: false; reason: string; code: "not-found" | "expired" | "too-many-attempts" | "mismatch" };

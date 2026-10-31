@@ -13,3 +13,7 @@ All migrations applied.
 
 $ curl -s http://127.0.0.1:3700/api/health
 {"ok":true,"schemaVersion":3,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","smsConfigured":false}
+
+## re-check after the final rebuild — 2026-10-31T14:00:18Z
+$ curl -s http://127.0.0.1:3400/api/health
+{"ok":true,"schemaVersion":3,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","smsConfigured":false}

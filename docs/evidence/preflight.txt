@@ -1,26 +1,27 @@
-# production readiness preflight — read-only — 2026-10-31T13:13:58Z
-$ DATABASE_URL=… npm run db:preflight
-EXIT=0
+# read-only production preflight — 2026-10-31T14:00:10Z
+DATABASE_URL=…:5544/postgres npm run db:preflight
+
 ▶ پیش‌بررسی پایگاه داده (فقط خواندن)
-  پایگاه: postgres · حجم: 8686 kB
+  پایگاه: postgres · حجم: 9014 kB
   نسخه: PostgreSQL 18.6
 
   ✓ مهاجرت‌های در انتظار
       هیچ — پایگاه با این نسخه کد هم‌تراز است.
   ✓ حجم داده
-      پروژه 5 · کاربر 5 · نشست 0 · کد OTP 10 · رخداد 18 · لینک اشتراک 9 (فعال: 5)
+      پروژه 17 · کاربر 10 · نشست 0 · کد OTP 14 · رخداد 54 · لینک اشتراک 27 (فعال: 17)
   ✓ یکپارچگی مالکیت
       هیچ پروژه یتیمی وجود ندارد؛ VALIDATE CONSTRAINT قابل اجراست.
   ✓ لینک‌های قدیمی
       هیچ پروژه‌ای در وضعیت «منتشرشده بدون لینک» نیست.
 
 ✔ هیچ مانعی نیست؛ اجرای db:migrate در پنجره تأییدشده مجاز است.
+EXIT=0
 
-## JSON form (for a ticket/log)
+## JSON
 {
   "database": "postgres",
   "version": "PostgreSQL 18.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit",
-  "size": "8686 kB",
+  "size": "9014 kB",
   "pending": [],
   "blockers": 0,
   "findings": [
@@ -32,7 +33,7 @@ EXIT=0
     {
       "level": "ok",
       "title": "حجم داده",
-      "detail": "پروژه 5 · کاربر 5 · نشست 0 · کد OTP 10 · رخداد 18 · لینک اشتراک 9 (فعال: 5)"
+      "detail": "پروژه 17 · کاربر 10 · نشست 0 · کد OTP 14 · رخداد 54 · لینک اشتراک 27 (فعال: 17)"
     },
     {
       "level": "ok",
@@ -46,3 +47,4 @@ EXIT=0
     }
   ]
 }
+EXIT=0

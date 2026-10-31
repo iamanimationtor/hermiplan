@@ -1,18 +1,205 @@
-# tests — npm test — 2026-10-31T13:17:29Z
-EXIT=0
+# unit/regression suites — 2026-10-31T14:00:37Z
+
+> test
+> tsx scripts/run-tests.ts
+
+
 ══════ موتور — بررسی مستقل (محاسبه دستی) ══════
+▶ ۱. مسیر بحرانی، شناوری کل و آزاد (محاسبه دستی)
+▶ ۲. روابط SS / FF / SF و Lag
+▶ ۳. تقویم کاری، تعطیلات و تاریخ‌ها
+▶ ۴. تخصیص منابع، ظرفیت و بیش‌تخصیص
+▶ ۵. مدیریت ارزش کسب‌شده (EVM) با اعداد دستی
+▶ ۶. تعدیل قیمت بر پایه کارکرد ماهانه
+▶ ۷. ساختار برآورد هزینه
+▶ ۸. تاریخ هدف پایان و شناوری منفی
+▶ ۹. انحراف زمان‌بندی نسبت به Baseline (تعریف صحیح)
+▶ ۱۰. کارایی روی پروژه بزرگ
+    زمان تحلیل: 40ms برای ۵۰۰ فعالیت
+
 ✔ 81 بررسی مستقل موتور — همه با محاسبه دستی تأیید شد
+
 ══════ موتور — رگرسیون محدودیت/مبنا/EVM ══════
+▶ ۱. محدودیت FNLT (پایان نه دیرتر از)
+▶ ۲. محدودیت MSO (باید در تاریخ مشخص شروع شود)
+▶ ۳. نقاط عطف (Milestones)
+▶ ۴. انحراف برنامه مبنا (شروع و پایان مستقل)
+▶ ۵. پیشرفت مقداری (فیزیکی) در برابر پیشرفت زمان‌محور
+▶ ۶. شاخص‌های EVM و مدیریت تقسیم بر صفر
+▶ ۷. تاریخ تعدیل و انتخاب دوره شاخص
+▶ ۸. مدت اعشاری، چرخه‌ها و پیش‌نیاز نامعتبر
+▶ ۹. روابط چهارگانه با تقویم دارای تعطیلی
+▶ ۱۰. فراخوانی مستقیم موتور (بدون لایه تحلیل)
+▶ ۱۱. موقعیت تاریخ وضعیت (چهار حالت مرزی)
+▶ ۱۲. سیاست واحد گرد کردن مدت و Lag (پایه آزمون: ۸ بررسی)
+▶ ۱۳. هر تشخیص دارای راه‌حل عملی است (what/which/cause/remedy)
+▶ ۱۴. گزارش خروجی HTML: نرخ با فراداده، راه‌حل تشخیص، پیشرفت مالی
+▶ ۱۵. سیاست پول: گرد کردن یک‌بار، جمع اجزای گردشده، بدون NaN
+
 ✔ 191 بررسی رگرسیون موتور — همه با محاسبه دستی تأیید شد
+
 ══════ موتور — دود (قالب‌ها) ══════
+  ✓ construction    21 acts · 158 wd · CP 19 · budget 24359048430
+  ✓ civil           14 acts · 171 wd · CP 14 · budget 152080552670
+  ✓ architecture    13 acts · 98 wd · CP 11 · budget 4460190240
+  ✓ infrastructure  11 acts · 98 wd · CP 11 · budget 18009000000
+  ✓ software        15 acts · 92 wd · CP 14 · budget 8804500000
+  ✓ manufacturing   11 acts · 94 wd · CP 10 · budget 33476044000
+  ✓ research        13 acts · 126 wd · CP 13 · budget 5301000000
+  ✓ event           11 acts · 53 wd · CP 9 · budget 4079098605
+  ✓ renovation      11 acts · 84 wd · CP 11 · budget 10494662280
+  ✓ general         10 acts · 37 wd · CP 10 · budget 1833236095
+  ✓ circular dependency detection
+  ✓ calendar arithmetic (Sat–Wed working week)
+  ✓ earned value at data date
+  ✓ market pricing, escalation and standards basis
+
+ALL ENGINE CHECKS PASSED
+
 ══════ خروجی‌ها و موارد مرزی ══════
+
+▶ ۱. پروژه خالی (بدون فعالیت، بدون منبع)
+  ✓ empty-project (0 acts, 0 wd, 23ms)
+
+▶ ۲. فقط Milestone
+  ✓ milestones-only (3 acts, 0 wd, 1ms)
+
+▶ ۳. حلقه وابستگی و ارجاع نامعتبر
+  ✓ cycle detection → 2 error(s), 1 warning(s)
+  ✓ cyclic-project (1 acts, 5 wd, 3ms)
+
+▶ ۴. تقویم‌های خاص
+  ✓ holidays-blocked-week (10 acts, 37 wd, 2ms)
+  ✓ empty workDays falls back to the default working week
+  ✓ single-working-day (10 acts, 37 wd, 2ms)
+  ✓ very-long-project (10 acts, 216 wd, 4ms)
+
+▶ ۵. انواع وابستگی، Lag منفی و محدودیت‌ها
+  ✓ mixed-dependencies (8 acts, 12 wd, 2ms)
+
+▶ ۶. قیمت‌گذاری و تعدیل
+  ✓ pricing & escalation (direct 56148223000 → total 81216716879)
+
+▶ ۷. تاریخ هجری شمسی
+  ✓ jalali brute-force round-trip over 6210 days (2020–2036)
+
+▶ ۸. همه قالب‌ها × همه مسیرهای خروجی
+  ✓ template:construction (21 acts, 158 wd, 3ms)
+  ✓ template:civil (14 acts, 171 wd, 2ms)
+  ✓ template:architecture (13 acts, 98 wd, 3ms)
+  ✓ template:infrastructure (11 acts, 98 wd, 1ms)
+  ✓ template:software (15 acts, 92 wd, 12ms)
+  ✓ template:manufacturing (11 acts, 94 wd, 1ms)
+  ✓ template:research (13 acts, 126 wd, 1ms)
+  ✓ template:event (11 acts, 53 wd, 0ms)
+  ✓ template:renovation (11 acts, 84 wd, 3ms)
+  ✓ template:general (10 acts, 37 wd, 0ms)
+
+▶ ۹. Baseline و پیشرفت کامل/صفر
+  ✓ baseline-100% (15 acts, 92 wd, 20ms)
+
 ══════════ EDGE-CASE AUDIT PASSED ══════════
+
 ══════ امنیت — توابع پایه ══════
+▶ ۱. نرمال‌سازی شماره موبایل
+▶ ۲. تولید و هش OTP
+▶ ۳. پیکربندی پیامک و حالت نمایشی
+▶ ۴. محافظت CSRF (هم‌مبدأ بودن درخواست)
+▶ ۵. اعتبارسنجی شناسه و استخراج IP
+▶ ۶. محدودکننده نرخ (حالت جایگزین حافظه‌ای)
+
+▶ توکن اشتراک گزارش
+
+▶ وضعیت اشتراک در رابط کاربری (قاعده‌ی خالص)
+
 ✔ 270 بررسی امنیتی — همه موفق
+
 ══════ درون‌ریزی و قالب‌ها ══════
 ✔ IMPORT PARSER: ALL CHECKS PASSED
+
 ══════ رگرسیون قالب‌ها ══════
+  construction   acts: 21  wd: 158  CP: 19  ✓
+  civil          acts: 14  wd: 171  CP: 14  ✓
+  architecture   acts: 13  wd:  98  CP: 11  ✓
+  infrastructure acts: 11  wd:  98  CP: 11  ✓
+  software       acts: 15  wd:  92  CP: 14  ✓
+  manufacturing  acts: 11  wd:  94  CP: 10  ✓
+  research       acts: 13  wd: 126  CP: 13  ✓
+  event          acts: 11  wd:  53  CP:  9  ✓
+  renovation     acts: 11  wd:  84  CP: 11  ✓
+  general        acts: 10  wd:  37  CP: 10  ✓
+
 ✔ ALL 10 TEMPLATES CLEAN
+
 ══════ خروجی — صحت فایل‌های XLSX/CSV/HTML/بسته ══════
+▶ ۱. XLSX — بسته واقعی Office
+  ✓ بخش [Content_Types].xml حاضر است
+  ✓ xl/workbook.xml حاضر است
+  ✓ CRC همه بخش‌ها معتبر است
+  ✓ تعداد شیت‌های اعلام‌شده با محتوا یکی است
+  ✓ برای هر شیت یک فایل وجود دارد
+  ✓ هیچ NaN/Infinity در XLSX نیست
+  ✓ خروجی XLSX تکرارپذیر است (بایت‌به‌بایت)
+  ✓ مهر زمانی واقعاً در آرشیو نوشته می‌شود
+  ✓ شیت «Info» موجود است
+  ✓ شیت «Activities» موجود است
+  ✓ شیت «Milestones» موجود است
+  ✓ شیت «Resources» موجود است
+  ✓ شیت «Costs» موجود است
+  ✓ شیت «Pricing» موجود است
+  ✓ شیت «CostSummary» موجود است
+  ✓ شیت «Standards» موجود است
+
+▶ ۲. CSV — خوانا برای Excel فارسی و قابل تجزیه
+  ✓ تعداد خطوط CSV = سرصفحه + یک خط برای هر فعالیت
+  ✓ سرصفحه CSV با سرصفحه شیت یکی است
+  ✓ CSV با BOM شروع می‌شود (Excel فارسی)
+  ✓ نام فعالیت واقعی در CSV هست
+  ✓ هیچ NaN/Infinity در CSV نیست
+
+▶ ۳. HTML — گزارش چاپی
+  ✓ سند HTML راست‌به‌چپ و فارسی اعلام شده است
+  ✓ متای viewport برای موبایل وجود دارد
+  ✓ CSS چاپ/موبایل برای صفحه‌های کوچک وجود دارد
+  ✓ هیچ NaN/Infinity در HTML نیست
+  ✓ جدول نرخ‌ها ستون «نوع داده» و «واحد» دارد
+  ✓ نرخ بدون سند رسمی، «سند ثبت نشده» علامت خورده است
+  ✓ متن HTML مقدار undefined چاپ نمی‌کند
+  ✓ گزارش هیچ منبع بیرونی (CDN) ندارد
+  ✓ فونت وزیرمتن داخل گزارش جاسازی شده است
+  ✓ حجم گزارش با فونت جاسازی‌شده معقول است
+
+▶ ۴. سازگاری بین خروجی‌ها (یک عدد، همه‌جا)
+  ✓ BAC در یکی از شیت‌ها با JSON یکسان است
+  ✓ همه ردیف‌ها با سرصفحه هم‌عرض‌اند
+  ✓ شیت‌ها داده دارند
+  ✓ تعداد فعالیت شیت با تحلیل یکی است
+  ✓ بازه برنامه از تحلیل قابل محاسبه است
+  ✓ بازه برنامه در HTML چاپ شده است
+
+▶ ۵. بسته‌ی تحویل
+  ✓ بسته شامل ۶ فایل است
+  ✓ CRC همه فایل‌های بسته معتبر است
+  ✓ Data.xlsx در بسته هست
+  ✓ XLSX داخل بسته با XLSX مستقل بایت‌به‌بایت یکی است
+  ✓ CSV داخل بسته با CSV مستقل یکی است
+  ✓ HTML داخل بسته با HTML مستقل یکی است
+
+▶ ۶. MS Project XML
+  ✓ ریشه <Project> وجود دارد
+  ✓ یک Task برای هر فعالیت (به‌علاوه خلاصه)
+  ✓ هیچ NaN/Infinity در XML نیست
+
+▶ ۷. سیاست پول داخل خودِ خروجی (جمع اجزا = جمع نهایی)
+  ✓ همه اجزای هزینه عددی‌اند
+  ✓ جمع پنج جزء برابر جمع نهایی است (بدون اختلاف گرد کردن)
+  ✓ همه مبالغ از قبل گردشده‌اند (idempotent roundMoney)
+  ✓ هیچ مبلغی بیش از دو رقم اعشار ندارد
+  ✓ CSV محافظ تزریق فرمول دارد
+
+▶ ۸. خروجی‌های HTTP — نادیده (BASE_URL تنظیم نشده)
+
 ✔ 51 موفق / 0 ناموفق
+
 ══════ همه 8 مجموعه تست موفق بودند ══════
+EXIT=0

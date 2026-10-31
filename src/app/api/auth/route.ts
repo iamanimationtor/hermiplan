@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { createSession, destroySession, getCurrentUser, getGuestToken, parsePhone } from "@/lib/server/auth";
-import { claimGuestProjects, findOrCreateUser, issueOtp, pruneAuthArtifacts, verifyOtp } from "@/lib/server/otp";
+import {
+  claimGuestProjects,
+  discardOtp,
+  findOrCreateUser,
+  issueOtp,
+  pruneAuthArtifacts,
+  verifyOtp,
+} from "@/lib/server/otp";
 import { checkRateLimit, RATE_RULES, clientIp, retryAfterHeaders } from "@/lib/server/rate-limit";
 import { demoOtpAllowed, readSmsConfig, sendOtpSms } from "@/lib/server/sms";
 import { csrfRejection, isSameOriginRequest, jsonError, jsonOk, readJson } from "@/lib/server/http";
@@ -90,7 +97,9 @@ async function handleRequestCode(request: Request, phone: string) {
 
   const delivery = await sendOtpSms(phone, code);
   if (!delivery.ok) {
-    // Never report a failed delivery as success.
+    // Never report a failed delivery as success — and never keep a usable code
+    // for a message that did not arrive.
+    await discardOtp(phone, code).catch(() => undefined);
     return jsonError(
       502,
       "ارسال پیامک ناموفق بود. لطفاً چند لحظه بعد دوباره تلاش کنید؛ اگر ادامه داشت با پشتیبانی تماس بگیرید.",

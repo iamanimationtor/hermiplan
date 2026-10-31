@@ -1,18 +1,12 @@
-# real PostgreSQL — version, applied migrations, table inventory — 2026-10-31T13:14:02Z
-$ DATABASE_URL=… npx tsx scripts/.pginfo.ts
-PostgreSQL 18.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit
-
-applied migrations:
-  0001_baseline  @ 2026-10-31T12:17:04.275Z
-  0002_security_hardening  @ 2026-10-31T12:17:04.283Z
-  0003_share_tokens  @ 2026-10-31T12:17:35.881Z
-
-tables: _hermiplan_migrations, otp_codes, project_events, project_share_tokens, projects, rate_limits, sessions, users
-
-$ DATABASE_URL=… npm run db:status
+# database state — 2026-10-31T14:00:21Z
+$ npm run db:status
 Database: 127.0.0.1:5544/postgres
   ✓ 0001_baseline (applied)
   ✓ 0002_security_hardening (applied)
   ✓ 0003_share_tokens (applied)
 
 Schema is up to date.
+
+$ select version()
+PostgreSQL 18.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit
+public tables: 8

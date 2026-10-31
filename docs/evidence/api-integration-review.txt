@@ -1,7 +1,10 @@
-# API integration — final artifacts (next start, production mode, real PostgreSQL 18.6) — 2026-10-31T12:51:28Z
+# api-integration — strict review pass (build + dev) — 2026-10-31T13:59:19Z
+## production build (:3400)
 
-▶ ۹. محدودیت نرخ درخواست
-  ✓ درخواست‌های پیاپی بیش از حد مجاز ⇒ ۴۲۹
-  ✓ محدودیت به‌ازای هر IP است، نه سراسری
+══════════ نتیجه: 92 موفق / 0 ناموفق / 6 نادیده ══════════
+EXIT=0
 
-══════════ نتیجه: 80 موفق / 0 ناموفق / 6 نادیده ══════════
+## dev + demo OTP (:3500)
+
+══════════ نتیجه: 97 موفق / 0 ناموفق / 0 نادیده ══════════
+EXIT=0

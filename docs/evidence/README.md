@@ -11,15 +11,16 @@
 | `tests.txt` | `npm test` | **۸ مجموعه** سبز، `EXIT=0` — هیچ سرور/دیتابیسی لازم نیست |
 | `build.txt` | `npm run build` | `✓ Compiled successfully` |
 | `real-postgres.txt` | `db:status` + `select version()` | PostgreSQL واقعی، سه مهاجرت اعمال‌شده |
-| `api-integration.txt` | `npm run test:api` روی build تولیدی + PostgreSQL واقعی | **۸۱ موفق / ۰ ناموفق / ۶ نادیده** (۶ نادیده = مسیر OTP که در production بسته است) |
-| `api-integration-otp.txt` | همان، روی `next dev` با `HERMIPLAN_ALLOW_DEMO_OTP=1` | **۸۶ موفق / ۰ ناموفق / ۰ نادیده** |
+| `api-integration.txt` | `npm run test:api` روی build تولیدی + PostgreSQL واقعی | **۹۲ موفق / ۰ ناموفق / ۶ نادیده** (۶ نادیده = مسیر OTP که در production بسته است) |
+| `api-integration-otp.txt` | همان، روی `next dev` با `HERMIPLAN_ALLOW_DEMO_OTP=1` | **۹۷ موفق / ۰ ناموفق / ۰ نادیده** |
 | `legacy-db.txt` | چرخه کامل روی پایگاه نسخه قبل (PostgreSQL واقعی) | prepare ۲ · verify **۲۵** · rollback · verify-rollback **۶** |
+| `otp-sms.txt` | `npm run test:otp` (ارائه‌دهنده‌ی ساختگی محلی + PostgreSQL واقعی) | **۳۹ بررسی**: پیکربندی ناقص، قرارداد HTTP ارائه‌دهنده، فقط-هش ذخیره شدن کد، یک‌بارمصرف بودن، مهلت ارسال مجدد، و ۵۰۲ در قطع ارائه‌دهنده بدون باقی‌ماندن کد |
 | `csp.txt` | `npm run test:csp` | هدر CSP، nonce، منابع مجاز |
 | `layout.txt` | `npm run test:layout` | رندر پیکسلی نمودار، قواعد چاپ، پیش‌شرط‌های موبایل |
 | `db-integrity.txt` | `npm run test:db:integrity` | **۱۴ بررسی**: هم‌زمانی ۴۰ اتصال، یکتایی هش، CASCADE، `VALIDATE CONSTRAINT`، سازگاری لینک قدیمی |
-| `load.txt` | `npm run test:load` (۳۰ ثانیه، هم‌زمانی ۲۴) | ۱۰٬۶۷۹ درخواست، ۰ خطا؛ تحلیل ۲۳۲٫۸ rps (p95 ۱۴۲ms)، SSR ۱۲۳٫۲ rps — ظرفیت محلی، نه Netlify |
+| `load.txt` | `npm run test:load` (۸ ثانیه، هم‌زمانی ۱۲، با سهمیه‌های بالا فقط برای همین سنجش) | ۲٬۳۷۵ درخواست، ۰ خطا؛ تحلیل ۱۸۴٫۶ rps (p95 ۸۹٫۹ms)، SSR ۱۱۲٫۳ rps (p95 ۱۴۰٫۲ms) — ظرفیت محلی، نه Netlify |
 | `production-smoke.txt` | `next start` + `curl` | health، کدهای ۲۰۰/۴۰۴، `robots.txt`، هدرهای امنیتی، فونت خودمیزبان |
-| `api-integration-review.txt` | `test:api` پس از بازبینی نهایی | **۸۰ موفق / ۰ ناموفق / ۶ نادیده** (۱۸ بررسی تازه: انقضا، ابطال مستقل، سقف ۱۰ لینک، CSRF، افشا) |
+| `api-integration-review.txt` | خلاصه دو اجرای `test:api` (build تولیدی و dev) | **۹۲/۰/۶** و **۹۷/۰/۰** — شامل انقضا، ابطال مستقل، سقف ۱۰ لینک، CSRF، افشا، لینک قدیمی، CASCADE |
 | `csp-review.txt` | `test:csp` با مسیرهای واقعی (`share-fixture.ts`: کوکی مالک + لینک زنده/باطل/ناشناس + UUID بیگانه) | **۹۲ بررسی** روی ۷ مسیر واقعی |
 | `db-integrity-review.txt` | `test:db:integrity` | **۱۴ بررسی** (شامل §۴ پروژه «منتشرشده پیش از ۰۰۰۳») |
 | `health-probe.txt` | `curl` روی پایگاهی که مهاجرت نشده است | ۵۰۳ + `missingTables`؛ پس از `db:migrate` ⇒ ۲۰۰ |

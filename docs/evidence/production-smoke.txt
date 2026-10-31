@@ -1,4 +1,4 @@
-# production smoke — next start + real PostgreSQL 18.6 — 2026-10-31T13:14:06Z
+# production smoke — next start + real PostgreSQL 18.6 — 2026-10-31T14:00:07Z
 $ curl -s http://127.0.0.1:3400/api/health
 {"ok":true,"schemaVersion":3,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","smsConfigured":false}
 /                                                    200
@@ -7,6 +7,15 @@ $ curl -s http://127.0.0.1:3400/api/health
 /sitemap.xml                                         200
 /report/00000000-0000-4000-8000-000000000000         404
 /s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa       404
+/api/projects                                        200
+
+## headers (/builder)
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+content-security-policy: default-src 'self'; script-src 'self' 'nonce-MDkxYjAwNWMtMzhmYi00NGFjLWE5ZDMtYjNmZDBjOTRmZGMy' 'strict-dynamic'; style-src 'self' 'unsa
+Content-Type: text/html; charset=utf-8
 
 ## robots.txt
 User-Agent: *
@@ -19,17 +28,9 @@ Disallow: /s/
 Host: https://hermiplan.netlify.app
 Sitemap: https://hermiplan.netlify.app/sitemap.xml
 
-## headers on an unknown share link
-HTTP/1.1 404 Not Found
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-Referrer-Policy: no-referrer
-Permissions-Policy: camera=(), microphone=(), geolocation=()
-Cross-Origin-Opener-Policy: same-origin
-Strict-Transport-Security: max-age=31536000; includeSubDomains
-X-Robots-Tag: noindex, nofollow, noarchive
-Cache-Control: no-store, max-age=0
-content-security-policy: default-src 'self'; script-src 'self' 'nonce-MDM4Y2EzYjQtYjhmNC00MGFlLWI3ZjctOGRlYjAxMzY2ZTAy' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'; media-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
-
-## font is self-hosted and served with the right type
-200 font/woff2 111152 bytes
+## sitemap.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url>
+<loc>https://hermiplan.netlify.app/</loc>
+<lastmod>2026-10-31T13:58:22.424Z</lastmod>

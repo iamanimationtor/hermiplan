@@ -91,7 +91,8 @@ npm run dev                     # یا: npm run build && npm start
 | `npm run test:security` | ۲۷۰ بررسی: شماره موبایل، OTP، CSRF، محدودیت نرخ، توکن اشتراک، وضعیت اشتراک در UI |
 | `npm run test:export` | صحت واقعی فایل‌های XLSX/CSV/HTML/بسته + سازگاری اعداد بین خروجی‌ها (۵۱ بررسی؛ با `BASE_URL` ۶۱) |
 | `npx tsx scripts/legacy-db-check.ts prepare\|verify\|rollback` | مهاجرت روی پایگاه داده نسخه قبل بدون از دست رفتن داده |
-| `npm run test:api` | ۸۶ سناریوی یکپارچگی (۸۱ در production + ۵ مسیر OTP که فقط با دمو باز است) |
+| `npm run test:api` | ۹۲ سناریوی یکپارچگی روی build تولیدی (۶ مسیر OTP فقط با دمو) و ۹۷ سناریو روی dev |
+| `npm run test:otp` | زنجیره واقعی پیامک/OTP با ارائه‌دهنده‌ی ساختگی محلی: پیکربندی، هش، یک‌بارمصرف، مهلت ارسال، ۵۰۲ در قطع سرویس (نیازمند `DATABASE_URL` و build) |
 | `npm run test:legacy-db` | مهاجرت/rollback روی پایگاه نسخه قبل (`prepare\|verify\|rollback\|verify-rollback`) |
 | `npm run test:csp` | هدر CSP، nonce روی همه اسکریپت‌های inline و مجاز بودن منابع بیرونی |
 | `npm run test:layout` | رندر واقعی نمودار (پیکسل)، قواعد چاپ A4 و پیش‌شرط‌های چیدمان موبایل |
@@ -125,7 +126,7 @@ npx tsx scripts/pg-dev-server.ts &            # PostgreSQL واقعی روی ۱�
 export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5544/postgres
 npm run db:migrate
 npm run build && npx next start -p 3400 &      # NODE_ENV=production
-BASE_URL=http://127.0.0.1:3400 npm run test:api        # ۶۷ سناریو
+BASE_URL=http://127.0.0.1:3400 npm run test:api        # ۹۲ سناریو
 npm run test:db:integrity                              # هم‌زمانی و قیدها
 npm run test:csp                                       # سیاست امنیتی محتوا
 ```
