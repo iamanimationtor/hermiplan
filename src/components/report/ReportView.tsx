@@ -9,6 +9,7 @@ import { describeShareState } from "@/lib/share-status";
 import { Modal } from "@/components/ui";
 import { Logo, LogoMark, CREATOR_CREDIT_FULL } from "@/components/Logo";
 import type { ProjectAnalysis, ProjectInput } from "@/lib/engine/types";
+import { diffHeadline, type ProjectDiff } from "@/lib/report/version-diff";
 import { formatCompact, formatCurrency, formatJalali, formatNumber, formatPercent, toPersianDigits } from "@/lib/date-fa";
 
 /**
@@ -198,6 +199,15 @@ export function ReportView({
   const [versions, setVersions] = useState<
     { version: number; reason: string; reasonLabel: string; createdAt: string; sizeBytes: number; activities: number; isCurrent: boolean }[]
   >([]);
+  /**
+   * Comparing is a read-only preview: it never mutates anything. The comparison
+   * is computed on the server from the stored payloads, so what the owner sees
+   * here is exactly what a restore would apply.
+   */
+  const [compareVersionNumber, setCompareVersionNumber] = useState<number | null>(null);
+  const [compareBusy, setCompareBusy] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  const [comparison, setComparison] = useState<{ diff: ProjectDiff; toVersion: number } | null>(null);
 
   /**
    * One source of truth for "is this report shared, private, or was it shared
@@ -310,6 +320,37 @@ export function ReportView({
       setHistoryError("بازگردانی ناموفق بود");
     } finally {
       setHistoryBusy(false);
+    }
+  }
+
+  async function compareWithCurrent(version: number) {
+    if (!canManage) return;
+    if (compareVersionNumber === version) {
+      setCompareVersionNumber(null);
+      setComparison(null);
+      setCompareError(null);
+      return;
+    }
+    setCompareVersionNumber(version);
+    setCompareBusy(true);
+    setCompareError(null);
+    setComparison(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/versions/${version}/diff`, { cache: "no-store" });
+      if (!response.ok) {
+        setCompareError(response.status === 404 ? "این نسخه برای مقایسه در دسترس نیست" : "مقایسه ناموفق بود");
+        return;
+      }
+      const data = (await response.json()) as { diff?: ProjectDiff; to?: { version?: number } };
+      if (!data.diff) {
+        setCompareError("پاسخ مقایسه نامعتبر بود");
+        return;
+      }
+      setComparison({ diff: data.diff, toVersion: data.to?.version ?? historyCurrent ?? 0 });
+    } catch {
+      setCompareError("مقایسه ناموفق بود");
+    } finally {
+      setCompareBusy(false);
     }
   }
 
@@ -683,15 +724,26 @@ export function ReportView({
                         {version.isCurrent ? (
                           <span className="text-[10.5px] text-slate-400">—</span>
                         ) : (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => restoreVersion(version.version)}
-                            disabled={historyBusy}
-                            title={`بازگردانی نسخه ${version.version}`}
-                          >
-                            بازگردانی
-                          </Button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void compareWithCurrent(version.version)}
+                              disabled={historyBusy || compareBusy}
+                              title={`مقایسه نسخه ${version.version} با وضعیت جاری`}
+                            >
+                              {compareVersionNumber === version.version ? "بستن مقایسه" : "مقایسه"}
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => restoreVersion(version.version)}
+                              disabled={historyBusy}
+                              title={`بازگردانی نسخه ${version.version}`}
+                            >
+                              بازگردانی
+                            </Button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -699,6 +751,93 @@ export function ReportView({
                 </tbody>
               </table>
             </div>
+
+            {compareError ? (
+              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-[11.5px] font-semibold text-red-700">{compareError}</p>
+            ) : null}
+            {compareBusy ? <p className="mt-2 text-[11.5px] text-slate-500">در حال مقایسه…</p> : null}
+
+            {comparison && compareVersionNumber !== null ? (
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3" data-testid="version-diff">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[12px] font-bold text-ink-900">
+                    مقایسه نسخه {toPersianDigits(String(compareVersionNumber))} با نسخه{" "}
+                    {toPersianDigits(String(comparison.toVersion))}
+                  </p>
+                  <p className="text-[11px] font-semibold text-slate-600">{diffHeadline(comparison.diff)}</p>
+                </div>
+
+                {comparison.diff.identical ? (
+                  <p className="mt-2 text-[11.5px] leading-6 text-slate-600">
+                    محتوای این دو نسخه یکسان است؛ بازگردانی هیچ تغییری ایجاد نمی‌کند.
+                  </p>
+                ) : (
+                  <>
+                    {comparison.diff.settings.length > 0 ? (
+                      <div className="mt-2">
+                        <p className="text-[11px] font-bold text-slate-700">اطلاعات پروژه، تقویم و قیمت‌گذاری</p>
+                        <ul className="mt-1 space-y-1">
+                          {comparison.diff.settings.map((field) => (
+                            <li key={field.key} className="text-[11px] leading-6 text-slate-600">
+                              <span className="font-semibold text-ink-900">{field.label}:</span>{" "}
+                              <span className="text-red-700">{field.before ?? "—"}</span>
+                              <span className="mx-1 text-slate-400">←</span>
+                              <span className="text-emerald-700">{field.after ?? "—"}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {comparison.diff.groups.map((group) => (
+                      <div key={group.key} className="mt-2">
+                        <p className="text-[11px] font-bold text-slate-700">
+                          {group.label} ({toPersianDigits(String(group.entries.length))})
+                        </p>
+                        <ul className="mt-1 space-y-1">
+                          {group.entries.slice(0, 8).map((entry) => (
+                            <li key={`${group.key}-${entry.id}`} className="text-[11px] leading-6 text-slate-600">
+                              <span
+                                className={
+                                  entry.status === "added"
+                                    ? "font-semibold text-emerald-700"
+                                    : entry.status === "removed"
+                                      ? "font-semibold text-red-700"
+                                      : "font-semibold text-ink-900"
+                                }
+                              >
+                                {entry.status === "added" ? "＋ " : entry.status === "removed" ? "− " : "• "}
+                                {entry.title}
+                              </span>
+                              {entry.fields.length > 0 ? (
+                                <ul className="mr-3 mt-0.5 space-y-0.5">
+                                  {entry.fields.slice(0, 6).map((field) => (
+                                    <li key={field.key} className="text-[10.5px] text-slate-500">
+                                      {field.label}: <span className="text-red-700">{field.before ?? "—"}</span>
+                                      <span className="mx-1 text-slate-400">←</span>
+                                      <span className="text-emerald-700">{field.after ?? "—"}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                            </li>
+                          ))}
+                          {group.entries.length > 8 ? (
+                            <li className="text-[10.5px] text-slate-400">
+                              و {toPersianDigits(String(group.entries.length - 8))} مورد دیگر…
+                            </li>
+                          ) : null}
+                        </ul>
+                      </div>
+                    ))}
+                  </>
+                )}
+                <p className="mt-2 text-[10.5px] leading-5 text-slate-500">
+                  مقایسه فقط نمایشی است و چیزی را تغییر نمی‌دهد؛ برای اعمال، «بازگردانی» را بزنید (وضعیت فعلی هم
+                  پیش از بازگردانی ذخیره می‌شود).
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

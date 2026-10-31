@@ -1,13 +1,13 @@
-# CSP over real routes (owner report, live share, revoked link, unknown token, unknown uuid) — 2026-10-31T15:01:09Z
+# CSP over real routes — 2026-10-31T15:10:43Z
 # fixture: BASE_URL=http://127.0.0.1:3400 npx tsx scripts/share-fixture.ts
-# CSP_PATHS=/,/builder,/report/05b5b0b6-7c34-493f-8f24-0525729e7ab7,/s/b6murhPSWmufjhThVNJ59VLId--RzBK0wR_uiTdduhI,/s/MTt_LeuCiW7-EZ1frOpUka6RAv4aDGkZwzfGYGTC58g,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
-# CSP_EXPECT_404=/s/MTt_LeuCiW7-EZ1frOpUka6RAv4aDGkZwzfGYGTC58g,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
+# CSP_PATHS=/,/builder,/report/bab0299b-8e63-4933-99d3-333442c99156,/s/RzwQDOokJp4VCzk65OFJrIkEfPcp8erNUMP8ftrL_oE,/s/t9Z-THXf1_59CErgM_D_I--BehHyopFVVRCQgbRXORA,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
+# CSP_EXPECT_404=/s/t9Z-THXf1_59CErgM_D_I--BehHyopFVVRCQgbRXORA,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
 
 ▶ /
 ▶ /builder
-▶ /report/05b5b0b6-7c34-493f-8f24-0525729e7ab7
-▶ /s/b6murhPSWmufjhThVNJ59VLId--RzBK0wR_uiTdduhI
-▶ /s/MTt_LeuCiW7-EZ1frOpUka6RAv4aDGkZwzfGYGTC58g
+▶ /report/bab0299b-8e63-4933-99d3-333442c99156
+▶ /s/RzwQDOokJp4VCzk65OFJrIkEfPcp8erNUMP8ftrL_oE
+▶ /s/t9Z-THXf1_59CErgM_D_I--BehHyopFVVRCQgbRXORA
 ▶ /s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ▶ /report/00000000-0000-4000-8000-000000000000
 

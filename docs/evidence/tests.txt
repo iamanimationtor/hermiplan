@@ -1,4 +1,4 @@
-# unit/regression suites — 2026-10-31T14:32:01Z
+# unit/regression suites — 2026-10-31T15:07:50Z
 
 > test
 > tsx scripts/run-tests.ts
@@ -15,7 +15,7 @@
 ▶ ۸. تاریخ هدف پایان و شناوری منفی
 ▶ ۹. انحراف زمان‌بندی نسبت به Baseline (تعریف صحیح)
 ▶ ۱۰. کارایی روی پروژه بزرگ
-    زمان تحلیل: 44ms برای ۵۰۰ فعالیت
+    زمان تحلیل: 60ms برای ۵۰۰ فعالیت
 
 ✔ 81 بررسی مستقل موتور — همه با محاسبه دستی تأیید شد
 
@@ -59,23 +59,23 @@ ALL ENGINE CHECKS PASSED
 ══════ خروجی‌ها و موارد مرزی ══════
 
 ▶ ۱. پروژه خالی (بدون فعالیت، بدون منبع)
-  ✓ empty-project (0 acts, 0 wd, 20ms)
+  ✓ empty-project (0 acts, 0 wd, 21ms)
 
 ▶ ۲. فقط Milestone
   ✓ milestones-only (3 acts, 0 wd, 2ms)
 
 ▶ ۳. حلقه وابستگی و ارجاع نامعتبر
   ✓ cycle detection → 2 error(s), 1 warning(s)
-  ✓ cyclic-project (1 acts, 5 wd, 2ms)
+  ✓ cyclic-project (1 acts, 5 wd, 3ms)
 
 ▶ ۴. تقویم‌های خاص
   ✓ holidays-blocked-week (10 acts, 37 wd, 3ms)
   ✓ empty workDays falls back to the default working week
-  ✓ single-working-day (10 acts, 37 wd, 2ms)
-  ✓ very-long-project (10 acts, 216 wd, 6ms)
+  ✓ single-working-day (10 acts, 37 wd, 1ms)
+  ✓ very-long-project (10 acts, 216 wd, 5ms)
 
 ▶ ۵. انواع وابستگی، Lag منفی و محدودیت‌ها
-  ✓ mixed-dependencies (8 acts, 12 wd, 3ms)
+  ✓ mixed-dependencies (8 acts, 12 wd, 1ms)
 
 ▶ ۶. قیمت‌گذاری و تعدیل
   ✓ pricing & escalation (direct 56148223000 → total 81216716879)
@@ -84,19 +84,19 @@ ALL ENGINE CHECKS PASSED
   ✓ jalali brute-force round-trip over 6210 days (2020–2036)
 
 ▶ ۸. همه قالب‌ها × همه مسیرهای خروجی
-  ✓ template:construction (21 acts, 158 wd, 2ms)
-  ✓ template:civil (14 acts, 171 wd, 3ms)
-  ✓ template:architecture (13 acts, 98 wd, 13ms)
+  ✓ template:construction (21 acts, 158 wd, 7ms)
+  ✓ template:civil (14 acts, 171 wd, 2ms)
+  ✓ template:architecture (13 acts, 98 wd, 1ms)
   ✓ template:infrastructure (11 acts, 98 wd, 2ms)
   ✓ template:software (15 acts, 92 wd, 1ms)
-  ✓ template:manufacturing (11 acts, 94 wd, 1ms)
-  ✓ template:research (13 acts, 126 wd, 1ms)
-  ✓ template:event (11 acts, 53 wd, 0ms)
-  ✓ template:renovation (11 acts, 84 wd, 2ms)
-  ✓ template:general (10 acts, 37 wd, 1ms)
+  ✓ template:manufacturing (11 acts, 94 wd, 5ms)
+  ✓ template:research (13 acts, 126 wd, 2ms)
+  ✓ template:event (11 acts, 53 wd, 1ms)
+  ✓ template:renovation (11 acts, 84 wd, 3ms)
+  ✓ template:general (10 acts, 37 wd, 0ms)
 
 ▶ ۹. Baseline و پیشرفت کامل/صفر
-  ✓ baseline-100% (15 acts, 92 wd, 21ms)
+  ✓ baseline-100% (15 acts, 92 wd, 37ms)
 
 ══════════ EDGE-CASE AUDIT PASSED ══════════
 
@@ -132,6 +132,62 @@ ALL ENGINE CHECKS PASSED
   general        acts: 10  wd:  37  CP: 10  ✓
 
 ✔ ALL 10 TEMPLATES CLEAN
+
+══════ تاریخچه — تفاوت نسخه‌ها ══════
+▶ ۱. نسخه‌های یکسان
+  ✓ دو نسخه با محتوای یکسان، «بدون تفاوت» گزارش می‌شوند
+  ✓ شمارش تغییرات صفر است
+  ✓ هیچ گروه یا تنظیم تغییری گزارش نشده
+  ✓ سرخط فارسی «بدون تفاوت» درست است
+  ✓ ترتیب کلیدهای JSON، تغییر محسوب نمی‌شود
+  ✓ canonical مستقل از ترتیب است
+
+▶ ۲. تغییر فعالیت‌ها
+  ✓ تغییر نام یک فعالیت، یک تغییر است
+  ✓ وضعیت ردیف «changed» است
+  ✓ برچسب فارسی «نام فعالیت» درج شده
+  ✓ عنوان ردیف «کد — نام» است
+  ✓ برچسب مدت کاری درست است
+  ✓ مقدار قبل/بعد مدت دقیق است
+  ✓ فعالیت تازه «افزوده» شمرده می‌شود
+  ✓ عنوان ردیف افزوده درست است
+  ✓ در ردیف افزوده، ستون «قبل» خالی است
+  ✓ حذف فعالیت گزارش می‌شود
+  ✓ در ردیف حذف‌شده، ستون «بعد» خالی است
+  ✓ پاک‌کردن همه فعالیت‌ها همه را گزارش می‌کند
+
+▶ ۳. وابستگی‌ها و منابع
+  ✓ برچسب وابستگی‌ها درست است
+  ✓ وابستگی جدید با کد فعالیت نمایش داده می‌شود
+  ✓ نوع و تأخیر مثبت در متن آمده
+  ✓ تأخیر منفی با علامت درست نوشته می‌شود
+  ✓ حذف همه وابستگی‌ها صریح است
+  ✓ تخصیص منبع با تعداد نمایش داده می‌شود
+  ✓ نام منبع در متن آمده
+
+▶ ۴. تنظیمات پروژه
+  ✓ درصد بالاسری در تنظیمات گزارش می‌شود
+  ✓ بلوک تنظیمات یک تغییر شمرده می‌شود (نه هر فیلد)
+  ✓ نام پروژه با برچسب فارسی گزارش می‌شود
+  ✓ تعداد تعطیلات نمایش داده می‌شود
+  ✓ مقدار خالی در برابر مقدار ناموجود، تغییر نیست
+
+▶ ۵. پوشش کامل (هیچ تغییری پنهان نمی‌شود)
+  ✓ فیلد ناشناخته هم گزارش می‌شود
+  ✓ فیلد ناشناخته، برچسب ساختگی نمی‌گیرد
+  ✓ گروه ریسک‌ها وقتی تغییر کند ظاهر می‌شود
+  ✓ افزودن خط مبنا گزارش می‌شود
+  ✓ تغییر تنظیمات گزارش گروه جدا دارد
+  ✓ نقطه عطف تازه گزارش می‌شود
+
+▶ ۶. پایداری و ترتیب
+  ✓ اجرای دوباره، دقیقاً همان ساختار را می‌دهد
+  ✓ ردیف‌ها بر اساس شناسه مرتب‌اند (بی‌توجه به ترتیب ذخیره)
+  ✓ جمع شمارش‌ها با کل برابر است
+  ✓ سرخط فارسی تعداد تغییرات را می‌گوید
+  ✓ کارکرد متره با برنامه‌ای/واقعی/تأییدشده نمایش داده می‌شود
+
+✔ 41 بررسی تفاوت نسخه‌ها — همه موفق
 
 ══════ خروجی — صحت فایل‌های XLSX/CSV/HTML/بسته ══════
 ▶ ۱. XLSX — بسته واقعی Office
@@ -203,5 +259,5 @@ ALL ENGINE CHECKS PASSED
 
 ✔ 51 موفق / 0 ناموفق
 
-══════ همه 8 مجموعه تست موفق بودند ══════
+══════ همه 9 مجموعه تست موفق بودند ══════
 EXIT=0

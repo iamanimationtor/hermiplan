@@ -1,11 +1,7 @@
-# api-integration — summary of both runs — 2026-10-31T15:02:06Z
+# api-integration — summary of both runs — 2026-10-31T15:09:59Z
 ## production build (:3400)
-══════════ نتیجه: 147 موفق / 0 ناموفق / 6 نادیده ══════════
-EXIT=0
-
+══════════ نتیجه: 161 موفق / 0 ناموفق / 6 نادیده ══════════
 ## dev + demo OTP (:3500)
-══════════ نتیجه: 152 موفق / 0 ناموفق / 0 نادیده ══════════
-EXIT=0
+══════════ نتیجه: 166 موفق / 0 ناموفق / 0 نادیده ══════════
 
-## history section (§۴-ب)
-checks: 52
+history+diff checks: 66

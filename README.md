@@ -88,10 +88,11 @@ npm run dev                     # یا: npm run build && npm start
 | `npm run test:engine:regressions` | ۱۹۱ رگرسیون: محدودیت/Milestone/Baseline/EVM/تاریخ وضعیت/گرد کردن/سیاست پول |
 | `npm run test:smoke` | دود موتور روی همه قالب‌ها |
 | `npm run test:edge` | ممیزی موارد مرزی + هر ۵ مسیر خروجی |
+| `npm run test:versions` | ۴۱ بررسی خالص تفاوت نسخه‌ها: افزوده/حذف‌شده/تغییر، ترتیب پایدار، پوشش کامل فیلدها |
 | `npm run test:security` | ۲۹۱ بررسی: شماره موبایل، OTP، CSRF، محدودیت نرخ، توکن اشتراک، قاعده‌های خالص تاریخچه/بازگردانی، وضعیت اشتراک در UI |
 | `npm run test:export` | صحت واقعی فایل‌های XLSX/CSV/HTML/بسته + سازگاری اعداد بین خروجی‌ها (۵۱ بررسی؛ با `BASE_URL` ۶۱) |
 | `npx tsx scripts/legacy-db-check.ts prepare\|verify\|rollback` | مهاجرت روی پایگاه داده نسخه قبل بدون از دست رفتن داده |
-| `npm run test:api` | ۱۵۲ بررسی یکپارچگی روی build تولیدی (۶ مسیر OTP فقط با دمو) و ۱۵۲ بررسی روی dev؛ شامل تاریخچه نسخه‌ها و ۴۰۹ |
+| `npm run test:api` | ۱۶۱ بررسی یکپارچگی روی build تولیدی (۶ مسیر OTP فقط با دمو) و ۱۶۶ بررسی روی dev؛ شامل تاریخچه، بازگردانی، مقایسه نسخه‌ها و ۴۰۹ |
 | `npm run test:otp` | زنجیره واقعی پیامک/OTP با ارائه‌دهنده‌ی ساختگی محلی: پیکربندی، هش، یک‌بارمصرف، مهلت ارسال، ۵۰۲ در قطع سرویس (نیازمند `DATABASE_URL` و build) |
 | `npm run test:legacy-db` | مهاجرت/rollback روی پایگاه نسخه قبل (`prepare\|verify\|rollback\|verify-rollback`) |
 | `npm run test:csp` | هدر CSP، nonce روی همه اسکریپت‌های inline و مجاز بودن منابع بیرونی |
@@ -126,7 +127,7 @@ npx tsx scripts/pg-dev-server.ts &            # PostgreSQL واقعی روی ۱�
 export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5544/postgres
 npm run db:migrate
 npm run build && npx next start -p 3400 &      # NODE_ENV=production
-BASE_URL=http://127.0.0.1:3400 npm run test:api        # ۱۵۲ بررسی
+BASE_URL=http://127.0.0.1:3400 npm run test:api        # ۱۶۱ بررسی
 npm run test:db:integrity                              # هم‌زمانی و قیدها
 npm run test:csp                                       # سیاست امنیتی محتوا
 ```
@@ -168,7 +169,7 @@ serverless بین نمونه‌ها مشترک باشند. در نبود پای�
 | `POST /api/projects/:id/share` (ساخت لینک) | IP | ۱۰ / ساعت | `RATE_LIMIT_SHARE_CREATE` |
 | `DELETE /api/projects/:id/share` (ابطال) | IP | ۳۰ / دقیقه | `RATE_LIMIT_SHARE_REVOKE` |
 | `GET /s/<token>` (بازدید گزارش اشتراکی) | IP | ۲۴۰ / دقیقه | `RATE_LIMIT_SHARE_READ` |
-| `GET /api/projects/:id/versions` و `…/versions/:n` | IP | ۱۲۰ / دقیقه | `RATE_LIMIT_VERSION_READ` |
+| `GET /api/projects/:id/versions`، `…/versions/:n` و `…/versions/:n/diff` | IP | ۱۲۰ / دقیقه | `RATE_LIMIT_VERSION_READ` |
 | `POST /api/projects/:id/versions/:n/restore` (بازگردانی) | IP | ۲۰ / دقیقه | `RATE_LIMIT_VERSION_RESTORE` |
 
 ## مدل دسترسی و امنیت
@@ -199,6 +200,10 @@ serverless بین نمونه‌ها مشترک باشند. در نبود پای�
   یک شماره ذخیره کنند، دومی **۴۰۹** می‌گیرد و نوشته اول بازنویسی نمی‌شود. تاریخچه با
   `PROJECT_HISTORY_LIMIT` (پیش‌فرض ۲۰، حداقل ۳) و `PROJECT_HISTORY_BYTES` (پیش‌فرض ۸ مگابایت)
   محدود می‌شود.
+- **مقایسه نسخه‌ها**: پیش از بازگردانی می‌توانید هر نسخه را با وضعیت جاری (یا با نسخه‌ای دیگر)
+  مقایسه کنید (`GET …/versions/:n/diff?against=current|<n>`). مقایسه روی سرور از داده‌ی ذخیره‌شده
+  محاسبه می‌شود، فقط‌خواندنی است و هیچ فیلدی را نادیده نمی‌گیرد؛ فیلد ناشناخته هم با نام خام خودش
+  گزارش می‌شود (`src/lib/report/version-diff.ts`).
 - **CSP هیچ منبع بیرونی ندارد**: فونت وزیرمتن خودمیزبان است (`public/fonts/`) و `style-src`/`font-src`
   دیگر `cdn.jsdelivr.net` را مجاز نمی‌کنند.
 

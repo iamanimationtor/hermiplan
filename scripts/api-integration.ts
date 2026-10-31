@@ -564,6 +564,60 @@ async function main() {
   );
   ok(Number(snapshotRows) === 4, "چهار ردیف نسخه در پایگاه", String(snapshotRows));
 
+  /* ---- ۴-ج. مقایسه نسخه‌ها (diff) ---- */
+  console.log("\n▶ ۴-ج. مقایسه نسخه‌ها");
+  const diffSame = await call(owner, `/api/projects/${historyId}/versions/1/diff`);
+  const diffSameBody = JSON.parse(diffSame.body || "{}") as {
+    from?: { version: number };
+    to?: { version: number };
+    diff?: { identical?: boolean; counts?: { total: number }; groups?: unknown[]; settings?: unknown[] };
+  };
+  ok(diffSame.status === 200, "مقایسه نسخه ۱ با نسخه جاری با ۲۰۰", diffSame.body.slice(0, 120));
+  ok(diffSameBody.from?.version === 1, "پاسخ می‌گوید مبدأ نسخه ۱ است", String(diffSameBody.from?.version));
+  ok(diffSameBody.to?.version === 4, "مقایسه پیش‌فرض با نسخه جاری انجام می‌شود", String(diffSameBody.to?.version));
+  ok(
+    diffSameBody.diff?.identical === true && (diffSameBody.diff?.counts?.total ?? -1) === 0,
+    "پس از بازگردانی، نسخه ۱ و وضعیت جاری تفاوتی ندارند",
+    JSON.stringify(diffSameBody.diff?.counts),
+  );
+
+  const diffChanged = await call(owner, `/api/projects/${historyId}/versions/2/diff`);
+  const diffChangedBody = JSON.parse(diffChanged.body || "{}") as {
+    diff?: {
+      identical?: boolean;
+      counts?: { total: number; changed?: number };
+      settings?: { key: string; label: string }[];
+      groups?: { key: string; label: string; entries: { status: string; fields: { key: string }[] }[] }[];
+    };
+  };
+  ok(diffChanged.status === 200 && diffChangedBody.diff?.identical === false, "نسخه ۲ با وضعیت جاری تفاوت دارد");
+  ok((diffChangedBody.diff?.counts?.total ?? 0) > 0, "تعداد تغییرات بزرگ‌تر از صفر است", String(diffChangedBody.diff?.counts?.total));
+  ok(
+    Boolean(diffChangedBody.diff?.settings?.some((field) => field.key === "name")),
+    "تغییر نام پروژه در بخش تنظیمات گزارش می‌شود",
+    JSON.stringify(diffChangedBody.diff?.settings?.map((field) => field.key)),
+  );
+  ok(
+    Boolean(diffChangedBody.diff?.groups?.some((group) => group.key === "activities" && group.entries.length > 0)),
+    "تغییر فعالیت‌ها در گروه خودش گزارش می‌شود",
+    JSON.stringify(diffChangedBody.diff?.groups?.map((group) => group.key)),
+  );
+
+  const diffPair = await call(owner, `/api/projects/${historyId}/versions/1/diff?against=2`);
+  const diffPairBody = JSON.parse(diffPair.body || "{}") as { from?: { version: number }; to?: { version: number } };
+  ok(diffPair.status === 200 && diffPairBody.to?.version === 2, "مقایسه دو نسخه مشخص با پارامتر against کار می‌کند");
+
+  const diffBadAgainst = await call(owner, `/api/projects/${historyId}/versions/1/diff?against=abc`);
+  ok(diffBadAgainst.status === 400, "نسخه مقایسه نامعتبر ⇒ ۴۰۰", `got ${diffBadAgainst.status}`);
+  const diffMissing = await call(owner, `/api/projects/${historyId}/versions/99/diff`);
+  ok(diffMissing.status === 404, "نسخه ناموجود ⇒ ۴۰۴", `got ${diffMissing.status}`);
+  const diffMissingAgainst = await call(owner, `/api/projects/${historyId}/versions/1/diff?against=99`);
+  ok(diffMissingAgainst.status === 404, "نسخه مقایسه ناموجود ⇒ ۴۰۴", `got ${diffMissingAgainst.status}`);
+  const diffStranger = await call(stranger, `/api/projects/${historyId}/versions/1/diff`);
+  ok(diffStranger.status === 404, "غریبه نمی‌تواند نسخه‌ها را مقایسه کند ⇒ ۴۰۴", `got ${diffStranger.status}`);
+  const diffAnon = await call(new Jar(), `/api/projects/${historyId}/versions/1/diff`);
+  ok(diffAnon.status === 404, "بدون کوکی، مقایسه نسخه‌ها ⇒ ۴۰۴", `got ${diffAnon.status}`);
+
   // Pruning: keep the newest HISTORY_LIMIT revisions and never lose the current one.
   const bulk = JSON.parse(JSON.stringify(historyProject));
   for (let step = 0; step < 22; step += 1) {

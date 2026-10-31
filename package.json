@@ -14,6 +14,7 @@
     "test:edge": "tsx scripts/edge-case-audit.ts",
     "test:security": "tsx scripts/security-checks.ts",
     "test:export": "tsx scripts/export-check.ts",
+    "test:versions": "tsx scripts/version-diff-check.ts",
     "test:api": "tsx scripts/api-integration.ts",
     "test:otp": "tsx scripts/otp-sms-check.ts",
     "test:legacy-db": "tsx scripts/legacy-db-check.ts",
