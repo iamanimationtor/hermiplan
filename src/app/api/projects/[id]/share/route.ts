@@ -11,7 +11,7 @@ import {
   isUuid,
   jsonError,
   jsonOk,
-  readJson,
+  readOptionalJson,
 } from "@/lib/server/http";
 import {
   countActiveShareTokens,
@@ -101,8 +101,9 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   const { id } = await ctx.params;
   if (!isUuid(id)) return jsonError(400, "شناسه پروژه نامعتبر است");
 
-  // An empty body is a valid request ("just create a link with defaults").
-  const parsedBody = await readJson(request);
+  // An empty body is a valid request ("just create a link with defaults"), but
+  // a truncated payload is not: `readOptionalJson` separates the two.
+  const parsedBody = await readOptionalJson(request);
   if (!parsedBody.ok) return jsonError(400, "بدنه درخواست معتبر نیست");
   const body = (parsedBody.body ?? {}) as { expiresAt?: unknown; label?: unknown };
 

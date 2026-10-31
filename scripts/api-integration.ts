@@ -339,6 +339,31 @@ async function main() {
   const finalFlag = await dbQuery("select case when is_public then 't' else 'f' end from projects where id = $1", [id]);
   ok(finalFlag === "f", "وضعیت نهایی: پروژه خصوصی است");
 
+  /* ------ ۳-ب-۲. بدنهٔ خالی در برابر بدنهٔ ناقص ------ */
+  console.log("\n▶ ۳-ب-۲. بدنهٔ خالیِ مجاز و بدنهٔ ناقصِ رد‌شده");
+  {
+    // Own client IP: the share-create quota is 10/hour per IP, and this block must
+    // not eat into the budget the revocation/expiry scenarios rely on.
+    const ip = `${CLIENT_IP}.61`;
+    const noBody = await call(owner, `/api/projects/${id}/share`, { method: "POST", ip });
+    ok(noBody.status === 201, "POST بدون بدنه، لینک با پیش‌فرض می‌سازد", `got ${noBody.status}: ${noBody.body.slice(0, 80)}`);
+    const created = JSON.parse(noBody.body || "{}") as { token?: string; tokenId?: string };
+    ok((created.token ?? "").length === 43, "لینک ساخته‌شده توکن ۴۳ نویسه‌ای دارد");
+
+    const truncated = await call(owner, `/api/projects/${id}/share`, {
+      method: "POST",
+      body: '{"label":',
+      headers: { "content-type": "application/json" },
+      ip,
+    });
+    ok(truncated.status === 400, "بدنهٔ JSON ناقص ⇒ ۴۰۰ (نه ساخت بی‌صدا)", `got ${truncated.status}`);
+
+    if (created.tokenId) {
+      const revoked = await call(owner, `/api/projects/${id}/share?tokenId=${created.tokenId}`, { method: "DELETE", ip });
+      ok(revoked.status === 200, "لینک بی‌بدنه هم قابل ابطال است", `got ${revoked.status}`);
+    }
+  }
+
   /* ------ ۳-ج. سازگاری با لینک‌های قدیمی و پروژه حذف‌شده ------ */
   console.log("\n▶ ۳-ج. لینک قدیمی (پیش از توکن)، پروژه حذف‌شده");
 

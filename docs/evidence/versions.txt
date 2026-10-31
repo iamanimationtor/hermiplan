@@ -1,4 +1,4 @@
-# revision history, restore, compare and parameter validation — 2026-10-31T15:36:01Z
+# revision history, restore, compare and parameter validation — 2026-10-31T16:12:38Z
 sections §۴-ب (history), §۴-ج (diff) and §۴-د (parameter validation) of `npm run test:api`
 against the production build on :3400 with real PostgreSQL.
 

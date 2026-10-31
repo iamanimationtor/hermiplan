@@ -1,4 +1,4 @@
-# migration safety (incl. full rollback rehearsal) — 2026-10-31T15:34:38Z
+# migration safety (incl. full rollback rehearsal) — 2026-10-31T16:17:10Z
 ▶ ۱. هر مهاجرت فایل بازگشت جفت‌شده دارد
   ✓ 0001_baseline.sql → 0001_baseline.rollback.sql
   ✓ 0002_security_hardening.sql → 0002_security_hardening.rollback.sql
@@ -47,4 +47,3 @@
   ✓ ساختار نهایی با ساختار اولیه یکسان است
 
 ✔ 33 بررسی ایمنی مهاجرت — همه موفق
-EXIT=0

@@ -8,11 +8,11 @@
 | `npm-ci.txt` | `npm ci --no-audit --no-fund` | نصب دقیق از `package-lock.json` بدون خطا |
 | `typecheck.txt` | `npx tsc --noEmit` | `EXIT=0` |
 | `lint.txt` | `npx eslint . -f json` | ۸۶ فایل · `errors 0 warnings 0` |
-| `tests.txt` | `npm test` | **۹ مجموعه** سبز، `EXIT=0` — هیچ سرور/دیتابیسی لازم نیست |
+| `tests.txt` | `npm test` | **۱۰ مجموعه** سبز، `EXIT=0` — هیچ سرور/دیتابیسی لازم نیست |
 | `build.txt` | `npm run build` | `✓ Compiled successfully` |
 | `real-postgres.txt` | `db:status` + `select version()` | PostgreSQL واقعی ۱۸٫۶، هر چهار مهاجرت اعمال‌شده |
-| `api-integration.txt` | `npm run test:api` روی build تولیدی + PostgreSQL واقعی | **۱۸۷ موفق / ۰ ناموفق / ۶ نادیده** (۶ نادیده = مسیر OTP که در production بسته است) |
-| `api-integration-otp.txt` | همان، روی `next dev` با `HERMIPLAN_ALLOW_DEMO_OTP=1` | **۱۹۲ موفق / ۰ ناموفق / ۰ نادیده** |
+| `api-integration.txt` | `npm run test:api` روی build تولیدی + PostgreSQL واقعی | **۱۹۱ موفق / ۰ ناموفق / ۶ نادیده** (۶ نادیده = مسیر OTP که در production بسته است) |
+| `api-integration-otp.txt` | همان، روی `next dev` با `HERMIPLAN_ALLOW_DEMO_OTP=1` | **۱۹۶ موفق / ۰ ناموفق / ۰ نادیده** |
 | `versions.txt` | برش بخش‌های تاریخچه، مقایسه و اعتبارسنجی پارامترها از `npm run test:api` | **۷۵ بررسی**: ایجاد، ذخیره، ذخیره تکراری، ۴۰۹، بازگردانی، هرس، مسابقه دو نویسنده، بازسازی نسخه گمشده، تفاوت نسخه‌ها و ۴۰۴ مقایسه |
 | `version-diff.txt` | `npm run test:versions` (خالص، بدون سرور) | **۴۱ بررسی** تفاوت نسخه‌ها |
 | `legacy-db.txt` | چرخه کامل روی پایگاه نسخه قبل (PostgreSQL واقعی) | prepare ۲ · migrate `0001`–`0004` · verify **۳۱** · rollback سه مهاجرت بالا · verify-rollback **۹** |
@@ -22,7 +22,7 @@
 | `db-integrity.txt` | `npm run test:db:integrity` | **۲۰ بررسی**: هم‌زمانی محدودیت نرخ، یکتایی هش، CASCADE، `VALIDATE CONSTRAINT`، سازگاری لینک قدیمی، **یکتایی نسخه + ۲۴ نویسنده هم‌زمان + آبشار تاریخچه** |
 | `load.txt` | `npm run test:load` (۸ ثانیه، هم‌زمانی ۱۲، با سهمیه‌های بالا فقط برای همین سنجش) | ۲٬۳۷۵ درخواست، ۰ خطا؛ تحلیل ۱۸۴٫۶ rps (p95 ۸۹٫۹ms)، SSR ۱۱۲٫۳ rps (p95 ۱۴۰٫۲ms) — ظرفیت محلی، نه Netlify |
 | `production-smoke.txt` | `next start` + `curl` | health، کدهای ۲۰۰/۴۰۴، `robots.txt`، هدرهای امنیتی، فونت خودمیزبان |
-| `api-integration-review.txt` | خلاصه دو اجرای `test:api` (build تولیدی و dev) | **۱۸۷/۰/۶** و **۱۹۲/۰/۰** — شامل انقضا، ابطال مستقل، سقف ۱۰ لینک، CSRF، افشا، لینک قدیمی، CASCADE، **تاریخچه/بازگردانی/مقایسه/اعتبارسنجی/۴۰۹** |
+| `api-integration-review.txt` | خلاصه دو اجرای `test:api` (build تولیدی و dev) | **۱۹۱/۰/۶** و **۱۹۶/۰/۰** — شامل انقضا، ابطال مستقل، سقف ۱۰ لینک، CSRF، افشا، لینک قدیمی، CASCADE، **تاریخچه/بازگردانی/مقایسه/اعتبارسنجی/۴۰۹** |
 | `csp-review.txt` | `test:csp` با مسیرهای واقعی (`share-fixture.ts`: کوکی مالک + لینک زنده/باطل/ناشناس + UUID بیگانه) | **۹۲ بررسی** روی ۷ مسیر واقعی (بازتولید در همین دور) |
 | `db-integrity-review.txt` | `test:db:integrity` — اجرای قدیمی‌تر | **۱۴ بررسی**؛ نسخه کامل‌تر و جاری: `db-integrity.txt` (۲۰ بررسی) |
 | `health-probe.txt` | `curl /api/health` روی پایگاه مهاجرت‌شده و روی یک پایگاه تازه‌ی خالی | ۲۰۰ + `schemaVersion:4` و `revisionHistory:postgres`؛ پایگاه خالی ⇒ ۵۰۳ + `missingTables` |
@@ -32,7 +32,9 @@
 | `preflight.txt` | `npm run db:preflight` (+ `--json`) | پیش‌بررسی فقط‌خواندنی: مهاجرت‌های در انتظار، drift، یتیم مالکیت، لینک قدیمی، حجم |
 | `export.txt` | `npm run test:export` (با `BASE_URL`) | **۶۴ بررسی** روی XLSX/CSV/HTML/بسته/MSProject + PDF-چاپی از سرویس |
 | `a11y.txt` | `npm run test:a11y` | **۳۲ بررسی** روی HTML سرو‌شده (زبان، جهت، landmark،‏ h1، برچسب ورودی‌ها، alt) |
-| `bundle.txt` | `npm run test:bundle` | بودجه‌ی gzip هر مسیر؛ سنگین‌ترین `/builder` با ۱۷۵٫۶KB |
+| `bundle.txt` | `npm run test:bundle` | بودجه‌ی gzip هر مسیر؛ سنگین‌ترین `/builder` با ۱۷۵٫۹KB |
+| `project-file.txt` | `npm run test:project-file` | **۳۱ بررسی**: رفت‌وبرگشت کامل داده، رد فایل خراب/بی‌پروژه/نسخهٔ آینده، پاک‌سازی بخش‌های ناشناخته |
+| `final-checks.txt` | a11y + export + layout + versions + project-file + bundle در یک اجرا | ۳۲ · ۶۴ · ۲۴ · ۴۱ · ۳۱ · ۶/۶ — همه سبز |
 
 ## بازتولید
 

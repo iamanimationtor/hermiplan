@@ -20,6 +20,7 @@ import {
 } from "./steps";
 import { buildProjectFromTemplate } from "@/lib/templates";
 import { DEFAULT_REPORT_SECTIONS } from "@/lib/validation";
+import { buildProjectFile, parseProjectFile, serializeProjectFile } from "@/lib/project-file";
 import { formatCompact, formatJalali, formatPercent, toPersianDigits } from "@/lib/date-fa";
 import type { ProjectInput } from "@/lib/engine/types";
 
@@ -51,6 +52,7 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
   const [savedMore, setSavedMore] = useState<{ total: number; nextOffset: number | null } | null>(null);
   const [savedError, setSavedError] = useState<string | null>(null);
   const [savedBusy, setSavedBusy] = useState(false);
+  const [fileMessage, setFileMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   /**
    * The server copy this builder session is working on. "Generate report" used
    * to create a *new* project every time, which meant a second run silently
@@ -250,6 +252,53 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
       setSavedError("بارگذاری پروژه‌های بیشتر ناموفق بود");
     } finally {
       setSavedBusy(false);
+    }
+  }
+
+  /**
+   * Project file backup.
+   *
+   * Why a file, not just the database: an anonymous visitor's projects belong to
+   * a cookie in *this* browser. A new device, a cleared cookie jar or a new
+   * preview origin silently loses access — and the owner then sees a 404 for
+   * work that still exists. A portable file is the honest escape hatch, and it
+   * contains exactly what the builder holds, validated again on the way back in.
+   */
+  function downloadProjectFile() {
+    const payload = buildProjectFile(current, reportSections);
+    const blob = new Blob([serializeProjectFile(payload)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchorEl = document.createElement("a");
+    const safeName = (current.meta.name || "project").replace(/[\\/:*?"<>|]+/g, "-").slice(0, 40);
+    anchorEl.href = url;
+    anchorEl.download = `HERMIPLAN-${safeName}.json`;
+    document.body.appendChild(anchorEl);
+    anchorEl.click();
+    anchorEl.remove();
+    URL.revokeObjectURL(url);
+    setFileMessage({ kind: "ok", text: "فایل پشتیبان ساخته شد." });
+  }
+
+  async function restoreProjectFile(file: File) {
+    setFileMessage(null);
+    try {
+      const result = parseProjectFile(await file.text());
+      if (!result.ok) {
+        setFileMessage({ kind: "error", text: result.reason });
+        return;
+      }
+      api.replace(result.project);
+      setReportSections(result.sections);
+      // A restored file is a *new* project on the server: saving must create,
+      // never overwrite an unrelated project.
+      setServerProject(null);
+      setSavedList(null);
+      setFileMessage({
+        kind: "ok",
+        text: `پروژه «${result.project.meta.name}» بازگردانی شد؛ برای ذخیره، دکمه «تولید گزارش» را بزنید.`,
+      });
+    } catch {
+      setFileMessage({ kind: "error", text: "خواندن فایل پشتیبان ناموفق بود." });
     }
   }
 
@@ -721,8 +770,48 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
           </button>
         ) : null}
         <p className="mt-4 text-[11.5px] leading-6 text-slate-500">
-          پروژه‌های شما روی همین مرورگر ذخیره می‌شوند. برای دسترسی از دستگاه‌های دیگر می‌توانید لینک گزارش را نگه دارید.
+          پروژه‌های مهمان به همین مرورگر وابسته‌اند. برای انتقال به دستگاه یا مرورگر دیگر، فایل پشتیبان بگیرید؛
+          و برای دیدن گزارش با شخص دیگر، از «لینک اشتراک» در صفحه گزارش استفاده کنید.
         </p>
+
+        <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+          <p className="text-[12px] font-bold text-ink-900">فایل پشتیبان پروژه</p>
+          <p className="text-[11px] leading-6 text-slate-600">
+            یک فایل JSON از پروژه جاری و بخش‌های گزارش می‌سازد. همین فایل را می‌توانید در مرورگر دیگر بازگردانی کنید؛
+            محتوا هنگام بازگردانی دوباره اعتبارسنجی می‌شود.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={downloadProjectFile}>
+              دریافت فایل پشتیبان
+            </Button>
+            <label
+              className="inline-flex cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-semibold text-brand-700 transition hover:border-brand-400 hover:bg-brand-50/40"
+            >
+              بازیابی از فایل
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="sr-only"
+                aria-label="بازیابی پروژه از فایل پشتیبان"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) void restoreProjectFile(file);
+                }}
+              />
+            </label>
+          </div>
+          {fileMessage ? (
+            <p
+              role="status"
+              className={`rounded-lg px-3 py-2 text-[11.5px] font-semibold ${
+                fileMessage.kind === "ok" ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
+              }`}
+            >
+              {fileMessage.text}
+            </p>
+          ) : null}
+        </div>
       </Modal>
     </div>
   );

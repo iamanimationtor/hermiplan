@@ -18,23 +18,38 @@ const SUITES: { name: string; file: string }[] = [
   { name: "درون‌ریزی و قالب‌ها", file: "scripts/import-parser.test.ts" },
   { name: "رگرسیون قالب‌ها", file: "scripts/template-regression.ts" },
   { name: "تاریخچه — تفاوت نسخه‌ها", file: "scripts/version-diff-check.ts" },
+  { name: "فایل پشتیبان پروژه — رفت‌وبرگشت و ردِ فایل نامعتبر", file: "scripts/project-file-check.ts" },
   // No server required: the local half of the artifact checks runs here, and the
   // HTTP half activates by itself when BASE_URL is set.
   { name: "خروجی — صحت فایل‌های XLSX/CSV/HTML/بسته", file: "scripts/export-check.ts" },
 ];
 
 let failed = 0;
+const summary: { name: string; ok: boolean; seconds: string }[] = [];
 for (const suite of SUITES) {
   console.log(`\n══════ ${suite.name} ══════`);
+  const startedAt = Date.now();
   const result = spawnSync(process.execPath, ["--import", "tsx", suite.file], {
     stdio: "inherit",
     env: process.env,
   });
-  if (result.status !== 0) {
+  const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+  const ok = result.status === 0;
+  summary.push({ name: suite.name, ok, seconds });
+  if (!ok) {
     failed += 1;
-    console.error(`✘ ${suite.file} با کد ${result.status} متوقف شد`);
+    // `result.signal` matters: a killed process (for example by the OOM killer
+    // in a small sandbox) is a different failure from a failed assertion.
+    console.error(
+      `✘ ${suite.file} با کد ${result.status}${result.signal ? ` (سیگنال ${result.signal})` : ""} متوقف شد`,
+    );
   }
 }
+
+// One compact index of what ran: when a suite fails, the reader should not have
+// to scroll back through several hundred lines to find out which one.
+console.log("\n══════ خلاصه ══════");
+for (const row of summary) console.log(`${row.ok ? "✔" : "✘"} ${row.seconds.padStart(5)}s  ${row.name}`);
 
 console.log(
   failed === 0

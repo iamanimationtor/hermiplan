@@ -112,6 +112,29 @@ export async function readJson(request: Request): Promise<{ ok: true; body: unkn
   }
 }
 
+/**
+ * Reads a JSON body where **no body at all** is a meaningful request ("do it
+ * with defaults"). The distinction matters: `POST /share` with an empty body is
+ * valid, while `{"expiresAt":` (truncated JSON) must still be rejected — a
+ * half-written payload is a client bug, not an intent.
+ */
+export async function readOptionalJson(
+  request: Request,
+): Promise<{ ok: true; body: unknown } | { ok: false }> {
+  let text: string;
+  try {
+    text = await request.text();
+  } catch {
+    return { ok: false };
+  }
+  if (text.trim() === "") return { ok: true, body: {} };
+  try {
+    return { ok: true, body: JSON.parse(text) };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export function payloadTooLarge(request: Request, maxBytes: number): boolean {
   const declared = Number(request.headers.get("content-length") ?? 0);
   return Number.isFinite(declared) && declared > maxBytes;

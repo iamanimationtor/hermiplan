@@ -1,4 +1,4 @@
-# unit/regression suites — 2026-10-31T15:37:22Z
+# unit/regression suites — 2026-10-31T16:15:19Z
 
 > test
 > tsx scripts/run-tests.ts
@@ -15,7 +15,7 @@
 ▶ ۸. تاریخ هدف پایان و شناوری منفی
 ▶ ۹. انحراف زمان‌بندی نسبت به Baseline (تعریف صحیح)
 ▶ ۱۰. کارایی روی پروژه بزرگ
-    زمان تحلیل: 39ms برای ۵۰۰ فعالیت
+    زمان تحلیل: 30ms برای ۵۰۰ فعالیت
 
 ✔ 81 بررسی مستقل موتور — همه با محاسبه دستی تأیید شد
 
@@ -66,13 +66,13 @@ ALL ENGINE CHECKS PASSED
 
 ▶ ۳. حلقه وابستگی و ارجاع نامعتبر
   ✓ cycle detection → 2 error(s), 1 warning(s)
-  ✓ cyclic-project (1 acts, 5 wd, 1ms)
+  ✓ cyclic-project (1 acts, 5 wd, 2ms)
 
 ▶ ۴. تقویم‌های خاص
   ✓ holidays-blocked-week (10 acts, 37 wd, 3ms)
   ✓ empty workDays falls back to the default working week
   ✓ single-working-day (10 acts, 37 wd, 2ms)
-  ✓ very-long-project (10 acts, 216 wd, 4ms)
+  ✓ very-long-project (10 acts, 216 wd, 3ms)
 
 ▶ ۵. انواع وابستگی، Lag منفی و محدودیت‌ها
   ✓ mixed-dependencies (8 acts, 12 wd, 2ms)
@@ -84,19 +84,19 @@ ALL ENGINE CHECKS PASSED
   ✓ jalali brute-force round-trip over 6210 days (2020–2036)
 
 ▶ ۸. همه قالب‌ها × همه مسیرهای خروجی
-  ✓ template:construction (21 acts, 158 wd, 4ms)
-  ✓ template:civil (14 acts, 171 wd, 9ms)
-  ✓ template:architecture (13 acts, 98 wd, 2ms)
-  ✓ template:infrastructure (11 acts, 98 wd, 2ms)
-  ✓ template:software (15 acts, 92 wd, 10ms)
+  ✓ template:construction (21 acts, 158 wd, 2ms)
+  ✓ template:civil (14 acts, 171 wd, 2ms)
+  ✓ template:architecture (13 acts, 98 wd, 1ms)
+  ✓ template:infrastructure (11 acts, 98 wd, 1ms)
+  ✓ template:software (15 acts, 92 wd, 1ms)
   ✓ template:manufacturing (11 acts, 94 wd, 1ms)
   ✓ template:research (13 acts, 126 wd, 1ms)
   ✓ template:event (11 acts, 53 wd, 1ms)
-  ✓ template:renovation (11 acts, 84 wd, 3ms)
-  ✓ template:general (10 acts, 37 wd, 0ms)
+  ✓ template:renovation (11 acts, 84 wd, 1ms)
+  ✓ template:general (10 acts, 37 wd, 1ms)
 
 ▶ ۹. Baseline و پیشرفت کامل/صفر
-  ✓ baseline-100% (15 acts, 92 wd, 22ms)
+  ✓ baseline-100% (15 acts, 92 wd, 35ms)
 
 ══════════ EDGE-CASE AUDIT PASSED ══════════
 
@@ -189,6 +189,50 @@ ALL ENGINE CHECKS PASSED
 
 ✔ 41 بررسی تفاوت نسخه‌ها — همه موفق
 
+══════ فایل پشتیبان پروژه — رفت‌وبرگشت و ردِ فایل نامعتبر ══════
+▶ ۱. ساخت فایل
+  ✓ برچسب فرمت درست است
+  ✓ نسخهٔ فرمت نوشته می‌شود
+  ✓ زمان صدور ISO و قابل خواندن است
+  ✓ پروژهٔ قالب فعالیت دارد
+  ✓ خروجی JSON خوانا (indent) است
+  ✓ JSON معتبر و نام پروژه در آن هست
+
+▶ ۲. بازگردانی بدون از دست دادن داده
+  ✓ فایلِ خودِ برنامه پذیرفته می‌شود
+  ✓ نام پروژه حفظ شد
+  ✓ تاریخ وضعیت حفظ شد
+  ✓ تعداد فعالیت‌ها حفظ شد
+  ✓ مدت همهٔ فعالیت‌ها یکی است
+  ✓ وابستگی‌ها (نوع/Lag) حفظ شدند
+  ✓ منابع حفظ شدند
+  ✓ نقاط عطف حفظ شدند
+  ✓ تقویم کاری حفظ شد
+  ✓ همهٔ بخش‌های گزارش حفظ شدند
+  ✓ واحد پول حفظ شد
+
+▶ ۳. رد فایل‌های نامعتبر (بدون حدس)
+  ✓ JSON خراب رد می‌شود
+  ✓ فرمت دیگر رد می‌شود
+  ✓ بدون پروژه رد می‌شود
+  ✓ نسخهٔ آینده رد می‌شود
+  ✓ پروژهٔ بی‌ساختار رد می‌شود
+  ✓ آرایه به‌جای شیء رد می‌شود
+
+▶ ۴. بخش‌های گزارش
+  ✓ کلید ناشناخته و غیررشته حذف می‌شوند
+  ✓ ترتیب بخش‌ها به ترتیب سند یکسان می‌شود
+  ✓ ورودی خالی ⇒ بخش‌های پیش‌فرض
+  ✓ اگر هیچ کلید معتبری نماند، پیش‌فرض برمی‌گردد
+
+▶ ۵. پروژه‌های دیگر قالب‌ها هم پشتیبان می‌شوند
+  ✓ قالب «construction» رفت‌وبرگشت می‌شود
+  ✓ قالب «software» رفت‌وبرگشت می‌شود
+  ✓ قالب «event» رفت‌وبرگشت می‌شود
+  ✓ قالب «general» رفت‌وبرگشت می‌شود
+
+✔ 31 بررسی فایل پروژه — همه موفق
+
 ══════ خروجی — صحت فایل‌های XLSX/CSV/HTML/بسته ══════
 ▶ ۱. XLSX — بسته واقعی Office
   ✓ بخش [Content_Types].xml حاضر است
@@ -262,5 +306,17 @@ ALL ENGINE CHECKS PASSED
 
 ✔ 54 موفق / 0 ناموفق
 
-══════ همه 9 مجموعه تست موفق بودند ══════
+══════ خلاصه ══════
+✔   0.3s  موتور — بررسی مستقل (محاسبه دستی)
+✔   0.3s  موتور — رگرسیون محدودیت/مبنا/EVM
+✔   0.3s  موتور — دود (قالب‌ها)
+✔   0.7s  خروجی‌ها و موارد مرزی
+✔   0.6s  امنیت — توابع پایه
+✔   0.2s  درون‌ریزی و قالب‌ها
+✔   0.3s  رگرسیون قالب‌ها
+✔   0.2s  تاریخچه — تفاوت نسخه‌ها
+✔   0.3s  فایل پشتیبان پروژه — رفت‌وبرگشت و ردِ فایل نامعتبر
+✔   0.5s  خروجی — صحت فایل‌های XLSX/CSV/HTML/بسته
+
+══════ همه 10 مجموعه تست موفق بودند ══════
 EXIT=0
