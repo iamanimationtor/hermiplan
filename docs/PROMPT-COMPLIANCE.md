@@ -95,11 +95,11 @@
 | اصلاح `normalizePhone` | **انجام‌شده** | `src/lib/server/phone.ts`، `security-checks.ts` §۱ | — |
 | محدودیت نرخ مشترک (PostgreSQL) + مستندسازی هر endpoint | **انجام‌شده** | `src/lib/server/rate-limit.ts` (جدول `rate_limits`)، `README.md` جدول سهمیه‌ها، `db-integrity-check.ts` §۱ | — |
 | بازبینی نشست/کوکی (HttpOnly/Secure/SameSite/انقضا/ابطال/CSRF) | **انجام‌شده** | `src/lib/server/auth.ts`، `src/lib/server/http.ts` (`isSameOriginRequest`) | — |
-| سخت‌سازی و آزمون‌های منفی مجوز | **انجام‌شده** | `api-integration` (۱۹۱ بررسی)، `security-checks` (۲۹۱ بررسی)، `export-check` (۶۴ بررسی) | — |
+| سخت‌سازی و آزمون‌های منفی مجوز | **انجام‌شده** | `api-integration` (۱۹۱ بررسی)، `security-checks` (۲۹۱ بررسی)، `export-check` (۷۲ بررسی) | — |
 | CSP و هدرهای امنیتی | **انجام‌شده** | `src/middleware.ts` (nonce، بدون `unsafe-inline` در script)، `test:csp` ۲۴ بررسی روی دو صفحه + ۹۲ بررسی روی هفت مسیر واقعی | — |
 | ارسال واقعی پیامک با ارائه‌دهنده بیرونی | **ناقص** | کل زنجیره با ارائه‌دهنده محلی آزموده شد (`docs/evidence/otp-sms.txt`) | کلید `SMS_PROVIDER_KEY` + `SMS_OTP_TEMPLATE` شما |
 | محافظت از داده (بدون مهاجرت مخرب، برگشت‌پذیر) | **انجام‌شده** | `drizzle/0002..0004` + فایل rollback، `migration-safety.ts` (۳۳ بررسی، شامل بازگشت کامل و بازسازی هم‌ساختار) | — |
-| تزریق فرمول در خروجی صفحه‌گسترده (CWE-1236) | **انجام‌شده (افزوده این دور)** | `src/lib/report/export.ts` (`csvSafe`، شامل `-` غیرعددی و اعداد منفی فارسی)، `export-check.ts` ۶۴ بررسی با عنوان مخرب واقعی | — |
+| تزریق فرمول در خروجی صفحه‌گسترده (CWE-1236) | **انجام‌شده (افزوده این دور)** | `src/lib/report/export.ts` (`csvSafe`، شامل `-` غیرعددی و اعداد منفی فارسی)، `export-check.ts` ۷۲ بررسی با عنوان مخرب واقعی | — |
 | سهمیه فهرست پروژه‌ها + صفحه‌بندی محدود | **انجام‌شده (افزوده این دور)** | `GET /api/projects?limit&offset` با `parsePositiveInt`، سقف ۵۰، ۴۲۹ با `Retry-After`، `total`/`hasMore`؛ `api-integration` §۴-ه و §۴-و | — |
 | بدنهٔ خالیِ مجاز در مقابل بدنهٔ ناقص در ساخت لینک اشتراک | **انجام‌شده (افزوده این دور)** | `readOptionalJson` در `src/lib/server/http.ts`؛ `POST /share` بدون بدنه ۲۰۱، بدنهٔ ناقص ۴۰۰ — `api-integration` §۳-ب-۲ (۴ بررسی) | — |
 

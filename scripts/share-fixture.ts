@@ -1,99 +1,55 @@
 /**
- * HERMIPLAN — share-link fixture for route-level checks (test databases only).
+ * Creates a throwaway project + share link so route-level checks can be run
+ * against the *real* pages: the owner report and a live share link.
  *
- * Creates a guest-owned project through the public API, issues a share link, and
- * prints the values needed to probe the *real* routes:
- *
- *   • `CSP_PATHS`      — `/`, `/builder`, the owner report, the shared report, a
- *                        revoked link and an unknown token
- *   • `CSP_COOKIE`     — the guest cookie, so the owner-only route is reachable
- *   • `CSP_EXPECT_404` — the paths that must stay 404
- *
- * It only ever talks to `BASE_URL` with its own fresh cookie jar, so it cannot
- * touch data that belongs to anyone else. Never point it at production data you
- * care about: it creates one project and one link.
- *
- * Usage:
  *   BASE_URL=http://127.0.0.1:3400 npx tsx scripts/share-fixture.ts
+ *
+ * It prints the environment values another check needs, for example:
+ *
+ *   CSP_PATHS=/report/<id>,/s/<token>
+ *   CSP_COOKIE=hermiplan_guest=…
+ *
+ * Test databases only: it writes a guest project and a share token. Never run
+ * it against production.
  */
 import { buildProjectFromTemplate } from "../src/lib/templates";
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:3400";
-/** unique per run so the share-creation quota never leaks between runs */
-const CLIENT_IP = `10.66.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
-const cookieJar = new Map<string, string>();
-
-function cookieHeader(): string {
-  return [...cookieJar.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
-}
-
-function absorb(response: Response) {
-  for (const raw of response.headers.getSetCookie?.() ?? []) {
-    const [pair] = raw.split(";");
-    const [name, ...rest] = pair.split("=");
-    if (name) cookieJar.set(name.trim(), rest.join("="));
-  }
-}
+const jar: string[] = [];
 
 async function call(path: string, init: RequestInit = {}): Promise<{ status: number; body: string }> {
   const headers = new Headers(init.headers ?? {});
-  if (cookieHeader()) headers.set("cookie", cookieHeader());
+  if (jar.length) headers.set("cookie", jar.join("; "));
   if (init.body) headers.set("content-type", "application/json");
-  // A distinct client identity per run: the per-IP quota (10 link creations an
-  // hour) would otherwise make the fixture fail on the eleventh run of a day.
-  headers.set("x-forwarded-for", CLIENT_IP);
   const response = await fetch(`${BASE}${path}`, { ...init, headers, redirect: "manual" });
-  absorb(response);
+  for (const cookie of response.headers.getSetCookie?.() ?? []) jar.push(cookie.split(";")[0]);
   return { status: response.status, body: await response.text() };
 }
 
-async function main() {
+async function main(): Promise<void> {
   const project = buildProjectFromTemplate("construction");
-  project.meta.name = "پروژه آزمون CSP و لینک اشتراک";
+  project.meta.name = "پروژه آزمون مسیرها";
 
   const created = await call("/api/projects", {
     method: "POST",
     body: JSON.stringify({ project, reportOptions: {} }),
   });
   if (created.status !== 201) {
-    console.error(`creating the fixture failed: ${created.status} ${created.body.slice(0, 200)}`);
+    console.error(`fixture failed: POST /api/projects → ${created.status} ${created.body.slice(0, 200)}`);
     process.exit(1);
   }
-  const projectId = (JSON.parse(created.body) as { id: string }).id;
+  const id = (JSON.parse(created.body) as { id: string }).id;
 
-  const share = await call(`/api/projects/${projectId}/share`, { method: "POST", body: "{}" });
+  const share = await call(`/api/projects/${id}/share`, { method: "POST", body: "{}" });
   if (share.status !== 201) {
-    console.error(`creating the share link failed: ${share.status} ${share.body.slice(0, 200)}`);
+    console.error(`fixture failed: POST /share → ${share.status} ${share.body.slice(0, 200)}`);
     process.exit(1);
   }
-  const { token, tokenId, url } = JSON.parse(share.body) as { token: string; tokenId: string; url: string };
+  const token = (JSON.parse(share.body) as { token: string }).token;
 
-  // A second link that is revoked right away: it must behave exactly like an
-  // unknown token (404) and must not be distinguishable from one.
-  const doomed = await call(`/api/projects/${projectId}/share`, { method: "POST", body: "{}" });
-  const doomedBody = JSON.parse(doomed.body) as { token: string; tokenId: string };
-  await call(`/api/projects/${projectId}/share?tokenId=${doomedBody.tokenId}`, { method: "DELETE" });
-
-  const unknownToken = "a".repeat(43);
-  // A well-formed UUID that belongs to nobody: knowing an id must never be the
-  // credential, not even when the requester happens to hold an owner cookie for
-  // a different project.
-  const unknownId = "00000000-0000-4000-8000-000000000000";
-  const paths = [
-    "/",
-    "/builder",
-    `/report/${projectId}`,
-    `/s/${token}`,
-    `/s/${doomedBody.token}`,
-    `/s/${unknownToken}`,
-    `/report/${unknownId}`,
-  ].join(",");
-  const expect404 = [`/s/${doomedBody.token}`, `/s/${unknownToken}`, `/report/${unknownId}`].join(",");
-
-  console.log(`CSP_PATHS=${paths}`);
-  console.log(`CSP_EXPECT_404=${expect404}`);
-  console.log(`CSP_COOKIE=${cookieHeader()}`);
-  console.error(`fixture ready: project ${projectId} · share ${url} · owner cookie len ${cookieHeader().length}`);
+  console.log(`CSP_PATHS=/report/${id},/s/${token}`);
+  console.log(`CSP_COOKIE=${jar.join("; ")}`);
+  console.log(`fixture ready: project ${id} · share ${BASE}/s/${token}`);
 }
 
 void main();

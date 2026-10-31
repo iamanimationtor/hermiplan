@@ -1,0 +1,12 @@
+# CSP on real routes (/, /builder, /report/<uuid>, live share link, two 404 paths) — 2026-10-31T16:20:14Z
+▶ /
+▶ /builder
+▶ /report/94132200-b754-453f-8e24-35fab5364e78
+▶ /s/VdwCC8ZKauzB-cym3ADvrItylbTsetJvPI0mGdVhF2A
+▶ /s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+▶ /report/00000000-0000-4000-8000-000000000000
+
+✔ 78 بررسی CSP — همه موفق
+  سیاست بررسی‌شده، نه آزمون مرورگری: اجرای واقعی مرورگر همچنان کار باز است.
+share token under test: /s/VdwCC8ZKauzB-cym3ADvrItylbTsetJvPI0mGdVhF2A
+EXIT=0

@@ -1,4 +1,4 @@
-# migration safety (incl. full rollback rehearsal) — 2026-10-31T16:17:10Z
+# migration safety + idempotency + drift — 2026-10-31T16:20:05Z
 ▶ ۱. هر مهاجرت فایل بازگشت جفت‌شده دارد
   ✓ 0001_baseline.sql → 0001_baseline.rollback.sql
   ✓ 0002_security_hardening.sql → 0002_security_hardening.rollback.sql

@@ -1,4 +1,4 @@
-# production smoke — 2026-10-31T16:17:10Z
+# production smoke — 2026-10-31T16:20:14Z
 $ curl -s http://127.0.0.1:3400/api/health
 {"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false}
 /                                                    200
@@ -8,19 +8,10 @@ $ curl -s http://127.0.0.1:3400/api/health
 /report/00000000-0000-4000-8000-000000000000         404
 /s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa       404
 /api/projects                                        200
-/api/projects?limit=2                                200
-/api/projects?limit=0                                400
 
-## security headers (/builder)
+## share page headers (noindex / no-store / referrer)
 X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-Referrer-Policy: strict-origin-when-cross-origin
-Permissions-Policy: camera=(), microphone=(), geolocation=()
-Strict-Transport-Security: max-age=31536000; includeSubDomains
-content-security-policy: default-src 'self'; script-src 'self' 'nonce-Zjg5Y2I1ZDctNTQ3ZC00NTg1LTg4ZmQtYjI2NTgyY2YxZDc2' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'; media-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
-Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
-
-## 404 page text (owner-only report)
-این گزارش برای این مرورگر یا حساب در دسترس نیست
-## 404 page text (share token)
-این لینک اشتراک معتبر نیست
+Referrer-Policy: no-referrer
+X-Robots-Tag: noindex, nofollow, noarchive
+Cache-Control: no-store, max-age=0
+Content-Type: text/html; charset=utf-8

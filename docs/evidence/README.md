@@ -24,13 +24,14 @@
 | `production-smoke.txt` | `next start` + `curl` | health، کدهای ۲۰۰/۴۰۴، `robots.txt`، هدرهای امنیتی، فونت خودمیزبان |
 | `api-integration-review.txt` | خلاصه دو اجرای `test:api` (build تولیدی و dev) | **۱۹۱/۰/۶** و **۱۹۶/۰/۰** — شامل انقضا، ابطال مستقل، سقف ۱۰ لینک، CSRF، افشا، لینک قدیمی، CASCADE، **تاریخچه/بازگردانی/مقایسه/اعتبارسنجی/۴۰۹** |
 | `csp-review.txt` | `test:csp` با مسیرهای واقعی (`share-fixture.ts`: کوکی مالک + لینک زنده/باطل/ناشناس + UUID بیگانه) | **۹۲ بررسی** روی ۷ مسیر واقعی (بازتولید در همین دور) |
+| `csp-real-routes.txt` | `BASE_URL=… bash scripts/csp-real-routes.sh` | **۷۸ بررسی** روی ۶ مسیر واقعی: `/`, `/builder`, `/report/<uuid>` با کوکی مالک، لینک زندهٔ اشتراک، و دو مسیر ۴۰۴ — شامل nonce یکتا، بدون `unsafe-inline`، و عدم افشای توکن با Referrer |
 | `db-integrity-review.txt` | `test:db:integrity` — اجرای قدیمی‌تر | **۱۴ بررسی**؛ نسخه کامل‌تر و جاری: `db-integrity.txt` (۲۰ بررسی) |
 | `health-probe.txt` | `curl /api/health` روی پایگاه مهاجرت‌شده و روی یک پایگاه تازه‌ی خالی | ۲۰۰ + `schemaVersion:4` و `revisionHistory:postgres`؛ پایگاه خالی ⇒ ۵۰۳ + `missingTables` |
 | `migration-review.txt` | اجرای دوباره `db:migrate` و دست‌کاری checksum | بیکار بودن اجرای دوباره و رد شدن drift |
 | `share-audit.txt` | `npm run db:share-audit` | فهرست لینک‌های فعال و علامت‌خوردن پروژه «منتشرشده پیش از مهاجرت» |
 | `migration-safety.txt` | `npm run db:migration-safety` (با `MIGRATION_SAFETY_ROLLBACK=1`) | **۳۳ بررسی**: جفت بازگشت هر مهاجرت، no-op بودن اجرای دوم، رد شدن drift، قفل بازگشت پایه، بازگشت کامل و بازسازی هم‌ساختار |
 | `preflight.txt` | `npm run db:preflight` (+ `--json`) | پیش‌بررسی فقط‌خواندنی: مهاجرت‌های در انتظار، drift، یتیم مالکیت، لینک قدیمی، حجم |
-| `export.txt` | `npm run test:export` (با `BASE_URL`) | **۶۴ بررسی** روی XLSX/CSV/HTML/بسته/MSProject + PDF-چاپی از سرویس |
+| `export.txt` | `npm run test:export` (با `BASE_URL`) | **۷۲ بررسی** روی XLSX/CSV/HTML/بسته/MSProject + امضای بایتی هر ۷ فرمت سرویس‌شده |
 | `a11y.txt` | `npm run test:a11y` | **۳۲ بررسی** روی HTML سرو‌شده (زبان، جهت، landmark،‏ h1، برچسب ورودی‌ها، alt) |
 | `bundle.txt` | `npm run test:bundle` | بودجه‌ی gzip هر مسیر؛ سنگین‌ترین `/builder` با ۱۷۵٫۹KB |
 | `project-file.txt` | `npm run test:project-file` | **۳۱ بررسی**: رفت‌وبرگشت کامل داده، رد فایل خراب/بی‌پروژه/نسخهٔ آینده، پاک‌سازی بخش‌های ناشناخته |

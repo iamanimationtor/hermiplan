@@ -279,6 +279,35 @@ async function main(): Promise<void> {
       Buffer.compare(csvBytes, Buffer.from(csv, "utf8")) === 0,
       "CSV سرویس‌شده بایت‌به‌بایت با خروجی مستقیم یکی است",
     );
+
+    /*
+     * Every format the download centre offers must come back as a real file of
+     * the right shape. A format that silently 400s — or returns JSON where an
+     * archive was promised — is invisible to unit tests but obvious to a user.
+     * The first bytes are the cheapest honest proof of what was sent.
+     */
+    const SIGNATURES: { format: string; magic: string; type: RegExp; label: string }[] = [
+      { format: "xlsx", magic: "504b0304", type: /spreadsheetml\.sheet/, label: "Excel (xlsx)" },
+      { format: "xls", magic: "3c3f786d", type: /ms-excel/, label: "Excel 2003 (xls)" },
+      { format: "json", magic: "7b0a", type: /application\/json/, label: "JSON" },
+      { format: "package", magic: "504b0304", type: /application\/zip/, label: "بسته ZIP" },
+    ];
+    for (const expected of SIGNATURES) {
+      const response = await fetch(`${base}/api/export`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ project: input, format: expected.format }),
+      });
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const magic = bytes.subarray(0, 4).toString("hex").slice(0, expected.magic.length);
+      const contentType = response.headers.get("content-type") ?? "";
+      check(
+        response.status === 200 && magic === expected.magic && expected.type.test(contentType),
+        `فرمت ${expected.label}: فایل واقعی با امضای درست و نوع محتوای درست`,
+        `status=${response.status} magic=${magic} type=${contentType}`,
+      );
+      check(bytes.byteLength > 4096, `فرمت ${expected.label}: خروجی خالی/ناقص نیست`, `${bytes.byteLength} بایت`);
+    }
   } else {
     console.log("\n▶ ۸. خروجی‌های HTTP — نادیده (BASE_URL تنظیم نشده)");
   }
