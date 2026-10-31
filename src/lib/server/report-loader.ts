@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { projects, projectShareTokens } from "@/db/schema";
 import { analyzeProject } from "@/lib/engine/analysis";
+import { resolveShareToken } from "@/lib/server/share-token";
 import {
   DEFAULT_REPORT_SECTIONS,
   parseProjectInput,
@@ -98,7 +99,6 @@ export async function loadOwnedReport(id: string): Promise<LoadedReport | null> 
  * reveals which of the three happened.
  */
 export async function loadSharedReport(token: string): Promise<LoadedReport | null> {
-  const { resolveShareToken } = await import("@/lib/server/share-token");
   const resolved = await resolveShareToken(token);
   if (!resolved) return null;
 

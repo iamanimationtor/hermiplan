@@ -21,7 +21,8 @@
     "test:load": "tsx scripts/load-test.ts",
     "db:status": "tsx scripts/migrate.ts --status",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:dev-server": "tsx scripts/pg-dev-server.ts"
+    "db:dev-server": "tsx scripts/pg-dev-server.ts",
+    "db:share-audit": "tsx scripts/share-audit.ts"
   },
   "dependencies": {
     "dotenv": "17.3.1",

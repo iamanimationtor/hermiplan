@@ -1,0 +1,29 @@
+# migration review — idempotency and drift detection (throwaway db) — 2026-10-31T12:47:46Z
+
+## 1) a second run must not re-apply anything
+$ DATABASE_URL=… npm run db:migrate
+Database: 127.0.0.1:5544/hermiplan_conc
+  ✓ 0001_baseline (applied)
+  ✓ 0002_security_hardening (applied)
+  ✓ 0003_share_tokens (applied)
+
+Nothing to do — schema is up to date.
+
+## 2) editing an already-applied migration must be refused (drift detection)
+$ node -e "update _hermiplan_migrations set checksum='tampered' where version='0003_share_tokens'"
+rows tampered: 1
+
+$ DATABASE_URL=… npm run db:migrate   # must refuse
+Database: 127.0.0.1:5544/hermiplan_conc
+  ✓ 0001_baseline (applied)
+  ✓ 0002_security_hardening (applied)
+
+✗ 0003_share_tokens was modified after being applied (checksum drift).
+  Never edit an applied migration — add a new numbered file instead.
+EXIT=1
+
+## 3) restore the real checksum and confirm the runner is clean again
+checksum restored
+  ✓ 0003_share_tokens (applied)
+
+Nothing to do — schema is up to date.

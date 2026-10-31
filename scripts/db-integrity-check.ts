@@ -199,6 +199,66 @@ async function validateConstraint(): Promise<void> {
   }
 }
 
+/**
+ * Legacy-flag compatibility: a project published *before* 0003 has
+ * `is_public = true` and `share_expires_at` but no token. After the migration
+ * nothing must grant access through it, and the audit query must flag it so its
+ * owner can re-issue a link deliberately.
+ */
+async function legacyPublishedProject(): Promise<void> {
+  console.log("\n▶ ۴. پروژه‌ای که پیش از مهاجرت «منتشر» شده بود");
+  const client = new Client({ connectionString: URL });
+  await client.connect();
+  const projectId = randomUUID();
+  try {
+    await client.query(
+      `INSERT INTO projects (id, guest_token, name, is_public, share_expires_at, input)
+       VALUES ($1, $2, $3, true, now() + interval '30 days',
+               '{"meta":{"name":"legacy-published","type":"general","currency":"IRR","startDate":"2026-01-03","statusDate":"2026-01-03"},"activities":[]}'::jsonb)`,
+      [projectId, `guest-${projectId}`, "پروژه منتشرشده قدیمی"],
+    );
+
+    const tokens = await client.query<{ c: number }>(
+      "SELECT count(*)::int AS c FROM project_share_tokens WHERE project_id = $1",
+      [projectId],
+    );
+    check(tokens.rows[0].c === 0, "مهاجرت برای پروژه قدیمی هیچ توکنی جعل نمی‌کند");
+
+    // This is the exact predicate used by scripts/share-audit.ts.
+    const legacy = await client.query<{ legacy: boolean }>(
+      `SELECT (p.is_public AND coalesce(t.active, 0) = 0) AS legacy
+         FROM projects p
+         LEFT JOIN LATERAL (
+           SELECT count(*) FILTER (WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())) AS active
+             FROM project_share_tokens WHERE project_id = p.id
+         ) t ON true
+        WHERE p.id = $1`,
+      [projectId],
+    );
+    check(legacy.rows[0]?.legacy === true, "پروژه قدیمی در بازبینی به‌عنوان «لینک قدیمی» علامت می‌خورد");
+
+    // Issuing a token is what restores sharing, and only then.
+    await client.query(
+      "INSERT INTO project_share_tokens (project_id, token_hash) VALUES ($1, $2)",
+      [projectId, `hash-${randomUUID()}`],
+    );
+    const afterIssue = await client.query<{ legacy: boolean }>(
+      `SELECT (p.is_public AND coalesce(t.active, 0) = 0) AS legacy
+         FROM projects p
+         LEFT JOIN LATERAL (
+           SELECT count(*) FILTER (WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())) AS active
+             FROM project_share_tokens WHERE project_id = p.id
+         ) t ON true
+        WHERE p.id = $1`,
+      [projectId],
+    );
+    check(afterIssue.rows[0]?.legacy === false, "پس از صدور لینک تازه، وضعیت «قدیمی» برداشته می‌شود");
+  } finally {
+    await client.query("DELETE FROM projects WHERE id = $1", [projectId]).catch(() => undefined);
+    await client.end();
+  }
+}
+
 async function main(): Promise<void> {
   console.log("▶ بررسی یکپارچگی پایگاه داده روی PostgreSQL واقعی");
   const version = new Client({ connectionString: URL });
@@ -210,6 +270,7 @@ async function main(): Promise<void> {
   await concurrency();
   await constraints();
   await validateConstraint();
+  await legacyPublishedProject();
 
   console.log(
     failures === 0

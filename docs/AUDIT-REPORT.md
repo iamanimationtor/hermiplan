@@ -31,10 +31,10 @@
 ## ۱. جدول اصلاحات
 
 ستون «تست تأییدکننده» نام مجموعه‌ای است که این رفتار را واقعاً اجرا می‌کند:
-`regressions` = `scripts/engine-regressions.ts` (۱۷۷ بررسی)، `verification` =
+`regressions` = `scripts/engine-regressions.ts` (۱۹۱ بررسی)، `verification` =
 `scripts/engine-verification.ts` (۸۱ بررسی)، `smoke`، `edge` = `scripts/edge-case-audit.ts`،
-`security` = `scripts/security-checks.ts` (۲۴۹ بررسی)، `api` = `scripts/api-integration.ts`
-(۵۱ سناریو).
+`security` = `scripts/security-checks.ts` (۲۶۱ بررسی)، `api` = `scripts/api-integration.ts`
+(۸۶ سناریو: ۸۰ اجراشده + ۶ نادیده در حالت production)، `csp` = `scripts/csp-check.ts`.
 
 ### ۱-۱. موتور زمان‌بندی (CPM/PERT)
 
@@ -116,7 +116,7 @@
 | --- | --- | --- | --- | --- | --- |
 | تعریف سنجه‌های دوپهلو مستند نبود | زیاد | `docs/ENGINE.md` (جدید) | تعریف مبنای زمانی، فرمول‌ها، جدول محدودیت‌ها، مدل EAC، سیاست گرد کردن، وضعیت تحلیل | مرجع آزمون‌های دستی | ✅ |
 | مسیر آزمون یکپارچگی به `psql` و `python3` وابسته بود و روی محیط مدیریت‌شده اجرا نمی‌شد | زیاد | `scripts/api-integration.ts` | `pg` + خواننده ZIP داخلی (بدون وابستگی جدید)؛ شمارنده IP مستقل هر اجرا | `api` ۵۱/۵۱ | ✅ |
-| آزمون‌های موتور فقط بخشی از رفتار را پوشش می‌دادند | زیاد | `scripts/engine-regressions.ts`, `run-tests.ts`, `security-checks.ts` | ۱۷۷ رگرسیون + ۲۴۹ بررسی امنیتی + فرمان واحد `npm test` | `npm test` (۷/۷) | ✅ |
+| آزمون‌های موتور فقط بخشی از رفتار را پوشش می‌دادند | زیاد | `scripts/engine-regressions.ts`, `run-tests.ts`, `security-checks.ts` | ۱۹۱ رگرسیون + ۲۶۱ بررسی امنیتی + فرمان واحد `npm test` | `npm test` (۷/۷) | ✅ |
 | ادعای «قیمت لحظه‌ای» بدون اتصال واقعی | زیاد | `src/app/page.tsx`, `steps.tsx` | برچسب شرطی «فید بازار متصل» / «کاتالوگ مرجع» | بازبینی متن | ✅ |
 | `tsconfig.tsbuildinfo` در مخزن ردیابی می‌شد | کم | `.gitignore` | از ردیابی خارج و نادیده شد | `git status` | ✅ |
 | هشدارها «راه‌حل» نداشتند (فقط پیام) | زیاد | `src/lib/engine/diagnostics.ts` (جدید), `analysis.ts`, `ReportView.tsx`, `steps.tsx`, `html.ts`, `export.ts` | هر تشخیص با `remedy` از نقشه ۲۵ کد؛ نمایش در بیلدر، گزارش، HTML و برگه `Diagnostics` در XLSX | regressions §۱۳ |
@@ -128,6 +128,13 @@
 | سیاست گرد کردن پول متمرکز و آزموده نبود | متوسط | `src/lib/engine/money.ts` | گرد کردن یک‌بار، `total = Σ اجزا`، `NaN`/`Infinity` ⇒ ۰ | رگرسیون §۱۵ (۱۱ بررسی) |
 | هیچ سنجش عملکرد یا هم‌زمانی وجود نداشت | متوسط | `scripts/load-test.ts`, `scripts/db-integrity-check.ts` | بنچمارک محلی + هم‌زمانی ۴۰ اتصال روی PostgreSQL واقعی | `load.txt`, `db-integrity.txt` |
 | `npm test` به متغیر محیطی `DATABASE_URL` وابسته بود (آزمون fallback حافظه‌ای با دیتابیس متصل شکست می‌خورد) | متوسط | `scripts/security-checks.ts` §۶ | محیط به‌صورت صریح و موقت پاک می‌شود و بازگردانده می‌شود؛ اجرای مجموعه با و بدون `DATABASE_URL` یکسان است | `tests.txt` (اجرا با `DATABASE_URL`) + ۱۰ اجرای متوالی سبز |
+| سقف «۱۰ لینک فعال» از لیست کوتاه‌شده محاسبه می‌شد ⇒ با انبوه لینک‌های باطل قابل دور زدن بود | متوسط | `src/lib/server/share-token.ts` (`countActiveShareTokens`), `api/projects/[id]/share/route.ts` | شمارش در خود SQL؛ سقف به‌صورت ثابت نام‌دار `MAX_ACTIVE_LINKS` | `api` §۳-ب (۴۰۹ پس از ۱۰ لینک) |
+| هر بازدید از لینک اشتراک یک `UPDATE` می‌زد (تقویت نوشتن روی مسیر فقط‌خواندنی) | کم | `src/lib/server/share-token.ts` | `last_used_at`/`use_count` حداکثر یک‌بار در دقیقه (شرط در SQL، مقاوم به هم‌زمانی)؛ شمارنده «دقیقه بازدید» است نه «بازدید خام» | `api` §۳-ب، `share-audit.txt` |
+| `/api/health` بدون مهاجرت هم «سبز» بود ⇒ استقرار ناقص دیده نمی‌شد | متوسط | `src/app/api/health/route.ts` | بررسی وجود هفت جدول؛ در نبودشان **۵۰۳** + `missingTables` + پیام راهنما | `health-probe.txt` |
+| CSP فقط روی `/` و `/builder` آزموده می‌شد، نه روی مسیرهای واقعی گزارش/اشتراک | متوسط | `scripts/csp-check.ts` (`CSP_PATHS`, `CSP_EXPECT_404`, `CSP_COOKIE`), `scripts/share-fixture.ts` (جدید) | شش مسیر واقعی با کوکی مالک و لینک زنده/باطل/ناشناس؛ ۴۰۴ هم باید سیاست را داشته باشد | `csp-review.txt` (۶۶ بررسی) |
+| رفتار لینک‌های قدیمی (منتشرشده پیش از ۰۰۰۳) مستند و قابل بازبینی نبود | متوسط | `scripts/share-audit.ts` (جدید), `DEPLOYMENT.md` §۴ب, `db-integrity-check.ts` §۴ | ابزار فقط‌خواندنی که پروژه‌های «لینک قدیمی» را فهرست می‌کند؛ هیچ توکنی به‌صورت خودکار ساخته نمی‌شود | `share-audit.txt`, `db-integrity-review.txt` |
+| درخواست `POST` بدون بدنه به `/share` خطای ۴۰۰ می‌داد | کم | `src/app/api/projects/[id]/share/route.ts` | بدنه خالی ⇒ پیش‌فرض‌ها | `api` §۳ (بدنه خالی) |
+| بارگذاری ماژول اشتراک در لودر گزارش به‌صورت پویا (به‌دلیل وابستگی حلقه‌ای احتمالی) | کم | `src/lib/server/report-loader.ts` | ایمپورت ایستا؛ بررسی چرخه انجام شد | `tsc`, `build` |
 
 ---
 
@@ -161,8 +168,9 @@
 | اجراکننده | `scripts/migrate.ts` (`npm run db:migrate`)، دفتر `_hermiplan_migrations` (نام، checksum، زمان) |
 | حالت‌ها | `--status` فهرست اعمال‌شده/باقی‌مانده، `--dry-run` چاپ SQL بدون اجرا، تشخیص تغییر در فایل اعمال‌شده |
 | ویژگی | همه دستورات `IF NOT EXISTS`/`ADD COLUMN IF NOT EXISTS`؛ هیچ `DROP`/`RENAME`/`TRUNCATE` در مسیر ارتقا نیست |
-| آزمون واقعی | پایگاه خالی ⇒ `0001` و `0002` اعمال شد؛ `0002.rollback.sql` اعمال و سپس `0002` دوباره اعمال شد (بدون خطا) |
-| جداول | `projects`, `users`, `sessions`, `otp_codes`, `project_events`, `rate_limits`, `_hermiplan_migrations` |
+| آزمون واقعی | پایگاه خالی ⇒ `0001`+`0002`+`0003` اعمال شد؛ اجرای دوباره بی‌اثر («Nothing to do»)، دست‌کاری checksum رد شد (`migration-review.txt`)؛ `0003.rollback.sql`+`0002.rollback.sql` اعمال و سپس هر سه دوباره اعمال شدند (بدون خطا، `legacy-db.txt`) |
+| جداول | `projects`, `users`, `sessions`, `otp_codes`, `project_events`, `rate_limits`, `project_share_tokens`, `_hermiplan_migrations` |
+| کشف استقرار ناقص | `/api/health` در نبود هر یک از این جداول **۵۰۳ + `missingTables`** برمی‌گرداند |
 | ساختار آماده برای فاز بعد | در `docs` و `schema` فقط الگوی مالکیت/رخداد اضافه شد؛ جداول Company/ProjectMember/Role و… **عمداً ساخته نشدند** (بدون نیاز فعلی) |
 | مهاجرت production | **اجرا نشد و بدون تأیید شما اجرا نخواهد شد** |
 
@@ -174,35 +182,40 @@
 | --- | --- |
 | `npm run typecheck` | ✅ بدون خطا |
 | `npm run lint` | ✅ ۰ خطا / ۰ هشدار |
-| `npm test` | ✅ ۷ از ۷ مجموعه |
+| `npm test` | ✅ ۷ از ۷ مجموعه (با `DATABASE_URL` و بدون آن یکسان) |
 | ├ `scripts/engine-verification.ts` | ✅ ۸۱ بررسی مستقل |
-| ├ `scripts/engine-regressions.ts` | ✅ ۱۷۷ بررسی در ۱۴ بخش: FNLT، MSO، Milestone، Baseline، پیشرفت مقداری/مالی، EVM، تاریخ افزایش هزینه و فراداده نرخ، مدت/چرخه، چهار رابطه، فراخوانی مستقیم، تاریخ وضعیت، سیاست گرد کردن، راه‌حل تشخیص‌ها، خروجی گزارش HTML |
+| ├ `scripts/engine-regressions.ts` | ✅ ۱۹۱ بررسی در ۱۵ بخش: FNLT، MSO، Milestone، Baseline، پیشرفت مقداری/مالی، EVM، تاریخ افزایش هزینه و فراداده نرخ، مدت/چرخه، چهار رابطه، فراخوانی مستقیم، تاریخ وضعیت، راه‌حل تشخیص‌ها، خروجی گزارش HTML، **سیاست گرد کردن پول** |
 | ├ `scripts/engine-smoke.ts` | ✅ ✅ ALL ENGINE CHECKS PASSED |
 | ├ `scripts/edge-case-audit.ts` | ✅ ✅ EDGE-CASE AUDIT PASSED (شامل `NaN`/`Infinity` در هر ۵ مسیر خروجی) |
-| ├ `scripts/security-checks.ts` | ✅ ۲۴۹ بررسی |
+| ├ `scripts/security-checks.ts` | ✅ ۲۶۱ بررسی |
 | ├ `scripts/import-parser.test.ts` | ✅ ✅ IMPORT PARSER: ALL CHECKS PASSED |
 | └ `scripts/template-regression.ts` | ✅ ALL 10 TEMPLATES CLEAN (۲۱/۱۵۸/۱۹، ۱۴/۱۷۱/۱۴، ۱۳/۹۸/۱۱، ۱۱/۹۸/۱۱، ۱۵/۹۲/۱۴، ۱۱/۹۴/۱۰، ۱۳/۱۲۶/۱۳، ۱۱/۵۳/۹، ۱۱/۸۴/۱۱، ۱۰/۳۷/۱۰ و بودجه‌های متناظر بدون تغییر) |
-| `npm run build` | ✅ Next.js 16.2.6 — ۱۱ مسیر (۴ ایستا، ۷ پویا) |
-| `npm run test:api` (سرور در حال اجرا + PostgreSQL) | ✅ **۵۱ موفق / ۰ ناموفق / ۰ نادیده** |
-| `npm run db:migrate` روی پایگاه خالی | ✅ `0001` و `0002` اعمال شد |
-| بررسی حالت production (`next start`) | ✅ `/api/auth` ⇒ ۵۰۳ بدون افشای کد؛ `/api/health` ⇒ `{ok:true, schemaVersion:2, database:"ok", rateLimitStore:"postgres", smsConfigured:false}`؛ `/` و `/builder` ⇒ ۲۰۰ |
-| `npm ci` (اجرای واقعی) | ✅ `added 399 packages in 13s` — قفل و `package.json` هم‌خوان |
-| `scripts/legacy-db-check.ts` (سناریوی پایگاه نسخه قبل) | ✅ مهاجرت: ۲۱ بررسی · rollback: ۵ بررسی · اعمال مجدد: موفق — بدون از دست رفتن هیچ ردیف |
+| `npm run build` | ✅ Next.js 16.2.6 — ۱۲ مسیر؛ `/` و `/builder` پویا (برای nonce هر درخواست) |
+| `npm run test:api` (سرور تولیدی + PostgreSQL واقعی ۱۸٫۶) | ✅ **۸۰ موفق / ۰ ناموفق / ۶ نادیده** (نادیده‌ها فقط مسیر OTP است که در production بسته است) |
+| `npm run test:api` با `HERMIPLAN_ALLOW_DEMO_OTP=1` روی `next dev` | ✅ **۶۷ موفق / ۰ ناموفق / ۰ نادیده** |
+| `npm run db:migrate` روی پایگاه خالی | ✅ `0001`+`0002`+`0003` اعمال شد؛ اجرای دوباره بی‌اثر |
+| بررسی حالت production (`next start`) | ✅ `/api/auth` ⇒ ۵۰۳ بدون افشای کد؛ `/api/health` ⇒ `{ok:true, schemaVersion:3, database:"ok", rateLimitStore:"postgres", shareLinks:"postgres"}` (و در نبود مهاجرت، ۵۰۳ با `missingTables`)؛ `/` و `/builder` ⇒ ۲۰۰ |
+| `npm ci` (اجرای واقعی، از صفر) | ✅ `added 406 packages` و `EXIT=0` — قفل و `package.json` هم‌خوان |
+| `npm run test:csp` روی ۶ مسیر واقعی | ✅ **۶۶ بررسی** (`csp-review.txt`) |
+| `npm run test:db:integrity` | ✅ **۱۴ بررسی** (`db-integrity-review.txt`) |
+| `npm run db:share-audit` | ✅ فهرست لینک‌های فعال + علامت‌خوردن پروژه «منتشرشده پیش از ۰۰۰۳» (`share-audit.txt`) |
+| `scripts/legacy-db-check.ts` (سناریوی پایگاه نسخه قبل) | ✅ مهاجرت: **۲۵ بررسی** · rollback: **۶ بررسی** · اعمال مجدد: موفق — بدون از دست رفتن هیچ ردیف |
 | `production-smoke` روی `next start` | ✅ health ok، `/` و `/builder` ۲۰۰، گزارش ناشناس ۴۰۴، ورود بدون پیامک ۵۰۳، هدرهای امنیتی حاضر |
 
-سناریوهای یکپارچگی اجراشده (`api`): ساخت پروژه و مالکیت (۵)، جداسازی مستأجر و ۴۰۴ بدون
-افشا (۶)، خصوصی‌بودن گزارش و انتشار/لغو (۹)، ویرایش و ماندگاری (۴)، اعتبارسنجی و ۴۱۳ (۳)،
-OTP و انتقال پروژه مهمان (۱۰)، حذف (۲)، صحت بسته خروجی/CSV/JSON (۹)، محدودیت نرخ (۲).
+سناریوهای یکپارچگی اجراشده (`api`، ۸۰ بررسی + ۶ نادیده): ساخت پروژه و مالکیت (۵)، جداسازی
+مستأجر و ۴۰۴ بدون افشا (۶)، خصوصی‌بودن گزارش و انتشار/لغو (۹)، **بازبینی لینک اشتراک (۲۹)**،
+ویرایش و ماندگاری (۴)، اعتبارسنجی و ۴۱۳ (۳)، OTP و انتقال پروژه مهمان (۱۰)، حذف (۲)،
+صحت بسته خروجی/CSV/JSON (۹)، محدودیت نرخ (۲)، مسیرهای حریم خصوصی و هدرها.
 
 **اجرا نشد / اجرا نشدنی در این محیط (با دلیل):**
 
 | مورد | دلیل |
 | --- | --- |
-| اجرای مجموعه یکپارچگی روی PostgreSQL واقعیِ نصب‌شده | `psql`/`postgres` در محیط موجود نیست؛ از PGlite (سازگار با پروتکل PostgreSQL) روی پورت ۵۴۳۳ استفاده شد. SQL استاندارد است اما تفاوت‌های جزئی نسخه ممکن است باقی بماند. |
+| اجرای مجموعه روی **نسخه/میزبان PostgreSQL شما** (۱۵/۱۶/۱۷، pooler مثل Neon/Supabase) | محیط ما PostgreSQL 18.6 محلی است؛ نسخه و pooler شما آزموده نشده و نیازمند staging است. |
 | ارسال واقعی پیامک | کلید سرویس پیامک وجود ندارد؛ فقط مسیر ۵۰۳ و مسیر دمو آزموده شد. |
-| بررسی بصری موبایل/دسکتاپ و PDF چاپی | ابزار مرورگر در این نشست در دسترس نبود؛ ساخت HTML/گزارش از طریق API سنجیده شد، نه رندر بصری. |
+| بررسی بصری موبایل/دسکتاپ و PDF چاپی در مرورگر واقعی | Chromium به `libnspr4`/`libnss3` و root برای نصب نیاز دارد؛ جای آن رندر پیکسلی نمودار و قواعد A4 (`layout.txt`) و ساخت HTML/گزارش از طریق API سنجیده شد. |
 | استقرار روی Netlify و مهاجرت production | نیازمند تأیید صریح شما و دسترسی به پایگاه تولید؛ عمداً انجام نشد. |
-| سنجش زمان پاسخ در بار واقعی | بنچمارک قبلی پروژه (۲۰۰ فعالیت + بسته کامل ≈ ۷۷ms) بازسنجی نشد. |
+| ظرفیت Netlify تحت بار | فقط بار محلی سنجیده شد (۱۹۴٫۸ req/s تحلیل، p95 ۹۲ms)؛ cold start، سقف هم‌زمانی و pool میزبان آزموده نشده. |
 
 ---
 
@@ -219,7 +232,7 @@ OTP و انتقال پروژه مهمان (۱۰)، حذف (۲)، صحت بسته
 | CSRF (Origin/Sec-Fetch-Site) + SameSite=Lax + Secure در production | ✅ | `security` §۴ |
 | پاک‌سازی شماره موبایل (ارقام فارسی/عربی، قالب‌های بین‌المللی) | ✅ | `security` §۱ |
 | هدرهای سخت‌سازی (nosniff، DENY frame، Referrer-Policy، Permissions-Policy، HSTS، noindex گزارش) | ✅ | `curl -I` روی سرور تولیدی |
-| CSP سخت‌گیرانه با nonce | ✅ انجام شد | `src/middleware.ts`: `script-src` بدون `unsafe-inline`/`unsafe-eval` در production، `object-src 'none'`، `base-uri`، `form-action`، `frame-ancestors`؛ آزمون `npm run test:csp` (۲۲ بررسی) روی سرور تولیدی — ولی رندر مرورگری آزموده نشده |
+| CSP سخت‌گیرانه با nonce | ✅ انجام شد | `src/middleware.ts`: `script-src` بدون `unsafe-inline`/`unsafe-eval` در production، `object-src 'none'`، `base-uri`، `form-action`، `frame-ancestors`؛ آزمون `npm run test:csp` روی **۶ مسیر واقعی** (شامل گزارش مالک، لینک زنده، لینک باطل، توکن ناشناس) = ۶۶ بررسی — ولی رندر مرورگری آزموده نشده |
 | سقف حجم بدنه و اعتبارسنجی Zod در همه مسیرهای نوشتن | ✅ | `api` §۵ |
 | کوکی مهمان بدون مجوز خواندن از JS | ✅ | `api` §۱ |
 
@@ -247,10 +260,15 @@ OTP و انتقال پروژه مهمان (۱۰)، حذف (۲)، صحت بسته
 2. `DATABASE_URL` را با scope **Functions** تنظیم کنید (endpoint تجمیعی توصیه می‌شود).
 3. مهاجرت را **دستی و یک‌بار** اجرا کنید: `npm run db:status` سپس `npm run db:migrate`
    (پیش از آن `pg_dump`). این کار در بیلد انجام نمی‌شود.
-4. پس از استقرار: `curl /api/health` باید `ok:true` و `schemaVersion` جاری را برگرداند.
-5. **Rollback کد:** Deploys → last known-good → Publish. **Rollback پایگاه:**
-   `psql -f drizzle/0002_security_hardening.rollback.sql` (پس از بازبینی) و حذف ردیف متناظر از
-   `_hermiplan_migrations`؛ در غیر این صورت بازگردانی بکاپ.
+4. پس از استقرار: `curl /api/health` باید `ok:true` و `schemaVersion` جاری را برگرداند
+   (در نبود مهاجرت ۵۰۳ + `missingTables` می‌دهد).
+5. پیش از اطلاع‌رسانی انتشار: `npm run db:share-audit` را اجرا و پروژه‌های «لینک قدیمی»
+   (منتشرشده پیش از `0003`) را فهرست کنید؛ لینک UUID قدیمی آن‌ها دیگر کار نمی‌کند و باید
+   لینک تازه صادر شود.
+6. **Rollback کد:** Deploys → last known-good → Publish. **Rollback پایگاه:**
+   ابتدا `drizzle/0003_share_tokens.rollback.sql` و سپس `0002_security_hardening.rollback.sql`
+   (پس از بازبینی، جدیدترین اول) و حذف ردیف‌های متناظر از `_hermiplan_migrations`؛ در غیر این
+   صورت بازگردانی بکاپ.
 
 جزئیات کامل در `DEPLOYMENT.md` (بازنویسی‌شده در این بسته).
 
@@ -258,10 +276,11 @@ OTP و انتقال پروژه مهمان (۱۰)، حذف (۲)، صحت بسته
 
 ## ۷. پیشنهاد فاز بعد (به ترتیب اولویت)
 
-1. **توکن اشتراک گزارش**: توکن تصادفی ۲۵۶ بیتی، ذخیره‌شده به‌صورت هش، انقضا و ابطال مستقل از
-   `isPublic`؛ مسیر `/report/[id]?t=…` بدون نیاز به کوکی، با محدودیت نرخ و ثبت دسترسی.
-2. **آزمون یکپارچگی روی PostgreSQL واقعی در CI**: یک سرویس `postgres:17` در pipeline و اجرای
-   `npm run db:migrate && npm run test:api` تا تفاوت‌های PGlite پوشش داده شود.
+1. **برنامه ارتباطی لینک‌های قدیمی** (تنها کار باقی‌مانده اشتراک): پیش از انتشار، `db:share-audit`
+   اجرا و فهرست پروژه‌های «منتشرشده پیش از ۰۰۰۳» به مالکان اطلاع داده شود تا لینک تازه بسازند.
+2. **تثبیت آزمون PostgreSQL در CI**: سرویس `postgres:17` در pipeline و اجرای
+   `npm run db:migrate && npm run test:api && npm run test:db:integrity` تا نسخه‌های ۱۵/۱۶/۱۷ و
+   pooler میزبان هم پوشش داده شود (امروز روی ۱۸٫۶ محلی سنجیده شده است).
 3. **آزمون بصری خودکار (Playwright)** برای موبایل/دسکتاپ و چاپ A4 — تنها شکاف آزمونی شناخته‌شده.
 4. **مهاجرت به OTP مبتنی بر پروفایل مشتری** با پشتیبانی چند ارائه‌دهنده و لاگ تحویل (وضعیت
    ارسال/تحویل) تا «پیامک ارسال شد» قابل اثبات باشد.
@@ -279,7 +298,7 @@ OTP و انتقال پروژه مهمان (۱۰)، حذف (۲)، صحت بسته
 | معیار | وضعیت | توضیح |
 | --- | --- | --- |
 | توکن اشتراک گزارش (به‌جای UUID + پرچم عمومی) | ✅ انجام شد | `0003_share_tokens` + `/s/<token>`؛ فقط هش SHA-256 ذخیره می‌شود، ابطال فوری، انقضا اختیاری |
-| آزمون یکپارچگی روی PostgreSQL واقعی | ✅ انجام شد | PostgreSQL 18.6 واقعی: ۶۷/۰/۰ API، ۲۵ بررسی مهاجرت، ۱۱ بررسی هم‌زمانی/قید (`evidence/real-postgres.txt`) |
+| آزمون یکپارچگی روی PostgreSQL واقعی | ✅ انجام شد | PostgreSQL 18.6 واقعی: ۸۰/۰/۶ API (۸۴ بررسی شامل §۳-ب)، ۲۵ بررسی مهاجرت، ۱۴ بررسی هم‌زمانی/قید (`evidence/real-postgres.txt`, `db-integrity-review.txt`) |
 | بررسی بصری موبایل/دسکتاپ و PDF چاپی | ⚠️ جزئی | رندر پیکسلی نمودار (۳۶۰/۱۱۸۰)، قواعد A4 و پیش‌شرط‌های چیدمان آزموده شد؛ مرورگر واقعی در دسترس نبود (`libnspr4`/`libnss3` + root) |
 | CSP سخت‌گیرانه | ✅ انجام شد | nonce در هر درخواست، بدون `unsafe-inline` در script؛ `npm run test:csp` (۲۲ بررسی) |
 | ارسال واقعی پیامک | ❌ آزموده نشد | کلید سرویس موجود نبود؛ مسیر کد و مسیر ۵۰۳ آزموده شد |

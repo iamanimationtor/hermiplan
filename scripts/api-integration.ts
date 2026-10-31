@@ -50,6 +50,15 @@ async function dbQuery(text: string, params: unknown[] = []): Promise<string> {
   const result = await client.query(text, params);
   return String(result.rows[0] ? Object.values(result.rows[0])[0] ?? "" : "");
 }
+/** Executes a statement that returns no value (test fixtures only). */
+async function dbRun(text: string, params: unknown[] = []): Promise<number> {
+  if (!client) {
+    client = new Client({ connectionString: PG });
+    await client.connect();
+  }
+  const result = await client.query(text, params);
+  return result.rowCount ?? 0;
+}
 async function closeDb(): Promise<void> {
   if (client) {
     await client.end();
@@ -286,6 +295,72 @@ async function main() {
 
   const publicFlag = await dbQuery("select case when is_public then 't' else 'f' end from projects where id = $1", [id]);
   ok(publicFlag === "f", "پس از ابطال همه لینک‌ها، پروژه دوباره خصوصی است");
+
+  /* ------ ۳-ب. بازبینی سخت‌گیرانه: انقضا، ابطال، سقف لینک، افشا ------ */
+  console.log("\n▶ ۳-ب. بازبینی لینک اشتراک: انقضا، تکرارِ پس از ابطال، سقف، افشا");
+
+  // (۱) an expired link must stop working even though it was never revoked
+  const expiring = await call(owner, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
+  const expiringBody = JSON.parse(expiring.body || "{}") as { token?: string; tokenId?: string };
+  const expiringToken = expiringBody.token ?? "";
+  ok(expiringToken.length === 43, "لینک دارای تاریخ انقضا ساخته شد");
+  const aliveBeforeExpiry = await call(new Jar(), `/s/${expiringToken}`);
+  ok(aliveBeforeExpiry.status === 200, "پیش از انقضا لینک کار می‌کند", `got ${aliveBeforeExpiry.status}`);
+  // The API refuses to create an already-expired link, so expiry is forced here.
+  await dbRun("update project_share_tokens set expires_at = now() - interval '1 second' where id = $1", [
+    expiringBody.tokenId,
+  ]);
+  const afterExpiry = await call(new Jar(), `/s/${expiringToken}`);
+  ok(afterExpiry.status === 404, "پس از انقضا لینک فوراً ⇒ ۴۰۴", `got ${afterExpiry.status}`);
+  const stillNotRaw = await call(stranger, `/api/projects/${id}`);
+  ok(stillNotRaw.status === 404, "لینک منقضی هیچ دسترسی جانبی نمی‌دهد");
+
+  // (۲) revoking one link must not revoke its sibling, and a revoked link must
+  //     never come back to life after a new link is issued (no id reuse).
+  const siblingA = await call(owner, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
+  const siblingB = await call(owner, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
+  const tokenA = (JSON.parse(siblingA.body || "{}") as { token?: string }).token ?? "";
+  const bodyB = JSON.parse(siblingB.body || "{}") as { token?: string; tokenId?: string };
+  const tokenB = bodyB.token ?? "";
+  ok(tokenA !== tokenB, "دو لینک هم‌زمان توکن یکسان ندارند");
+  await call(owner, `/api/projects/${id}/share?tokenId=${(JSON.parse(siblingA.body || "{}") as { tokenId?: string }).tokenId}`, {
+    method: "DELETE",
+  });
+  ok((await call(new Jar(), `/s/${tokenA}`)).status === 404, "لینک باطل‌شده ⇒ ۴۰۴");
+  ok((await call(new Jar(), `/s/${tokenB}`)).status === 200, "ابطال یک لینک، لینک دیگر را نمی‌بندد");
+  await call(owner, `/api/projects/${id}/share?all=1`, { method: "DELETE" });
+  ok((await call(new Jar(), `/s/${tokenB}`)).status === 404, "ابطال همه ⇒ لینک دوم ۴۰۴");
+  const reissue = await call(owner, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
+  const reissuedToken = (JSON.parse(reissue.body || "{}") as { token?: string }).token ?? "";
+  ok(reissuedToken !== tokenB, "لینک تازه توکن تازه دارد");
+  ok((await call(new Jar(), `/s/${tokenB}`)).status === 404, "لینک باطل‌شده با صدور لینک جدید زنده نمی‌شود");
+  ok((await call(new Jar(), `/s/${reissuedToken}`)).status === 200, "لینک تازه کار می‌کند");
+
+  // (۳) hard cap on live links (bounded blast radius)
+  for (let index = 0; index < 9; index += 1) {
+    await call(owner, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
+  }
+  const overCap = await call(owner, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
+  ok(overCap.status === 409, "سقف ۱۰ لینک فعال اعمال می‌شود ⇒ ۴۰۹", `got ${overCap.status}`);
+
+  // (۴) CSRF on revocation
+  const crossOriginRevoke = await call(owner, `/api/projects/${id}/share?all=1`, {
+    method: "DELETE",
+    headers: { origin: "https://evil.example" },
+  });
+  ok(crossOriginRevoke.status === 403, "ابطال از دامنه دیگر رد می‌شود ⇒ ۴۰۳", `got ${crossOriginRevoke.status}`);
+
+  // (۵) the shared page must not expose owner controls or the project raw data
+  const sharedHtml = await call(new Jar(), `/s/${reissuedToken}`);
+  ok(sharedHtml.status === 200, "صفحه اشتراکی ۲۰۰ است");
+  ok(!sharedHtml.body.includes("ساخت لینک جدید"), "صفحه اشتراکی دکمه ساخت لینک ندارد");
+  ok(!sharedHtml.body.includes("ابطال همه لینک‌ها"), "صفحه اشتراکی کنترل ابطال ندارد");
+  ok(sharedHtml.body.includes("فقط‌خواندنی"), "صفحه اشتراکی صریحاً فقط‌خواندنی است");
+
+  // (۶) cleanup: revoke everything so the project ends private again
+  await call(owner, `/api/projects/${id}/share?all=1`, { method: "DELETE" });
+  const finalFlag = await dbQuery("select case when is_public then 't' else 'f' end from projects where id = $1", [id]);
+  ok(finalFlag === "f", "وضعیت نهایی: پروژه خصوصی است");
 
   const ownerReport = await call(owner, `/report/${id}`);
   ok(ownerReport.status === 200, "مالک همچنان گزارش را می‌بیند");

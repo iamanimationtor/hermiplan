@@ -135,6 +135,19 @@ Connection guidance:
   publish UUID-based links — they no longer work, by design.
 * Revoking: `DELETE /api/projects/:id/share?tokenId=…`, all at once with
   `?all=1`, or implicitly by `PATCH { isPublic: false }`.
+* At most **10 live links per project** (`409` beyond that); the count is done in
+  SQL, so revoked links never creep the cap upwards. `last_used_at` /
+  `use_count` are telemetry and are updated **at most once per minute per link**,
+  so viewing a shared report is not a write amplification vector.
+* **Legacy links (published before migration 0003):** a project with
+  `is_public = true` and no token is *not* reachable — UUIDs are not credentials,
+  so its old `/report/<uuid>` URL stops working. Nothing is backfilled and no
+  token is invented for existing rows: backfilling would either store a token in
+  plaintext or expose links the owner never issued. Run
+  `DATABASE_URL=… npm run db:share-audit` **before** announcing the release to
+  list the affected projects (read-only; `--json` for machines), then let each
+  owner re-issue a link from the report panel. `db-integrity` §۴ and
+  `docs/evidence/share-audit.txt` rehearse exactly this state.
 * The CSP is issued per request by `src/middleware.ts` with a nonce, so **do not**
   add a static `Content-Security-Policy` header in `next.config.ts` or at the CDN:
   it would conflict and drop the nonce. If you front the site with a CDN, make
@@ -198,7 +211,10 @@ command). Recommended:
 Run these against the production URL:
 
 ```bash
-curl -s https://<site>/api/health                 # {"ok":true}
+curl -s https://<site>/api/health
+# {"ok":true,"schemaVersion":3,"database":"ok","rateLimitStore":"postgres",
+#  "shareLinks":"postgres","smsConfigured":false}
+# 503 with "missingTables" means the migrations were not applied yet.
 curl -s -o /dev/null -w '%{http_code}\n' https://<site>/            # 200
 curl -s -o /dev/null -w '%{http_code}\n' https://<site>/builder     # 200
 curl -s -o /dev/null -w '%{http_code}\n' https://<site>/report/xxx  # 404

@@ -1,19 +1,11 @@
-# build — 2026-10-31T12:36:28Z  (after a clean npm ci)
-$ npm run build
-
-> build
-> next build
-
-▲ Next.js 16.2.6 (Turbopack)
-
-⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+# build — npm run build — 2026-10-31T12:50:59Z
   Creating an optimized production build ...
-✓ Compiled successfully in 8.9s
+✓ Compiled successfully in 8.2s
   Running TypeScript ...
-  Finished TypeScript in 7.5s ...
+  Finished TypeScript in 7.7s ...
   Collecting page data using 1 worker ...
   Generating static pages using 1 worker (0/2) ...
-✓ Generating static pages using 1 worker (2/2) in 157ms
+✓ Generating static pages using 1 worker (2/2) in 125ms
   Finalizing page optimization ...
 
 Route (app)
@@ -37,4 +29,3 @@ Route (app)
 ○  (Static)   prerendered as static content
 ƒ  (Dynamic)  server-rendered on demand
 
-EXIT=0

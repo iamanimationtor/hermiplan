@@ -14,6 +14,7 @@ import {
   readJson,
 } from "@/lib/server/http";
 import {
+  countActiveShareTokens,
   createShareToken,
   listShareTokens,
   revokeAllShareTokens,
@@ -21,6 +22,9 @@ import {
 } from "@/lib/server/share-token";
 
 export const dynamic = "force-dynamic";
+
+/** Hard cap on live links per project — bounded blast radius for a leaked list. */
+const MAX_ACTIVE_LINKS = 10;
 
 /**
  * Share links for the printable report.
@@ -97,9 +101,10 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   const { id } = await ctx.params;
   if (!isUuid(id)) return jsonError(400, "شناسه پروژه نامعتبر است");
 
+  // An empty body is a valid request ("just create a link with defaults").
   const parsedBody = await readJson(request);
   if (!parsedBody.ok) return jsonError(400, "بدنه درخواست معتبر نیست");
-  const body = parsedBody.body as { expiresAt?: unknown; label?: unknown };
+  const body = (parsedBody.body ?? {}) as { expiresAt?: unknown; label?: unknown };
 
   const expiry = parseExpiry(body.expiresAt);
   if (!expiry.ok) return jsonError(422, "تاریخ انقضای لینک باید تاریخی در آینده باشد");
@@ -111,9 +116,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     const { row, owner } = await loadOwnedProject(id);
     if (!row || !owner) return jsonError(404, "پروژه یافت نشد");
 
-    const existing = await listShareTokens(id);
-    if (existing.filter((token) => token.active).length >= 10) {
-      return jsonError(409, "حداکثر ۱۰ لینک فعال برای هر پروژه مجاز است؛ ابتدا یکی را باطل کنید");
+    const active = await countActiveShareTokens(id);
+    if (active >= MAX_ACTIVE_LINKS) {
+      return jsonError(
+        409,
+        `حداکثر ${MAX_ACTIVE_LINKS} لینک فعال برای هر پروژه مجاز است؛ ابتدا یکی را باطل کنید`,
+      );
     }
 
     const created = await createShareToken(id, { expiresAt: expiry.value, label: body.label ?? null });

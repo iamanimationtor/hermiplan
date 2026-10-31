@@ -7,7 +7,7 @@
 | --- | --- | --- |
 | `npm-ci.txt` | `npm ci --no-audit --no-fund` | نصب دقیق از `package-lock.json` بدون خطا |
 | `typecheck.txt` | `npx tsc --noEmit` | `EXIT=0` |
-| `lint.txt` | `npx eslint . -f json` | `errors 0 warnings 0` |
+| `lint.txt` | `npx eslint . -f json` | ۸۶ فایل · `errors 0 warnings 0` |
 | `tests.txt` | `npm test` (با `DATABASE_URL` صادرشده) | ۷ مجموعه سبز، `EXIT=0` — مجموعه به متغیرهای محیطی وابسته نیست |
 | `build.txt` | `npm run build` | `✓ Compiled successfully` |
 | `real-postgres.txt` | `db:status` + `select version()` | PostgreSQL واقعی، سه مهاجرت اعمال‌شده |
@@ -19,11 +19,17 @@
 | `db-integrity.txt` | `npm run test:db:integrity` | هم‌زمانی ۴۰ اتصال، قیدها، `VALIDATE CONSTRAINT` |
 | `load.txt` | `npm run test:load` | p50/p95/p99 و نرخ خطا |
 | `production-smoke.txt` | `next start` + `curl` | health، کدهای ۲۰۰/۴۰۴، هدرهای امنیتی |
+| `api-integration-review.txt` | `test:api` پس از بازبینی نهایی | **۸۰ موفق / ۰ ناموفق / ۶ نادیده** (۱۸ بررسی تازه: انقضا، ابطال مستقل، سقف ۱۰ لینک، CSRF، افشا) |
+| `csp-review.txt` | `test:csp` با مسیرهای واقعی (کوکی مالک + لینک زنده/باطل/ناشناس) | **۶۶ بررسی** روی ۶ مسیر واقعی |
+| `db-integrity-review.txt` | `test:db:integrity` | **۱۴ بررسی** (شامل §۴ پروژه «منتشرشده پیش از ۰۰۰۳») |
+| `health-probe.txt` | `curl` روی پایگاهی که مهاجرت نشده است | ۵۰۳ + `missingTables`؛ پس از `db:migrate` ⇒ ۲۰۰ |
+| `migration-review.txt` | اجرای دوباره `db:migrate` و دست‌کاری checksum | بیکار بودن اجرای دوباره و رد شدن drift |
+| `share-audit.txt` | `npm run db:share-audit` | فهرست لینک‌های فعال و علامت‌خوردن پروژه «منتشرشده پیش از مهاجرت» |
 
 ## بازتولید
 
 ```bash
-# ۱. نصب دقیق و بررسی ایستا
+# ۱. نصب دقیق و بررسی ایستا (۸۶ فایل)
 npm ci
 npx tsc --noEmit
 npx eslint . -f json

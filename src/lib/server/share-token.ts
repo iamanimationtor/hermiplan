@@ -158,15 +158,48 @@ export async function resolveShareToken(token: string): Promise<ResolvedShare | 
   if (row.revokedAt !== null) return null;
   if (row.expiresAt !== null && row.expiresAt.getTime() <= Date.now()) return null;
 
-  // Usage telemetry is best effort: it must never block reading a report.
+  /**
+   * Usage telemetry is best effort and **rate limited to one write per minute
+   * per token**: without the guard, every page view of a shared report would be
+   * a write, which turns a read-only endpoint into a cheap write amplifier. The
+   * condition lives in the SQL predicate, so concurrent views cannot both win.
+   * Consequently `use_count` counts "viewed minutes", not raw page views.
+   */
   try {
     await db
       .update(projectShareTokens)
       .set({ lastUsedAt: new Date(), useCount: sql`${projectShareTokens.useCount} + 1` })
-      .where(eq(projectShareTokens.id, row.tokenId));
+      .where(
+        and(
+          eq(projectShareTokens.id, row.tokenId),
+          or(
+            isNull(projectShareTokens.lastUsedAt),
+            sql`${projectShareTokens.lastUsedAt} < now() - interval '1 minute'`,
+          ),
+        ),
+      );
   } catch {
     /* ignored on purpose */
   }
 
   return { projectId: row.projectId, tokenId: row.tokenId };
+}
+
+/**
+ * Number of links that would currently grant access. Counted in SQL: deriving it
+ * from `listShareTokens` (which is capped and ordered) would let a project with
+ * many revoked links exceed the "10 active links" limit.
+ */
+export async function countActiveShareTokens(projectId: string): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(projectShareTokens)
+    .where(
+      and(
+        eq(projectShareTokens.projectId, projectId),
+        isNull(projectShareTokens.revokedAt),
+        or(isNull(projectShareTokens.expiresAt), sql`${projectShareTokens.expiresAt} > now()`),
+      ),
+    );
+  return Number(row?.count ?? 0);
 }

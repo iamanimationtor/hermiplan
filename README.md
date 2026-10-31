@@ -96,6 +96,7 @@ npm run dev                     # یا: npm run build && npm start
 | `npm run test:layout` | رندر واقعی نمودار (پیکسل)، قواعد چاپ A4 و پیش‌شرط‌های چیدمان موبایل |
 | `npm run test:db:integrity` | هم‌زمانی محدودیت نرخ، یکتایی/آبشاری‌شدن قیدها، `VALIDATE CONSTRAINT` |
 | `npm run test:load` | آزمون بار محلی با p50/p95/p99 و نرخ خطا |
+| `npm run db:share-audit` | بازبینی فقط‌خواندنی لینک‌های اشتراک و فهرست پروژه‌های «لینک قدیمی» (`--json` برای ماشین) |
 | `npm run build` | ساخت production |
 
 برای مجموعه یکپارچگی:

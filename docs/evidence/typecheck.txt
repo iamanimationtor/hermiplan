@@ -1,3 +1,2 @@
-# typecheck — 2026-10-31T12:39:06Z
-$ npx tsc --noEmit
+# typecheck — tsc --noEmit — 2026-10-31T12:50:44Z
 EXIT=0

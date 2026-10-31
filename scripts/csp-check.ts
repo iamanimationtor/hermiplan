@@ -21,6 +21,8 @@ import { request } from "node:http";
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:3200";
 const PATHS = (process.env.CSP_PATHS ?? "/,/builder").split(",").filter(Boolean);
+/** Optional cookie header, so owner-only and token-only routes can be checked. */
+const COOKIE = process.env.CSP_COOKIE ?? "";
 
 let checks = 0;
 let failures = 0;
@@ -43,7 +45,13 @@ function fetchPath(path: string): Promise<Fetched> {
   return new Promise((resolve, reject) => {
     const url = new URL(path, BASE);
     const req = request(
-      { hostname: url.hostname, port: url.port, path: url.pathname, method: "GET", headers: { accept: "text/html" } },
+      {
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname + url.search,
+        method: "GET",
+        headers: { accept: "text/html", ...(COOKIE ? { cookie: COOKIE } : {}) },
+      },
       (res) => {
         let body = "";
         res.setEncoding("utf8");
@@ -80,7 +88,11 @@ async function main() {
   for (const path of PATHS) {
     console.log(`▶ ${path}`);
     const page = await fetchPath(path);
-    check(page.status === 200, `${path} با کد ۲۰۰ پاسخ می‌دهد`, `status=${page.status}`);
+    // A route may legitimately answer 404 (unknown token / foreign project):
+    // what matters is that *every* response carries the policy, so 404 is only
+    // accepted when the path is explicitly marked as expected to be missing.
+    const expected = Number(process.env.CSP_EXPECT_404?.split(",").includes(path) ? 404 : 200);
+    check(page.status === expected, `${path} با کد ${expected} پاسخ می‌دهد`, `status=${page.status}`);
 
     const rawCsp = page.headers["content-security-policy"];
     const csp = Array.isArray(rawCsp) ? rawCsp[0] : rawCsp;

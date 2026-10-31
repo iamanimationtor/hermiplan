@@ -119,7 +119,7 @@
 
 | معیار | وضعیت | شاهد | آزمون | باقی‌مانده |
 | --- | --- | --- | --- | --- |
-| کلید خارجی، ایندکس، یکتایی، تراکنش، رخداد حسابرسی | ✅ | `drizzle/0001..0003` + `scripts/migrate.ts` | `docs/evidence/legacy-db.txt` — **۲۵ بررسی** روی پایگاه **نسخه قبل** (PostgreSQL 18.6 واقعی): FK، ۹ ایندکس، تبدیل `attempts`، جدول توکن، حفظ همه ردیف‌ها؛ `db-integrity` — **۱۱ بررسی** هم‌زمانی/قید | FK مالکیت به‌صورت `NOT VALID` اضافه شده (داده قدیمی معیوب مهاجرت را نمی‌شکند) |
+| کلید خارجی، ایندکس، یکتایی، تراکنش، رخداد حسابرسی | ✅ | `drizzle/0001..0003` + `scripts/migrate.ts` | `docs/evidence/legacy-db.txt` — **۲۵ بررسی** روی پایگاه **نسخه قبل** (PostgreSQL 18.6 واقعی): FK، ۹ ایندکس، تبدیل `attempts`، جدول توکن، حفظ همه ردیف‌ها؛ `db-integrity` — **۱۴ بررسی** هم‌زمانی/قید و سازگاری لینک قدیمی | FK مالکیت به‌صورت `NOT VALID` اضافه شده (داده قدیمی معیوب مهاجرت را نمی‌شکند) |
 | یتیم‌ها و تاریخچه | ✅ | `project_events` (انتشار/اشتراک)، `ON DELETE CASCADE`/`SET NULL` | `npm run test:db:integrity` §۳ روی **PostgreSQL واقعی**: کوئری یتیم‌ها (۰ ردیف) + `VALIDATE CONSTRAINT` موفق و سپس ROLLBACK | داده تولیدی شما در دسترس نیست؛ همان کوئری باید پیش از مهاجرت روی نسخه staging اجرا شود |
 | آماده‌سازی ساختار Company/CompanyMember/ProjectMember/Role/… (ساخت بدون نیاز ممنوع) | ✅ | `docs/AUDIT-REPORT.md` §۳ + بخش ۷ (طرح پیشنهادی) | — | جداول ساخته نشده‌اند (طبق درخواست شما: آماده‌سازی، نه ایجاد) |
 | قواعد چندمستأجری | ✅ | `schema.ts` (مالکیت کاربر/مهمان)، `README.md` §مدل دسترسی | `api-integration` §۲ | نقش‌های ریزدانه تا زمان نیاز محصول ساخته نمی‌شوند |
@@ -252,7 +252,7 @@
 | --- | --- | --- |
 | `npm-ci.txt` | `npm ci --no-audit --no-fund` | `added 399 packages in 13s` · EXIT=0 |
 | `typecheck.txt` | `npx tsc --noEmit` | EXIT=0 (بدون خروجی) |
-| `lint.txt` | `npx eslint . -f json` | ۸۴ فایل · ۰ خطا · ۰ هشدار |
+| `lint.txt` | `npx eslint . -f json` | ۸۶ فایل · ۰ خطا · ۰ هشدار |
 | `tests.txt` | `npm test` | ۷/۷ مجموعه: ۸۱ مستقل، **۱۹۱** رگرسیون (۱۵ بخش)، smoke، edge، **۲۶۱** امنیتی، import parser، ۱۰ قالب · EXIT=0 |
 | `evidence/README.md` | — | فهرست همه شواهد + فرمان بازتولید |
 | `build.txt` | `npm run build` | `✓ Compiled successfully in 9.8s` · ۱۲ مسیر · EXIT=0 |
@@ -260,10 +260,16 @@
 | `production-smoke.txt` | `next start` + curl | health `ok:true`, **schemaVersion 3**, `/` و `/builder` ۲۰۰، `/report/<uuid>` و `/s/<token>` نامعتبر ۴۰۴، هدر CSP و بقیه هدرها |
 | `real-postgres.txt` | سرور + `db:status` + `version()` | `PostgreSQL 18.6`، سه مهاجرت اعمال‌شده، فهرست جداول |
 | `api-integration.txt` | `npm run test:api` روی build تولیدی و PostgreSQL واقعی | **۶۲ موفق / ۰ ناموفق / ۶ نادیده** (مسیر OTP در production غیرفعال است) |
+| `api-integration-review.txt` | همان، پس از بازبینی نهایی (افزودن §۳-ب) | **۸۰ موفق / ۰ ناموفق / ۶ نادیده** — ۱۸ بررسی تازه: انقضا، ابطال مستقل/همه، سقف ۱۰ لینک، CSRF، عدم افشا |
 | `api-integration-otp.txt` | همان، با `HERMIPLAN_ALLOW_DEMO_OTP=1` روی `next dev` | **۶۷ موفق / ۰ ناموفق / ۰ نادیده** |
-| `csp.txt` | `npm run test:csp` | **۲۲ بررسی**: هدر CSP، بدون `unsafe-inline` در script، nonce همه اسکریپت‌های inline |
+| `csp.txt` | `npm run test:csp` | **۲۲ بررسی** روی `/` و `/builder` |
+| `csp-review.txt` | `CSP_PATHS=… npm run test:csp` | **۶۶ بررسی** روی ۶ مسیر واقعی: `/`، `/builder`، `/report/<uuid>` با کوکی مالک، `/s/<لینک زنده>`، `/s/<لینک باطل>` (۴۰۴)، `/s/<توکن ناشناس>` (۴۰۴) — همه با CSP و nonce |
 | `layout.txt` | `npm run test:layout` | **۲۴ بررسی**: رندر پیکسلی نمودار در ۳۶۰/۱۱۸۰ (بدون بریدگی)، A4، پیش‌شرط‌های موبایل |
 | `db-integrity.txt` | `npm run test:db:integrity` | **۱۱ بررسی**: هم‌زمانی ۴۰ اتصال، یکتایی هش، CASCADE، `VALIDATE CONSTRAINT` |
+| `db-integrity-review.txt` | همان + §۴ | **۱۴ بررسی** (شامل پروژه «منتشرشده پیش از ۰۰۰۳»: بدون توکن جعلی، علامت‌خوردن در بازبینی، برداشته‌شدن پس از صدور لینک) |
+| `health-probe.txt` | `curl /api/health` روی پایگاه مهاجرت‌نشده و سپس پس از `db:migrate` | **۵۰۳ + `missingTables`** ⇒ پس از مهاجرت **۲۰۰** با `schemaVersion:3` |
+| `migration-review.txt` | `db:migrate` دوباره + دست‌کاری checksum | اجرای دوباره: «Nothing to do»؛ checksum تغییرکرده: **رد با ‎EXIT=1**؛ پس از بازگردانی هش: پاک |
+| `share-audit.txt` | `npm run db:share-audit` (فقط‌خواندنی) | پروژه «منتشرشده پیش از ۰۰۰۳» در فهرست «لینک قدیمی» دیده شد؛ هیچ نوشتنی انجام نداد |
 | `load.txt` | `npm run test:load` | ۱۹۴٫۸ req/s تحلیل (p95 ۹۲ms) و ۱۱۱ req/s SSR (p95 ۱۴۳ms)، ۰ خطا |
 
 ---
@@ -282,13 +288,13 @@
 | `/report/[id]` | GET | **فقط مالک**؛ UUID هرگز مجوز نیست ⇒ ۴۰۴ | — | — | `api` §۳ (`production-smoke` هم ۴۰۴ داد) |
 | `/s/[token]` | GET | دارنده توکن معتبر (۲۵۶ بیتی، هش‌شده، منقضی‌نشده، باطل‌نشده)؛ وگرنه ۴۰۴ | ۲۴۰/دقیقه بر IP | — | `api` §۳ |
 | `/api/projects/[id]/share` | GET | مالک | ۱۲۰/دقیقه | ✔ (برای POST/DELETE) | `api` §۳ |
-| `/api/projects/[id]/share` | POST (ساخت لینک) | مالک | ۱۰/ساعت | ✔ | `api` §۳ (۲۰ سناریو) |
+| `/api/projects/[id]/share` | POST (ساخت لینک) | مالک | ۱۰/ساعت | ✔ | `api` §۳ + §۳-ب (۳۸ بررسی: سقف ۱۰ لینک ⇒ ۴۰۹، بدنه خالی مجاز) |
 | `/api/projects/[id]/share` | DELETE (ابطال یک/همه) | مالک | ۳۰/دقیقه | ✔ | `api` §۳ |
 | `/api/auth` | POST/DELETE | شماره موبایل + OTP؛ بدون سرویس پیامک ⇒ ۵۰۳ | ۱۲/دقیقه + ۵ ارسال/۱۵دقیقه + ۱۰ تأیید/۱۵دقیقه | ✔ | `api` §۶، `security` |
 | `/api/analyze` | POST | عمومی (محاسبه بدون ذخیره داده؛ ورودی از بدنه) | ۶۰/دقیقه | ✔ | `api` §۵، §۹ |
 | `/api/export` | POST | عمومی (تولید فایل از داده ارسالی) | ۳۰/دقیقه | ✔ | `api` §۸ |
 | `/api/market` | GET | عمومی، فقط خواندن کاتالوگ/فید | — | — | `smoke` |
-| `/api/health` | GET | عمومی، بدون داده حساس | — | — | `production-smoke` |
+| `/api/health` | GET | عمومی، بدون داده حساس؛ **۵۰۳ با `missingTables`** اگر مهاجرت اعمال نشده باشد | — | — | `production-smoke`، `health-probe` |
 
 نکته‌های امنیتی ثبت‌شده:
 - UUID هرگز مجوز نیست: تفکیک ۴۰۳/۴۰۴ حذف شد تا وجود پروژه افشا نشود (`api` §۲).
@@ -321,6 +327,23 @@
 | دستور مخرب | ندارد (بدون `DROP`/`RENAME`/`TRUNCATE` در مسیر ارتقا) |
 | اجرا روی محیط شما | **انجام نشد** — هیچ اتصالی به پایگاه production یا staging شما برقرار نشد |
 | اجرا روی محیط آزمون | **PostgreSQL 18.6 واقعی** (باینری `embedded-postgres`، بدون root/Docker) — سه پایگاه دورانداختنی: api-integration، سناریوی legacy، آزمون هم‌زمانی. قبلاً فقط PGlite بود |
+
+### ۳-۳ب. بازبینی نهایی لینک اشتراک، CSP و مهاجرت (این دور)
+
+پس از تحویل گزارش، همان موارد خواسته‌شده دوباره و سخت‌گیرانه بازبینی شد. نتیجه و اقدام:
+
+| مورد بازبینی | یافته | اقدام / شاهد |
+| --- | --- | --- |
+| رفتار لینک‌های قدیمی (`is_public=true` پیش از ۰۰۰۳، بدون توکن) | `/report/<uuid>` فقط مالک را می‌پذیرد و `/s/*` ناشناس ۴۰۴ می‌دهد؛ **هیچ توکنی جعل نمی‌شود** (backfill امن نیست: یا باید توکن را آشکار ذخیره کرد یا لینکی ساخت که مالک صادر نکرده) | ابزار فقط‌خواندنی `npm run db:share-audit` + بررسی §۴ در `db-integrity-check` + بند «لینک قدیمی» در `DEPLOYMENT.md` §۴ب |
+| کنترل دسترسی | مالک/غیرمالک، انقضا، ابطال تک‌تک/همه، صدور مجدد، سقف ۱۰ لینک، CSRF | `api-integration.txt` §۳-ب — **۱۸ بررسی، همه موفق** |
+| ابطال و توکن | لینک باطل/منقضی **بی‌تمایز ۴۰۴**؛ صدور لینک تازه لینک باطل‌شده را زنده نمی‌کند؛ ابطال یک لینک بقیه را نمی‌بندد | همان |
+| CSP روی مسیرهای واقعی | `/`، `/builder`، `/report/<uuid>` (با کوکی مالک)، `/s/<زنده|باطل|ناشناس>` | `csp-review.txt` — **۶۶ بررسی** |
+| سقف لینک فعال | شمارش از لیست کوتاه‌شده انجام می‌شد ⇒ قابل عبور؛ حالا `count(*)` در SQL | `src/lib/server/share-token.ts` → `countActiveShareTokens` |
+| تلمتری بازدید | هر بازدید یک `UPDATE` بود (تقویت نوشتن)؛ حالا حداکثر یک بار در دقیقه برای هر لینک | همان، با شرط در خود SQL |
+| بدنه خالی POST لینک | `body {}` پذیرفته می‌شود (پیش‌فرض‌ها) | `src/app/api/projects/[id]/share/route.ts` |
+| `/api/health` | در نبود مهاجرت «سبز» گزارش می‌کرد؛ حالا **۵۰۳ + فهرست جداول غایب** | `src/app/api/health/route.ts` + `health-probe.txt` |
+| هشدار عمومی گزارش | در هدر گزارش چاپی اکنون «داده تخمینی ⚠» + نوع/واحد دیده می‌شود | `src/components/report/ReportView.tsx` + رگرسیون §۱۴ |
+| مهاجرت روی داده موجود | اجرای دوباره بی‌اثر، drift رد می‌شود، ۰۰۰۳ فقط‌افزودنی | `migration-review.txt`، `legacy-db.txt` |
 
 ### ۳-۴. آزمون روی PostgreSQL واقعی — چه چیزی سنجیده شد و چه چیزی نه
 
