@@ -6,6 +6,7 @@ import { analyzeProject } from "@/lib/engine/analysis";
 import { parseProjectInput, reportOptionsSchema } from "@/lib/validation";
 import { getCurrentUser, getGuestToken, isProjectOwner } from "@/lib/server/auth";
 import { revokeAllShareTokens } from "@/lib/server/share-token";
+import { saveProjectRevision } from "@/lib/server/project-versions";
 import { checkRateLimit, RATE_RULES, clientKey, retryAfterHeaders } from "@/lib/server/rate-limit";
 import {
   csrfRejection,
@@ -80,6 +81,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
     reportOptions: row.reportOptions,
     isPublic: row.isPublic,
     shareExpiresAt: row.shareExpiresAt,
+    version: row.version,
     updatedAt: row.updatedAt,
   });
 }
@@ -113,7 +115,14 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     reportOptions?: unknown;
     isPublic?: unknown;
     shareExpiresAt?: unknown;
+    expectedVersion?: unknown;
   };
+
+  let expectedVersion: number | undefined;
+  if (body.expectedVersion !== undefined) {
+    if (!Number.isInteger(body.expectedVersion)) return jsonError(422, "شماره نسخه نامعتبر است");
+    expectedVersion = body.expectedVersion as number;
+  }
 
   const expiry = parseShareExpiry(body.shareExpiresAt);
   if (body.shareExpiresAt !== undefined && expiry === undefined) {
@@ -170,23 +179,34 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
 
   const analysis = analyzeProject(input);
 
+  // One transaction: revision number, snapshot and prune. `expectedVersion`
+  // turns a concurrent edit into 409 instead of a silent overwrite.
+  let outcome;
   try {
-    await db
-      .update(projects)
-      .set({
-        input,
-        analysis,
-        reportOptions,
-        isPublic: body.isPublic ?? row.isPublic,
-        shareExpiresAt: expiry === undefined ? row.shareExpiresAt : expiry,
-        name: input.meta.name,
-        projectType: input.meta.type,
-        updatedAt: new Date(),
-      })
-      .where(eq(projects.id, id));
+    outcome = await saveProjectRevision({
+      projectId: id,
+      input,
+      reportOptions,
+      name: input.meta.name,
+      projectType: input.meta.type,
+      isPublic: body.isPublic ?? row.isPublic,
+      shareExpiresAt: expiry === undefined ? row.shareExpiresAt : expiry,
+      analysis,
+      expectedVersion,
+      actor: { kind: row.ownerUserId ? "owner" : "guest", userId: row.ownerUserId },
+    });
   } catch (error) {
     return internalErrorResponse(error, "projects/:id", "ذخیره پروژه ناموفق بود");
   }
+
+  if (outcome.status === "conflict") {
+    return jsonError(
+      409,
+      "این پروژه از جای دیگری تغییر کرده است؛ نسخه تازه را بارگذاری کنید و ویرایش را دوباره اعمال کنید",
+      { currentVersion: outcome.currentVersion },
+    );
+  }
+  if (outcome.status === "missing") return jsonError(404, "پروژه یافت نشد");
 
   if (body.isPublic === false) await revokeAllShareTokens(id);
 
@@ -194,6 +214,8 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     activities: input.activities.length,
     workingDays: analysis.schedule.workingDays,
     estimate: analysis.pricing.breakdown.total,
+    version: outcome.version,
+    unchanged: outcome.unchanged,
   });
 
   return jsonOk({
@@ -201,6 +223,8 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     ok: analysis.errors.length === 0,
     isPublic: body.isPublic ?? row.isPublic,
     shareExpiresAt: expiry === undefined ? row.shareExpiresAt : expiry,
+    version: outcome.version,
+    unchanged: outcome.unchanged,
   });
 }
 

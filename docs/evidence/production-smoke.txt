@@ -1,6 +1,6 @@
-# production smoke — next start + real PostgreSQL 18.6 — 2026-10-31T14:00:07Z
+# production smoke — next start + real PostgreSQL 18.6 — 2026-10-31T15:01:09Z
 $ curl -s http://127.0.0.1:3400/api/health
-{"ok":true,"schemaVersion":3,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","smsConfigured":false}
+{"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false}
 /                                                    200
 /builder                                             200
 /robots.txt                                          200
@@ -9,28 +9,11 @@ $ curl -s http://127.0.0.1:3400/api/health
 /s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa       404
 /api/projects                                        200
 
-## headers (/builder)
+## security headers (/builder)
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
 Strict-Transport-Security: max-age=31536000; includeSubDomains
-content-security-policy: default-src 'self'; script-src 'self' 'nonce-MDkxYjAwNWMtMzhmYi00NGFjLWE5ZDMtYjNmZDBjOTRmZGMy' 'strict-dynamic'; style-src 'self' 'unsa
-Content-Type: text/html; charset=utf-8
-
-## robots.txt
-User-Agent: *
-Allow: /
-Allow: /builder
-Disallow: /api/
-Disallow: /report/
-Disallow: /s/
-
-Host: https://hermiplan.netlify.app
-Sitemap: https://hermiplan.netlify.app/sitemap.xml
-
-## sitemap.xml
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-<url>
-<loc>https://hermiplan.netlify.app/</loc>
-<lastmod>2026-10-31T13:58:22.424Z</lastmod>
+content-security-policy: default-src 'self'; script-src 'self' 'nonce-ODQ0ODE4MmEtOTc5My00ZTM0LTg1NDMtMTc3Y2Q4MzZmZWZm' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'; media-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate

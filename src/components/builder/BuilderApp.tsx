@@ -47,6 +47,14 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedList, setSavedList] = useState<SavedProject[] | null>(null);
+  /**
+   * The server copy this builder session is working on. "Generate report" used
+   * to create a *new* project every time, which meant a second run silently
+   * duplicated the project and its history was never updated. Now the same
+   * project is revised in place: the revision number is sent with the save so a
+   * concurrent edit is refused instead of overwritten.
+   */
+  const [serverProject, setServerProject] = useState<{ id: string; version: number } | null>(null);
   const [stepsOpen, setStepsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -140,10 +148,57 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
         }),
       });
       if (!response.ok) throw new Error("failed");
-      const data = (await response.json()) as { id: string };
+      const data = (await response.json()) as { id: string; version?: number };
+      setServerProject({ id: data.id, version: data.version ?? 1 });
       router.push(`/report/${data.id}?deliver=1`);
     } catch {
       setError("تولید گزارش ناموفق بود. لطفاً دوباره تلاش کنید.");
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Saves the current builder state into the project it came from and opens its
+   * report. Falls back to creating a project when there is nothing to update (or
+   * the server copy is gone), and reports a 409 honestly instead of overwriting.
+   */
+  async function saveAndOpenReport() {
+    if (!serverProject) return generateReport();
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/projects/${serverProject.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project: current,
+          reportOptions: {
+            sections: reportSections,
+            includeNotes: true,
+            includeGanttDependencyArrows: true,
+            ganttScale: "day",
+            theme: "print",
+            author: current.meta.manager,
+          },
+          expectedVersion: serverProject.version,
+        }),
+      });
+      if (response.status === 404) {
+        setServerProject(null);
+        return await generateReport();
+      }
+      if (response.status === 409) {
+        setError("این گزارش از جای دیگری تغییر کرده است. برای جلوگیری از بازنویسی، نسخه تازه را از فهرست پروژه‌ها باز کنید.");
+        setServerProject(null);
+        return;
+      }
+      if (!response.ok) throw new Error("failed");
+      const data = (await response.json()) as { version?: number };
+      setServerProject({ id: serverProject.id, version: data.version ?? serverProject.version });
+      router.push(`/report/${serverProject.id}?deliver=1`);
+    } catch {
+      setError("ذخیره پروژه ناموفق بود. لطفاً دوباره تلاش کنید.");
+    } finally {
       setBusy(false);
     }
   }
@@ -162,9 +217,10 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
   async function loadSaved(id: string) {
     try {
       const response = await fetch(`/api/projects/${id}`);
-      const data = (await response.json()) as { project: ProjectInput };
+      const data = (await response.json()) as { project: ProjectInput; version?: number };
       if (data.project) {
         api.replace(data.project);
+        setServerProject({ id, version: data.version ?? 1 });
         setSavedList(null);
       }
     } catch {
@@ -263,8 +319,8 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
             >
               ؟
             </button>
-            <Button size="sm" onClick={generateReport} disabled={busy}>
-              {busy ? "…" : "تولید گزارش"}
+            <Button size="sm" onClick={saveAndOpenReport} disabled={busy}>
+              {busy ? "…" : serverProject ? "به‌روزرسانی گزارش" : "تولید گزارش"}
             </Button>
           </div>
         </div>
@@ -346,8 +402,12 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
             {step < STEPS.length - 1 ? (
               <Button onClick={() => setStep((s) => s + 1)}>مرحله بعد</Button>
             ) : (
-              <Button variant="accent" onClick={generateReport} disabled={busy}>
-                {busy ? "در حال تولید…" : "ساخت نهایی پروژه و دریافت خروجی"}
+              <Button variant="accent" onClick={saveAndOpenReport} disabled={busy}>
+                {busy
+                  ? "در حال تولید…"
+                  : serverProject
+                    ? "ذخیره نسخه تازه و دریافت خروجی"
+                    : "ساخت نهایی پروژه و دریافت خروجی"}
               </Button>
             )}
           </div>
@@ -474,7 +534,7 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
         ) : (
           <button
             type="button"
-            onClick={generateReport}
+            onClick={saveAndOpenReport}
             disabled={busy}
             className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-accent-500 text-[16px] text-ink-950 transition active:scale-95 disabled:opacity-50"
             aria-label="ساخت نهایی پروژه"

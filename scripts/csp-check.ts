@@ -85,6 +85,12 @@ function originOf(url: string): string | null {
 }
 
 async function main() {
+  if (PATHS.length === 0) {
+    // An empty CSP_PATHS must never look like a pass: only the two nonce checks
+    // would run, so a broken route list would go unnoticed.
+    console.error("CSP_PATHS is empty — refusing to report a passing run.");
+    process.exit(2);
+  }
   for (const path of PATHS) {
     console.log(`▶ ${path}`);
     const page = await fetchPath(path);
@@ -137,7 +143,9 @@ async function main() {
     }
     if (origins.size === 0) check(true, "هیچ منبع بیرونی در HTML صفحه فراخوانی نمی‌شود");
 
-    // The stylesheet itself imports the webfont from jsDelivr.
+    // A stylesheet-level @import is a second way to pull in a third-party
+    // origin; it must also be covered by the policy. (The webfont is
+    // self-hosted now, so this is normally empty — the check stays as a guard.)
     const cssOrigin = (page.body.match(/@import\s+url\("?(https?:\/\/[^")]+)/) ?? [])[1];
     if (cssOrigin) {
       const origin = originOf(cssOrigin);

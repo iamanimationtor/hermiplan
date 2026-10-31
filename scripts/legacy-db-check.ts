@@ -15,7 +15,7 @@
  *   DATABASE_URL=… npx tsx scripts/legacy-db-check.ts rollback
  *   DATABASE_URL=… npx tsx scripts/legacy-db-check.ts verify-rollback
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client } from "pg";
 
@@ -32,6 +32,14 @@ const check = (condition: boolean, message: string, detail?: string) => {
     console.error(`  ✗ ${message}${detail ? ` — ${detail}` : ""}`);
   }
 };
+/** Migration files in apply order — the ledger must match them exactly. */
+function migrationVersions(): string[] {
+  return readdirSync(join(process.cwd(), "drizzle"))
+    .filter((file) => file.endsWith(".sql") && !file.endsWith(".rollback.sql"))
+    .map((file) => file.replace(/\.sql$/, ""))
+    .sort();
+}
+
 const eq = (actual: unknown, expected: unknown, message: string) =>
   check(actual === expected, message, `got ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`);
 
@@ -216,8 +224,8 @@ async function main() {
     );
     eq(
       ledger.rows.map((r) => r.version).join(","),
-      "0001_baseline,0002_security_hardening,0003_share_tokens",
-      "دفتر مهاجرت هر سه فایل را ثبت کرد",
+      migrationVersions().join(","),
+      "دفتر مهاجرت همه فایل‌ها را ثبت کرد",
     );
 
     // 0003 — share tokens: additive only, so the legacy rows must be untouched.
@@ -240,11 +248,40 @@ async function main() {
     check(shareIndexNames.includes("project_share_tokens_hash_idx"), "ایندکس یکتای هش توکن ساخته شد");
     const countsAfter = await client.query<{ projects: number }>('select count(*)::int as projects from "projects"');
     eq(countsAfter.rows[0]?.projects, 2, "مهاجرت ۰۰۰۳ هیچ پروژه‌ای را حذف نکرد");
+
+    // 0004 — revision history. Additive: the legacy projects are untouched and
+    // simply start at version 1 without a back-filled snapshot.
+    const historyTable = await client.query(
+      "select 1 from information_schema.tables where table_name = 'project_versions'",
+    );
+    eq(historyTable.rowCount, 1, "جدول project_versions ساخته شد");
+    const versionColumn = await client.query<{ column_default: string | null; is_nullable: string }>(
+      `select column_default, is_nullable from information_schema.columns
+        where table_name = 'projects' and column_name = 'version'`,
+    );
+    eq(versionColumn.rows[0]?.column_default, "1", "ستون projects.version با پیش‌فرض ۱ اضافه شد");
+    eq(versionColumn.rows[0]?.is_nullable, "NO", "ستون version اجباری است");
+    const versionsOfLegacy = await client.query<{ version: number }>('select version from "projects" order by created_at');
+    check(
+      versionsOfLegacy.rows.every((row) => row.version === 1),
+      "پروژه‌های قدیمی از نسخه ۱ شروع می‌کنند",
+    );
+    const historyRows = await client.query<{ count: number }>(
+      "select count(*)::int as count from project_versions",
+    );
+    eq(historyRows.rows[0]?.count, 0, "تاریخچه برای پروژه‌های قدیمی از پیش پر نمی‌شود (بی‌دلیل حجم داده دو برابر نمی‌شود)");
+    const historyFk = await client.query<{ delete_rule: string }>(
+      `select rc.delete_rule
+         from information_schema.referential_constraints rc
+         join information_schema.table_constraints tc on tc.constraint_name = rc.constraint_name
+        where tc.table_name = 'project_versions'`,
+    );
+    eq(historyFk.rows[0]?.delete_rule, "CASCADE", "حذف پروژه، تاریخچه آن را هم پاک می‌کند (CASCADE)");
   }
 
   if (PHASE === "rollback") {
     // Newest first: 0003, then 0002 — the order a real operator would use.
-    for (const file of ["0003_share_tokens.rollback.sql", "0002_security_hardening.rollback.sql"]) {
+    for (const file of ["0004_project_versions.rollback.sql", "0003_share_tokens.rollback.sql", "0002_security_hardening.rollback.sql"]) {
       console.log(`▶ اجرای rollback رسمی ${file}`);
       const sql = readFileSync(join(process.cwd(), "drizzle", file), "utf8");
       await client.query(sql);
@@ -276,6 +313,18 @@ async function main() {
       "select 1 from information_schema.tables where table_name = 'project_share_tokens'",
     );
     eq(shareTable.rowCount, 0, "جدول لینک‌های اشتراک در rollback حذف شد");
+    const historyTable = await client.query(
+      "select 1 from information_schema.tables where table_name = 'project_versions'",
+    );
+    eq(historyTable.rowCount, 0, "جدول تاریخچه در rollback حذف شد");
+    const versionColumn = await client.query<{ data_type: string }>(
+      "select data_type from information_schema.columns where table_name = 'projects' and column_name = 'version'",
+    );
+    eq(versionColumn.rowCount, 0, "ستون version حذف شد (کد نسخه قبلی بدون آن کار می‌کند)");
+    const countsAfterRollback = await client.query<{ projects: number }>(
+      'select count(*)::int as projects from "projects"',
+    );
+    eq(countsAfterRollback.rows[0]?.projects, 2, "بازگشت ۰۰۰۴ هیچ پروژه‌ای را حذف نکرد");
   }
 
   await client.end();

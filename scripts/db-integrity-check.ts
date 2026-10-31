@@ -19,7 +19,7 @@
  * Usage:
  *   DATABASE_URL=postgresql://…/hermiplan_conc npx tsx scripts/db-integrity-check.ts
  */
-import { Client } from "pg";
+import { Client, Pool } from "pg";
 import { randomUUID } from "node:crypto";
 
 const URL = process.env.DATABASE_URL;
@@ -253,6 +253,65 @@ async function legacyPublishedProject(): Promise<void> {
       [projectId],
     );
     check(afterIssue.rows[0]?.legacy === false, "پس از صدور لینک تازه، وضعیت «قدیمی» برداشته می‌شود");
+
+    /* ---------- ۵. تاریخچه نسخه‌ها: یکتایی و هم‌زمانی ---------- */
+    console.log("\n▶ ۵. تاریخچه نسخه‌ها: یکتایی، آبشار و هم‌زمانی");
+
+    const insertSnapshot = (version: number) =>
+      client.query(
+        `INSERT INTO project_versions (project_id, version, reason, input, checksum, size_bytes, activities)
+         VALUES ($1, $2, 'autosave', '{"meta":{},"activities":[]}'::jsonb, $3, 10, 0)`,
+        [projectId, version, `checksum-${version}`],
+      );
+
+    await insertSnapshot(1);
+    check(true, "ثبت نسخه اول موفق است");
+
+    let duplicate = false;
+    try {
+      await insertSnapshot(1);
+    } catch (error) {
+      duplicate = /duplicate key|unique/i.test(error instanceof Error ? error.message : "");
+    }
+    check(duplicate, "قید یکتایی (project_id, version) تکرار نسخه را رد می‌کند");
+
+    // 24 concurrent writers racing for the same revision: exactly one wins.
+    // Each writer gets its own connection — reusing one client would serialise
+    // the queries and prove nothing about concurrent inserts.
+    const pool = new Pool({ connectionString: URL, max: 24 });
+    const raced = await Promise.allSettled(
+      Array.from({ length: 24 }, () =>
+        pool
+          .query(
+            `INSERT INTO project_versions (project_id, version, reason, input, checksum, size_bytes, activities)
+             VALUES ($1, 7, 'autosave', '{"meta":{},"activities":[]}'::jsonb, $2, 10, 0)`,
+            [projectId, `race-${randomUUID()}`],
+          )
+          .then(() => true)
+          .catch(() => false),
+      ),
+    );
+    await pool.end();
+    const winners = raced.filter((result) => result.status === "fulfilled" && result.value === true).length;
+    check(winners === 1, "از ۲۴ نویسنده هم‌زمان، فقط یکی نسخه ۷ را ثبت می‌کند", `winners=${winners}`);
+
+    const projectVersionDefault = await client.query<{ column_default: string }>(
+      "select column_default from information_schema.columns where table_name = 'projects' and column_name = 'version'",
+    );
+    check(projectVersionDefault.rows[0]?.column_default === "1", "پیش‌فرض projects.version برابر ۱ است");
+
+    const historyCount = await client.query<{ c: number }>(
+      "SELECT count(*)::int AS c FROM project_versions WHERE project_id = $1",
+      [projectId],
+    );
+    check(historyCount.rows[0].c === 2, "دو نسخه ثبت‌شده است (۱ و ۷)", `count=${historyCount.rows[0].c}`);
+
+    await client.query("DELETE FROM projects WHERE id = $1", [projectId]);
+    const orphanedHistory = await client.query<{ c: number }>(
+      "SELECT count(*)::int AS c FROM project_versions WHERE project_id = $1",
+      [projectId],
+    );
+    check(orphanedHistory.rows[0].c === 0, "حذف پروژه، کل تاریخچه را آبشاری پاک می‌کند");
   } finally {
     await client.query("DELETE FROM projects WHERE id = $1", [projectId]).catch(() => undefined);
     await client.end();

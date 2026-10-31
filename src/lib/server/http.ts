@@ -20,6 +20,8 @@ export interface ApiErrorBody {
   /** field-level problems for 422 responses (message text only, no internals) */
   issues?: { path: string; message: string }[];
   retryAfterSeconds?: number;
+  /** present on 409 responses: the revision the server currently holds */
+  currentVersion?: number;
 }
 
 export function jsonError(

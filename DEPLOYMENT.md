@@ -69,18 +69,26 @@ scope variables to Builds only, requests will fail at runtime.
 ## 4. Production database and safe migrations
 
 The schema lives in `src/db/schema.ts`; the versioned SQL lives in `drizzle/`
-(`0001_baseline.sql`, `0002_security_hardening.sql`, `0003_share_tokens.sql`, each
-with a matching `*.rollback.sql`). They are applied by **`scripts/migrate.ts`**,
+(`0001_baseline.sql`, `0002_security_hardening.sql`, `0003_share_tokens.sql`,
+`0004_project_versions.sql`, each with a matching `*.rollback.sql`). They are applied by **`scripts/migrate.ts`**,
 never during the site build, so a deploy cannot alter data automatically.
 
 `0003_share_tokens` is **purely additive**: it creates the table
 `project_share_tokens` (hashed share links) and touches no existing row. Until it
 is applied, the `/s/<token>` route returns 404 — reports stay owner-only, which
-is the safe direction. It has been rehearsed end-to-end on a real PostgreSQL 18.6
-server rebuilt from the previous release's schema (`docs/evidence/legacy-db.txt`:
-prepare → migrate 0001+0002+0003 → 25 checks → rollback 0003+0002 → 6 checks),
-and the runner itself is covered by `npm run db:migration-safety`
-(`docs/evidence/migration-safety.txt`: 25 checks incl. a full rollback → rebuild
+is the safe direction.
+
+`0004_project_versions` is also **purely additive**: it adds `projects.version`
+(default 1) and the `project_versions` table. Existing projects are not
+back-filled — their history starts with the first save after the deploy, so the
+migration does not duplicate every stored project. Until it is applied the
+application still works, but nothing is versioned.
+
+Both have been rehearsed end-to-end on a real PostgreSQL 18.6 server rebuilt from
+the previous release's schema (`docs/evidence/legacy-db.txt`: prepare → migrate
+0001+0002+0003+0004 → 31 checks → rollback 0004+0003+0002 → 9 checks), and the
+runner itself is covered by `npm run db:migration-safety`
+(`docs/evidence/migration-safety.txt`: 31 checks incl. a full rollback → rebuild
 rehearsal).
 
 ```bash
@@ -110,7 +118,8 @@ How the runner protects you:
 
 **Rollback:** every migration ships with a paired `*.rollback.sql` that removes
 exactly what it added. Apply the newest first
-(`drizzle/0003_share_tokens.rollback.sql`, then
+(`drizzle/0004_project_versions.rollback.sql`, then
+`drizzle/0003_share_tokens.rollback.sql`, then
 `drizzle/0002_security_hardening.rollback.sql`). Each rollback file deletes its
 own `_hermiplan_migrations` row in the same transaction, so a later
 `npm run db:migrate` re-applies it instead of silently believing the schema is
@@ -132,15 +141,18 @@ that each migration has a rollback, that a second `db:migrate` is a no-op, that 
 tampered checksum aborts the run, and — with
 `MIGRATION_SAFETY_ROLLBACK=1` on a **disposable** database — that the baseline
 rollback stays blocked without the confirmation table and that
-rollback → `db:migrate` reproduces an identical schema
-(`docs/evidence/migration-safety.txt`).
+rollback → `db:migrate` reproduces an identical schema. It also asserts that the
+numbered rollbacks really remove what they added (`project_versions`,
+`project_share_tokens`, `rate_limits`, `projects.version`) and that re-applying
+them restores the column defaults — 31 checks in
+`docs/evidence/migration-safety.txt`.
 
 **Step-by-step production runbook:** `docs/RUNBOOK-PRODUCTION-MIGRATION.md`
 (preflight → backup → migrate → deploy → verify → legacy-link communication →
 rollback), with the expected output of every step.
 
 The schema has no destructive statement: `0001` creates tables `IF NOT EXISTS`,
-`0002` only adds tables/columns/constraints/indexes. Nothing is dropped or
+`0002`/`0003`/`0004` only add tables/columns/constraints/indexes. Nothing is dropped or
 renamed, so an existing database deployed with `drizzle-kit push` keeps working
 after `npm run db:migrate`.
 
@@ -250,7 +262,7 @@ Run these against the production URL:
 
 ```bash
 curl -s https://<site>/api/health
-# {"ok":true,"schemaVersion":3,"database":"ok","rateLimitStore":"postgres",
+# {"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres",
 #  "shareLinks":"postgres","smsConfigured":false}
 # 503 with "missingTables" means the migrations were not applied yet.
 curl -s -o /dev/null -w '%{http_code}\n' https://<site>/            # 200

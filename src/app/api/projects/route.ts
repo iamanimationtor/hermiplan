@@ -5,6 +5,7 @@ import { projectEvents, projects } from "@/db/schema";
 import { analyzeProject } from "@/lib/engine/analysis";
 import { parseProjectInput, reportOptionsSchema } from "@/lib/validation";
 import { ensureGuestToken, getCurrentUser, getGuestToken } from "@/lib/server/auth";
+import { recordProjectCreation } from "@/lib/server/project-versions";
 import { checkRateLimit, RATE_RULES, clientKey, retryAfterHeaders } from "@/lib/server/rate-limit";
 import {
   csrfRejection,
@@ -108,7 +109,12 @@ export async function POST(request: Request) {
       console.error("[projects] audit event failed:", error);
     }
 
-    return jsonOk({ id: row.id, ok: analysis.errors.length === 0, isPublic: false }, 201);
+    await recordProjectCreation(row.id, input, reportOptions, {
+      kind: user ? "owner" : "guest",
+      userId: user?.id ?? null,
+    });
+
+    return jsonOk({ id: row.id, ok: analysis.errors.length === 0, isPublic: false, version: 1 }, 201);
   } catch (error) {
     return internalErrorResponse(error, "projects", "ذخیره پروژه ناموفق بود");
   }

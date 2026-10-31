@@ -36,6 +36,12 @@ export const projects = pgTable(
     input: jsonb("input").$type<ProjectInput>().notNull(),
     analysis: jsonb("analysis").$type<ProjectAnalysis>(),
     reportOptions: jsonb("report_options").$type<ReportOptions>(),
+    /**
+     * Revision counter. Every content change increments it and writes a row in
+     * `project_versions` under the same number, so a client can send the version
+     * it edited from (`expectedVersion`) and never overwrite a newer save.
+     */
+    version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -137,6 +143,40 @@ export const projectShareTokens = pgTable(
 );
 
 /**
+ * Project revision history.
+ *
+ * One immutable row per accepted content change: the full input, the report
+ * options, a checksum (for de-duplication) and who made the change. The current
+ * state stays in `projects`; this table exists so a mistake is recoverable.
+ *
+ * `reason` is one of `create` | `autosave` | `restore` | `pre-restore` and is
+ * shown to the owner in Persian through `versionReasonLabel()`.
+ */
+export const projectVersions = pgTable(
+  "project_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    reason: text("reason").notNull(),
+    input: jsonb("input").$type<ProjectInput>().notNull(),
+    reportOptions: jsonb("report_options").$type<ReportOptions>(),
+    checksum: text("checksum").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    activities: integer("activities").notNull().default(0),
+    actorKind: text("actor_kind").notNull().default("owner"),
+    actorUser: uuid("actor_user").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("project_versions_project_version_unique").on(table.projectId, table.version),
+    index("project_versions_project_created_idx").on(table.projectId, table.createdAt),
+  ],
+);
+
+/**
  * Distributed rate-limit windows. One row per limiter key; the counter is
  * incremented by a single atomic upsert (see `lib/server/rate-limit.ts`).
  */
@@ -154,5 +194,5 @@ export const rateLimits = pgTable(
  * Schema revision understood by this code base. Bumped whenever a migration is
  * required; the health endpoint exposes it for deployment verification.
  */
-export const SCHEMA_VERSION = 3;
-export const schemaVersion = sql`3`;
+export const SCHEMA_VERSION = 4;
+export const schemaVersion = sql`4`;

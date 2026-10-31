@@ -10,6 +10,16 @@ import { checkRateLimit, clientIp } from "../src/lib/server/rate-limit";
 import { isSameOriginRequest, isUuid } from "../src/lib/server/http";
 import { describeShareState } from "../src/lib/share-status";
 import {
+  canonicalJson,
+  checksumOf,
+  byteSizeOf,
+  HISTORY_LIMIT,
+  HISTORY_BYTES_LIMIT,
+  KEEP_AT_LEAST,
+  planPrune,
+  versionReasonLabel,
+} from "../src/lib/server/project-versions-core";
+import {
   generateShareToken,
   hashShareToken,
   SHARE_TOKEN_BYTES,
@@ -237,6 +247,57 @@ async function main() {
     check(recovered.kind === "shared" && recovered.notice === null, "صدور لینک تازه هشدار را برمی‌دارد");
   }
 
+  /* ---------------- revision history: pure rules ---------------- */
+  console.log("\n▶ تاریخچه نسخه‌ها: قاعده‌های خالص");
+
+  const sampleInput = {
+    meta: { name: "الف", startDate: "2026-01-01" },
+    activities: [{ id: "a1", predecessors: [{ predecessorId: "a0", type: "FS", lag: 0 }] }],
+  } as unknown as Parameters<typeof checksumOf>[0];
+
+  // Key order must not create a new revision.
+  const reordered = {
+    activities: sampleInput.activities,
+    meta: { startDate: "2026-01-01", name: "الف" },
+  } as unknown as Parameters<typeof checksumOf>[0];
+  eq(checksumOf(sampleInput, null), checksumOf(reordered, null), "ترتیب کلیدها checksum را تغییر نمی‌دهد");
+  check(checksumOf(sampleInput, null) !== checksumOf(sampleInput, { sections: [] } as never), "گزینه‌های گزارش در checksum اثر دارند");
+  check(/^[0-9a-f]{64}$/.test(checksumOf(sampleInput, null)), "checksum یک هش SHA-256 است");
+  check(canonicalJson({ b: 1, a: [2, { d: 4, c: 3 }] }) === '{"a":[2,{"c":3,"d":4}],"b":1}', "سریال‌سازی متعارف، کلیدها را در هر عمق مرتب می‌کند");
+  check(canonicalJson({ a: undefined, b: 1 }) === '{"b":1}', "کلید undefined حذف می‌شود");
+  check(byteSizeOf(sampleInput, null) > 0, "اندازه بایت محاسبه می‌شود");
+  check(
+    byteSizeOf(sampleInput, null) ===
+      Buffer.byteLength(canonicalJson({ input: sampleInput, reportOptions: null }), "utf8"),
+    "اندازه بایت با فرم متعارف هم‌خوان است",
+  );
+
+  eq(versionReasonLabel("create"), "ایجاد پروژه", "برچسب «ایجاد»");
+  eq(versionReasonLabel("restore"), "بازگردانی‌شده", "برچسب «بازگردانی»");
+  eq(versionReasonLabel("pre-restore"), "وضعیت پیش از بازگردانی", "برچسب «پیش از بازگردانی»");
+  eq(versionReasonLabel("autosave"), "ذخیره ویرایش", "برچسب «ذخیره ویرایش»");
+  eq(versionReasonLabel("unknown-thing"), "تغییر", "علت ناشناس، برچسب عمومی می‌گیرد");
+
+  check(HISTORY_LIMIT >= 3 && HISTORY_LIMIT <= 100, "سقف تعداد نسخه در بازه مجاز است", String(HISTORY_LIMIT));
+  check(HISTORY_BYTES_LIMIT >= 512 * 1024, "سقف بایتی حداقل ۵۱۲ کیلوبایت است", String(HISTORY_BYTES_LIMIT));
+  eq(KEEP_AT_LEAST, 3, "حداقل سه نسخه هرگز حذف نمی‌شوند");
+
+  const revisions = Array.from({ length: 5 }, (_, index) => ({ version: 5 - index, sizeBytes: 100 }));
+  eq(planPrune(revisions, 3, 10_000).length, 2, "هرس بر اساس تعداد: دو نسخه قدیمی حذف می‌شود");
+  eq(planPrune(revisions, 10, 10_000).length, 0, "داخل بودجه: هیچ حذفی");
+  check(
+    planPrune(revisions, 10, 250).every((version) => version <= 2),
+    "هرس بر اساس حجم، از قدیمی‌ترین نسخه‌های اضافی شروع می‌شود",
+  );
+  const heavy = [
+    { version: 3, sizeBytes: 10_000_000 },
+    { version: 2, sizeBytes: 10_000_000 },
+    { version: 1, sizeBytes: 10_000_000 },
+  ];
+  eq(planPrune(heavy, 10, 100).length, 0, "حتی با حجم بیش از سقف، سه نسخه آخر می‌مانند");
+  const fourHeavy = [{ version: 4, sizeBytes: 9_000_000 }, ...heavy];
+  eq(JSON.stringify(planPrune(fourHeavy, 10, 100)), "[1]", "با چهار نسخه سنگین، فقط قدیمی‌ترین حذف می‌شود");
+  eq(planPrune([], 10, 10_000).length, 0, "تاریخچه خالی، حذفی ندارد");
 }
 
 main()

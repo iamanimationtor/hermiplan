@@ -1,5 +1,5 @@
-# legacy database upgrade — 2026-10-31T14:00:25Z
-DATABASE_URL=…/hermiplan_gate_legacy2 (fresh disposable database)
+# legacy database upgrade — 2026-10-31T14:32:28Z
+DATABASE_URL=…/hermiplan_legacy6 (fresh disposable database)
 
 ▶ ساخت پایگاه داده نسخه قبلی (legacy) و درج داده‌های موجود
   ✓ پایگاه داده برای سناریوی مهاجرت خالی است
@@ -8,10 +8,11 @@ DATABASE_URL=…/hermiplan_gate_legacy2 (fresh disposable database)
 
 ✔ مرحله «prepare» با 2 بررسی موفق
 
-Database: 127.0.0.1:5544/hermiplan_gate_legacy2
+Database: 127.0.0.1:5544/hermiplan_legacy6
   → 0001_baseline (pending)
   → 0002_security_hardening (pending)
   → 0003_share_tokens (pending)
+  → 0004_project_versions (pending)
 
 ▶ applying 0001_baseline
   ✓ applied
@@ -20,6 +21,9 @@ Database: 127.0.0.1:5544/hermiplan_gate_legacy2
   ✓ applied
 
 ▶ applying 0003_share_tokens
+  ✓ applied
+
+▶ applying 0004_project_versions
   ✓ applied
 
 All migrations applied.
@@ -45,14 +49,22 @@ All migrations applied.
   ✓ ایندکس otp_phone_created_idx ساخته شد
   ✓ ایندکس project_events_project_kind_idx ساخته شد
   ✓ ایندکس rate_limits_window_idx ساخته شد
-  ✓ دفتر مهاجرت هر سه فایل را ثبت کرد
+  ✓ دفتر مهاجرت همه فایل‌ها را ثبت کرد
   ✓ جدول project_share_tokens ساخته شد
   ✓ حذف پروژه، لینک‌های اشتراک آن را پاک می‌کند (CASCADE)
   ✓ ایندکس یکتای هش توکن ساخته شد
   ✓ مهاجرت ۰۰۰۳ هیچ پروژه‌ای را حذف نکرد
+  ✓ جدول project_versions ساخته شد
+  ✓ ستون projects.version با پیش‌فرض ۱ اضافه شد
+  ✓ ستون version اجباری است
+  ✓ پروژه‌های قدیمی از نسخه ۱ شروع می‌کنند
+  ✓ تاریخچه برای پروژه‌های قدیمی از پیش پر نمی‌شود (بی‌دلیل حجم داده دو برابر نمی‌شود)
+  ✓ حذف پروژه، تاریخچه آن را هم پاک می‌کند (CASCADE)
 
-✔ مرحله «verify» با 25 بررسی موفق
+✔ مرحله «verify» با 31 بررسی موفق
 
+▶ اجرای rollback رسمی 0004_project_versions.rollback.sql
+  ✓ rollback اجرا شد
 ▶ اجرای rollback رسمی 0003_share_tokens.rollback.sql
   ✓ rollback اجرا شد
 ▶ اجرای rollback رسمی 0002_security_hardening.rollback.sql
@@ -67,6 +79,9 @@ All migrations applied.
   ✓ پروژه‌ها در rollback حذف نشدند
   ✓ rollback عمداً پروژه را دوباره عمومی نکرد (حفاظت از داده)
   ✓ جدول لینک‌های اشتراک در rollback حذف شد
+  ✓ جدول تاریخچه در rollback حذف شد
+  ✓ ستون version حذف شد (کد نسخه قبلی بدون آن کار می‌کند)
+  ✓ بازگشت ۰۰۰۴ هیچ پروژه‌ای را حذف نکرد
 
-✔ مرحله «verify-rollback» با 6 بررسی موفق
+✔ مرحله «verify-rollback» با 9 بررسی موفق
 EXIT=0

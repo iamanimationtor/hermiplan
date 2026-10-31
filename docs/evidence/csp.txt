@@ -1,6 +1,4 @@
-# CSP — two public pages — 2026-10-31T13:59:26Z
-BASE_URL=http://127.0.0.1:3400 npm run test:csp
-
+# CSP — two public pages — 2026-10-31T15:01:02Z
 ▶ /
 ▶ /builder
 

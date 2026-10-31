@@ -1,11 +1,14 @@
-# Migration runner safety + rollback rehearsal — 2026-10-31T13:27:46Z
-DATABASE_URL=postgres://…:5544/hermiplan_gate_ms MIGRATION_SAFETY_ROLLBACK=1 npm run db:migration-safety
-# scratch database created for this run only; it is emptied by step ۵–۷ by design
+# Migration runner safety + rollback rehearsal — 2026-10-31T14:31:53Z
+DATABASE_URL=…/hermiplan_gate_ms7 MIGRATION_SAFETY_ROLLBACK=1 npm run db:migration-safety
+# scratch database created for this run only; steps ۵–۷ empty it by design
 
 ▶ ۱. هر مهاجرت فایل بازگشت جفت‌شده دارد
   ✓ 0001_baseline.sql → 0001_baseline.rollback.sql
   ✓ 0002_security_hardening.sql → 0002_security_hardening.rollback.sql
   ✓ 0003_share_tokens.sql → 0003_share_tokens.rollback.sql
+  ✓ 0004_project_versions.sql → 0004_project_versions.rollback.sql
+  ✓ شماره‌گذاری مهاجرت‌ها پیوسته است
+  ✓ SCHEMA_VERSION با آخرین مهاجرت هم‌خوان است
 
 ▶ ۲. اجرای دوباره چیزی اعمال نمی‌کند (idempotency)
   ✓ اجرای اول موفق است
@@ -32,14 +35,19 @@ DATABASE_URL=postgres://…:5544/hermiplan_gate_ms MIGRATION_SAFETY_ROLLBACK=1 n
   ✓ اجرای دوباره مهاجرت‌ها موفق است
   ✓ ساختار بازسازی‌شده با ساختار پیش از بازگشت یکسان است
 
-▶ ۷. بازگشت ۰۰۰۲ و ۰۰۰۳ هم اجرا می‌شود و قابل بازاعمال است
+▶ ۷. بازگشت مهاجرت‌های شماره‌دار هم اجرا می‌شود و قابل بازاعمال است
+  ✓ 0004_project_versions: ردیف دفتر حذف شد
   ✓ 0003_share_tokens: ردیف دفتر حذف شد
   ✓ 0002_security_hardening: ردیف دفتر حذف شد
+  ✓ ۰۰۰۲–۰۰۰۴ جدول‌های افزوده را واقعاً حذف کردند
+  ✓ ستون projects.version با بازگشت ۰۰۰۴ حذف شد
   ✓ ستون attempts به text بازگشت
   ✓ پیش‌فرض is_public به true بازگشت (فقط ساختار)
-  ✓ بازاعمال ۰۰۰۲ و ۰۰۰۳ موفق است
+  ✓ بازاعمال ۰۰۰۲–۰۰۰۴ موفق است
+  ✓ پس از بازاعمال، هر سه جدول برگشتند
+  ✓ ستون projects.version با پیش‌فرض ۱ بازگشت
   ✓ پس از بازاعمال، پیش‌فرض خصوصی است
   ✓ ساختار نهایی با ساختار اولیه یکسان است
 
-✔ 25 بررسی ایمنی مهاجرت — همه موفق
+✔ 33 بررسی ایمنی مهاجرت — همه موفق
 EXIT=0

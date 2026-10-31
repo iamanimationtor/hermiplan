@@ -13,7 +13,18 @@ export const dynamic = "force-dynamic";
  * `npm run db:migrate` must fail *here* (503, with the missing objects named)
  * rather than failing later on a user's share link.
  */
-const REQUIRED_TABLES = ["projects", "users", "sessions", "otp_codes", "project_events", "rate_limits", "project_share_tokens"];
+const REQUIRED_TABLES = [
+  "projects",
+  "users",
+  "sessions",
+  "otp_codes",
+  "project_events",
+  "rate_limits",
+  "project_share_tokens",
+  // 0004 — revision history. A database migrated only through 0003 is a real
+  // (recoverable) deployment mistake and must be reported here, not later.
+  "project_versions",
+];
 
 export async function GET() {
   try {
@@ -24,7 +35,8 @@ export async function GET() {
         FROM information_schema.tables
        WHERE table_schema = 'public'
          AND table_name IN ('projects', 'users', 'sessions', 'otp_codes',
-                            'project_events', 'rate_limits', 'project_share_tokens')
+                            'project_events', 'rate_limits', 'project_share_tokens',
+                            'project_versions')
     `);
     const rows = (present as unknown as { rows?: { table_name: string }[] }).rows ?? [];
     const found = new Set(rows.map((row) => row.table_name));
@@ -51,6 +63,7 @@ export async function GET() {
         // both stores exist ⇒ the security and share migrations have run
         rateLimitStore: "postgres",
         shareLinks: "postgres",
+        revisionHistory: "postgres",
         smsConfigured: Boolean(process.env.SMS_PROVIDER_KEY),
       },
       { headers: { "Cache-Control": "no-store" } },

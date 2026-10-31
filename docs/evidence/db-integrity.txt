@@ -1,5 +1,5 @@
-# db-integrity / concurrency — 2026-10-31T14:02:44Z
-DATABASE_URL=…:5544/postgres npm run test:db:integrity
+# db-integrity / concurrency — 2026-10-31T14:32:35Z
+DATABASE_URL=…/hermiplan_conc4 npm run db:migrate && npm run test:db:integrity
 
 ▶ بررسی یکپارچگی پایگاه داده روی PostgreSQL واقعی
   سرور: PostgreSQL 18.6
@@ -25,5 +25,13 @@ DATABASE_URL=…:5544/postgres npm run test:db:integrity
   ✓ پروژه قدیمی در بازبینی به‌عنوان «لینک قدیمی» علامت می‌خورد
   ✓ پس از صدور لینک تازه، وضعیت «قدیمی» برداشته می‌شود
 
-✔ 14 بررسی یکپارچگی/هم‌زمانی — همه موفق
+▶ ۵. تاریخچه نسخه‌ها: یکتایی، آبشار و هم‌زمانی
+  ✓ ثبت نسخه اول موفق است
+  ✓ قید یکتایی (project_id, version) تکرار نسخه را رد می‌کند
+  ✓ از ۲۴ نویسنده هم‌زمان، فقط یکی نسخه ۷ را ثبت می‌کند
+  ✓ پیش‌فرض projects.version برابر ۱ است
+  ✓ دو نسخه ثبت‌شده است (۱ و ۷)
+  ✓ حذف پروژه، کل تاریخچه را آبشاری پاک می‌کند
+
+✔ 20 بررسی یکپارچگی/هم‌زمانی — همه موفق
 EXIT=0

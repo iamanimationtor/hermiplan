@@ -189,6 +189,16 @@ export function ReportView({
   const [freshLink, setFreshLink] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
 
+  /* ------------------------- revision history ------------------------- */
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyNotice, setHistoryNotice] = useState<string | null>(null);
+  const [historyCurrent, setHistoryCurrent] = useState<number | null>(null);
+  const [versions, setVersions] = useState<
+    { version: number; reason: string; reasonLabel: string; createdAt: string; sizeBytes: number; activities: number; isCurrent: boolean }[]
+  >([]);
+
   /**
    * One source of truth for "is this report shared, private, or was it shared
    * before tokens existed". The badge and the panel both read it, so they cannot
@@ -254,6 +264,60 @@ export function ReportView({
     } finally {
       setShareBusy(false);
     }
+  }
+
+  /**
+   * Revision history. Restoring never deletes anything: the server snapshots the
+   * state being replaced, so the owner can walk back again if the restore itself
+   * was a mistake. The interface says so before the click.
+   */
+  async function loadVersions() {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/versions`, { cache: "no-store" });
+      if (!response.ok) {
+        setHistoryError(response.status === 404 ? "تاریخچه در دسترس نیست" : "بارگذاری تاریخچه ناموفق بود");
+        return;
+      }
+      const data = (await response.json()) as { versions?: typeof versions; currentVersion?: number };
+      setVersions(data.versions ?? []);
+      setHistoryCurrent(data.currentVersion ?? null);
+    } catch {
+      setHistoryError("بارگذاری تاریخچه ناموفق بود");
+    }
+  }
+
+  async function restoreVersion(version: number) {
+    if (!canManage) return;
+    setHistoryBusy(true);
+    setHistoryError(null);
+    setHistoryNotice(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/versions/${version}/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedVersion: historyCurrent ?? undefined }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        setHistoryError(body.error ?? "بازگردانی ناموفق بود");
+        return;
+      }
+      const data = (await response.json()) as { version?: number; restoredFrom?: number };
+      setHistoryNotice(`نسخه ${toPersianDigits(String(data.restoredFrom ?? version))} بازگردانی شد؛ نسخه تازه ${toPersianDigits(String(data.version ?? ""))} است. صفحه بازخوانی می‌شود.`);
+      await loadVersions();
+      window.setTimeout(() => window.location.reload(), 1200);
+    } catch {
+      setHistoryError("بازگردانی ناموفق بود");
+    } finally {
+      setHistoryBusy(false);
+    }
+  }
+
+  function toggleHistoryPanel() {
+    const next = !historyOpen;
+    setHistoryOpen(next);
+    setHistoryError(null);
+    if (next) void loadVersions();
   }
 
   /** Opening the panel is also the moment the link list is refreshed. */
@@ -378,13 +442,23 @@ export function ReportView({
             {copied ? "✓ کپی شد" : "کپی لینک"}
           </Button>
           {canManage ? (
-            <Button
+              <Button
               variant="secondary"
               size="sm"
               onClick={toggleSharePanel}
               title={shareState.hint}
             >
               {shareState.badge}
+            </Button>
+          ) : null}
+          {canManage ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={toggleHistoryPanel}
+              title="نسخه‌های ذخیره‌شده این پروژه؛ هر نسخه قابل بازگردانی است"
+            >
+              تاریخچه
             </Button>
           ) : null}
           <Button variant="accent" size="sm" onClick={() => setDownloadOpen(true)}>
@@ -544,6 +618,87 @@ export function ReportView({
                 آخرین انقضای ثبت‌شده روی پروژه: {formatJalali(shareExpiresAt.slice(0, 10))}
               </p>
             ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {/* ------------------------- revision history ------------------------- */}
+      {canManage && historyOpen ? (
+        <div className="mx-auto max-w-[1180px] px-3 pt-3 sm:px-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-[13px] font-bold text-ink-900">تاریخچه نسخه‌ها</p>
+                <p className="mt-0.5 text-[11px] leading-5 text-slate-500">
+                  هر ذخیره، یک نسخه نگه می‌دارد. بازگردانی چیزی را پاک نمی‌کند: وضعیت فعلی هم پیش از
+                  بازگردانی به‌عنوان یک نسخه ذخیره می‌شود و بعداً قابل بازگشت است.
+                </p>
+              </div>
+              {historyCurrent ? (
+                <Badge tone="neutral">نسخه فعلی: {toPersianDigits(String(historyCurrent))}</Badge>
+              ) : null}
+            </div>
+
+            {historyError ? (
+              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-[11.5px] font-semibold text-red-700">{historyError}</p>
+            ) : null}
+            {historyNotice ? (
+              <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-[11.5px] font-semibold text-emerald-800">{historyNotice}</p>
+            ) : null}
+
+            <div className="thin-scroll mt-3 overflow-x-auto">
+              <table className="w-full min-w-[520px] text-right text-[11.5px]">
+                <thead>
+                  <tr className="text-[10.5px] uppercase tracking-wide text-slate-400">
+                    <th className="py-1.5 font-semibold">نسخه</th>
+                    <th className="py-1.5 font-semibold">علت</th>
+                    <th className="py-1.5 font-semibold">زمان (شمسی)</th>
+                    <th className="py-1.5 font-semibold">فعالیت</th>
+                    <th className="py-1.5 font-semibold">حجم</th>
+                    <th className="py-1.5 font-semibold" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {versions.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-3 text-center text-slate-400">
+                        {historyBusy ? "در حال بارگذاری…" : "هنوز نسخه‌ای ثبت نشده است"}
+                      </td>
+                    </tr>
+                  ) : null}
+                  {versions.map((version) => (
+                    <tr key={version.version} className={version.isCurrent ? "bg-brand-50/40" : ""}>
+                      <td className="py-1.5 font-mono font-semibold text-ink-900">
+                        {toPersianDigits(String(version.version))}
+                        {version.isCurrent ? <span className="mr-1 text-[10px] text-emerald-700">جاری</span> : null}
+                      </td>
+                      <td className="py-1.5 text-slate-600">{version.reasonLabel}</td>
+                      <td className="py-1.5 text-slate-600">
+                        {formatJalali(version.createdAt.slice(0, 10), { withMonthName: false })}
+                        <span className="mr-1 font-mono text-[10px] text-slate-400">{version.createdAt.slice(11, 16)}</span>
+                      </td>
+                      <td className="py-1.5 text-slate-600">{toPersianDigits(String(version.activities))}</td>
+                      <td className="py-1.5 text-slate-500">{formatNumber(Math.max(1, Math.round(version.sizeBytes / 1024)))} KB</td>
+                      <td className="py-1.5 text-left">
+                        {version.isCurrent ? (
+                          <span className="text-[10.5px] text-slate-400">—</span>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => restoreVersion(version.version)}
+                            disabled={historyBusy}
+                            title={`بازگردانی نسخه ${version.version}`}
+                          >
+                            بازگردانی
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       ) : null}

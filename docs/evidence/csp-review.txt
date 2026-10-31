@@ -1,16 +1,13 @@
-# CSP on every REAL route — 2026-10-31T13:59:41Z
-fx=$(BASE_URL=http://127.0.0.1:3400 npx tsx scripts/share-fixture.ts 2>/dev/null)
-eval "$(printf "%s\n" "$fx" | sed -n "s/^\(CSP_[A-Z0-9_]*=.*\)/export \1/p")"
-BASE_URL=http://127.0.0.1:3400 npm run test:csp
-
-CSP_PATHS=/,/builder,/report/3093f286-cfdc-4fad-a2d9-b94299e4439c,/s/2fTFhUc1P01g6lx9eT1RHt45kHhpVVuwIPVx1Ews7gs,/s/J1lsF32DIf5KOVTYvbSmozVvH0MWNurrmU30wxnu4kI,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
-CSP_EXPECT_404=/s/J1lsF32DIf5KOVTYvbSmozVvH0MWNurrmU30wxnu4kI,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
+# CSP over real routes (owner report, live share, revoked link, unknown token, unknown uuid) — 2026-10-31T15:01:09Z
+# fixture: BASE_URL=http://127.0.0.1:3400 npx tsx scripts/share-fixture.ts
+# CSP_PATHS=/,/builder,/report/05b5b0b6-7c34-493f-8f24-0525729e7ab7,/s/b6murhPSWmufjhThVNJ59VLId--RzBK0wR_uiTdduhI,/s/MTt_LeuCiW7-EZ1frOpUka6RAv4aDGkZwzfGYGTC58g,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
+# CSP_EXPECT_404=/s/MTt_LeuCiW7-EZ1frOpUka6RAv4aDGkZwzfGYGTC58g,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
 
 ▶ /
 ▶ /builder
-▶ /report/3093f286-cfdc-4fad-a2d9-b94299e4439c
-▶ /s/2fTFhUc1P01g6lx9eT1RHt45kHhpVVuwIPVx1Ews7gs
-▶ /s/J1lsF32DIf5KOVTYvbSmozVvH0MWNurrmU30wxnu4kI
+▶ /report/05b5b0b6-7c34-493f-8f24-0525729e7ab7
+▶ /s/b6murhPSWmufjhThVNJ59VLId--RzBK0wR_uiTdduhI
+▶ /s/MTt_LeuCiW7-EZ1frOpUka6RAv4aDGkZwzfGYGTC58g
 ▶ /s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ▶ /report/00000000-0000-4000-8000-000000000000
 

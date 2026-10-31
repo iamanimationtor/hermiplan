@@ -1,13 +1,5 @@
-# final one-shot checks — 2026-10-31T14:01:30Z
+# final one-shot checks — 2026-10-31T15:01:02Z
 BASE_URL=http://127.0.0.1:3400
-
-## npm run test:csp
-▶ /
-▶ /builder
-
-✔ 24 بررسی CSP — همه موفق
-  سیاست بررسی‌شده، نه آزمون مرورگری: اجرای واقعی مرورگر همچنان کار باز است.
-EXIT=0
 
 ## npm run test:a11y
 ▶ / (200, 146 KB)
@@ -100,14 +92,14 @@ EXIT=0
 
 ## npm run test:bundle
 ▶ بودجه‌ی جاوااسکریپت هر مسیر (gzip)
-  ✓ /builder             175.4 KB  (سقف 210 KB)
-  ✓ /report/[id]         137.2 KB  (سقف 170 KB)
-  ✓ /s/[token]           137.2 KB  (سقف 170 KB)
+  ✓ /builder             175.6 KB  (سقف 210 KB)
+  ✓ /report/[id]         138.1 KB  (سقف 170 KB)
+  ✓ /s/[token]           138.1 KB  (سقف 170 KB)
   ✓ /                     23.8 KB  (سقف 45 KB)
   ✓ /_not-found           20.6 KB  (سقف 40 KB)
   ✓ /_global-error        13.9 KB  (سقف 40 KB)
 
-  سنگین‌ترین مسیر: /builder با 175.4 KB gzip
+  سنگین‌ترین مسیر: /builder با 175.6 KB gzip
   ✓ خودآزمون: بودجه‌ی ۱KB روی سنگین‌ترین مسیر «نقض» تشخیص داده می‌شود
 
 ✔ 6 مسیر در بودجه‌ی تعیین‌شده هستند.

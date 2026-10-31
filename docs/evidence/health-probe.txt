@@ -1,19 +1,10 @@
-# health probe against a database where migrations were NOT applied — 2026-10-31T12:48:58Z
-# (a deploy that forgot 'npm run db:migrate' must fail loudly here, not on a user's share link)
-$ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3700/api/health
-503
+# health probe — 2026-10-31T15:01:20Z
 
-$ curl -s http://127.0.0.1:3700/api/health
-{"ok":false,"schemaVersion":3,"database":"ok","missingTables":["projects","users","sessions","otp_codes","project_events","rate_limits","project_share_tokens"],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
-
-## after applying the migrations to that same database
-  ✓ applied
-
-All migrations applied.
-
-$ curl -s http://127.0.0.1:3700/api/health
-{"ok":true,"schemaVersion":3,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","smsConfigured":false}
-
-## re-check after the final rebuild — 2026-10-31T14:00:18Z
+## A) migrated database (:3400)
 $ curl -s http://127.0.0.1:3400/api/health
-{"ok":true,"schemaVersion":3,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","smsConfigured":false}
+{"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false}
+
+## B) brand-new empty database (:3600, never migrated) — must be 503 and name the missing tables
+$ curl -s -w "HTTP %{http_code}\n" http://127.0.0.1:3600/api/health
+{"ok":false,"schemaVersion":4,"database":"ok","missingTables":["projects","users","sessions","otp_codes","project_events","rate_limits","project_share_tokens","project_versions"],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
+HTTP 503

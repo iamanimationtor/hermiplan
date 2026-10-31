@@ -19,6 +19,8 @@
 import { buildProjectFromTemplate } from "../src/lib/templates";
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:3400";
+/** unique per run so the share-creation quota never leaks between runs */
+const CLIENT_IP = `10.66.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
 const cookieJar = new Map<string, string>();
 
 function cookieHeader(): string {
@@ -37,7 +39,9 @@ async function call(path: string, init: RequestInit = {}): Promise<{ status: num
   const headers = new Headers(init.headers ?? {});
   if (cookieHeader()) headers.set("cookie", cookieHeader());
   if (init.body) headers.set("content-type", "application/json");
-  headers.set("x-forwarded-for", "10.66.0.7");
+  // A distinct client identity per run: the per-IP quota (10 link creations an
+  // hour) would otherwise make the fixture fail on the eleventh run of a day.
+  headers.set("x-forwarded-for", CLIENT_IP);
   const response = await fetch(`${BASE}${path}`, { ...init, headers, redirect: "manual" });
   absorb(response);
   return { status: response.status, body: await response.text() };

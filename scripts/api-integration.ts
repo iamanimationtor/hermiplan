@@ -104,13 +104,14 @@ class Jar {
 async function call(
   jar: Jar | null,
   path: string,
-  init: RequestInit = {},
+  init: RequestInit & { ip?: string } = {},
 ): Promise<{ status: number; body: string; response: Response }> {
   const headers = new Headers(init.headers ?? {});
   // Every request carries the run's own client IP: the rate limiter is backed by
   // PostgreSQL, so without this header all runs would share one bucket and a
-  // previous run could exhaust the quota of the next one.
-  headers.set("x-forwarded-for", CLIENT_IP);
+  // previous run could exhaust the quota of the next one. `ip` overrides it for
+  // suites that intentionally issue many writes in a row.
+  headers.set("x-forwarded-for", init.ip ?? CLIENT_IP);
   if (jar && jar.header()) headers.set("cookie", jar.header());
   if (init.body) headers.set("content-type", "application/json");
   const response = await fetch(`${BASE}${path}`, { ...init, headers, redirect: "manual" });
@@ -310,8 +311,14 @@ async function main() {
     (listedBody.tokens ?? []).filter((token) => token.active).length >= 10,
     "پایگاه اکنون ۱۰ لینک فعال دارد",
   );
-  const overCap = await call(owner, `/api/projects/${id}/share`, { method: "POST", body: "{}" });
-  ok(overCap.status === 409, "سقف ۱۰ لینک فعال اعمال می‌شود ⇒ ۴۰۹", `got ${overCap.status}`);
+  const overCap = await call(owner, `/api/projects/${id}/share`, {
+    method: "POST",
+    body: "{}",
+    // A fresh client identity: 409 must come from the per-project cap, never from
+    // the per-IP creation quota (which would make the assertion meaningless).
+    ip: `${CLIENT_IP}.62`,
+  });
+  ok(overCap.status === 409, "سقف ۱۰ لینک فعال اعمال می‌شود ⇒ ۴۰۹ (نه ۴۲۹)", `got ${overCap.status}`);
 
   // (۴) CSRF on revocation
   const crossOriginRevoke = await call(owner, `/api/projects/${id}/share?all=1`, {
@@ -397,6 +404,270 @@ async function main() {
   ok(rereadBody.project.meta.name === "پروژه ویرایش‌شده", "نام ویرایش‌شده ماندگار است");
   ok(rereadBody.project.activities.length === 5, "تعداد فعالیت ویرایش‌شده ماندگار است");
   ok(rereadBody.analysis.activities.length === 5, "تحلیل موتور با داده جدید هم‌خوان است");
+
+  /* ---------------- 4-ب. تاریخچه نسخه‌ها، بازگردانی، ویرایش هم‌زمان ---------- */
+  console.log("\n▶ ۴-ب. تاریخچه نسخه‌ها، بازگردانی و ویرایش هم‌زمان");
+
+  const historyProject = JSON.parse(projectJson);
+  historyProject.meta.name = "پروژه تاریخچه";
+  historyProject.activities = historyProject.activities.slice(0, 4);
+  const historyCreated = await call(owner, "/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ project: historyProject, reportOptions: {} }),
+  });
+  const historyId = (JSON.parse(historyCreated.body || "{}") as { id?: string }).id ?? "";
+  ok(historyCreated.status === 201 && Boolean(historyId), "پروژه آزمون تاریخچه ساخته شد", historyCreated.body.slice(0, 120));
+  ok(
+    (JSON.parse(historyCreated.body || "{}") as { version?: number }).version === 1,
+    "پاسخ ساخت، شماره نسخه ۱ را برمی‌گرداند",
+  );
+
+  const initialList = await call(owner, `/api/projects/${historyId}/versions`);
+  const initialBody = JSON.parse(initialList.body || "{}") as {
+    versions?: { version: number; reason: string; isCurrent: boolean; activities: number; reasonLabel: string }[];
+    currentVersion?: number;
+  };
+  ok(initialList.status === 200, "فهرست تاریخچه با ۲۰۰", initialList.body.slice(0, 120));
+  ok(initialBody.currentVersion === 1, "نسخه فعلی ۱ است", String(initialBody.currentVersion));
+  ok(initialBody.versions?.length === 1, "یک نسخه ثبت شده", String(initialBody.versions?.length));
+  ok(initialBody.versions?.[0]?.reason === "create", "علت نسخه اول «ایجاد» است", initialBody.versions?.[0]?.reason);
+  ok(initialBody.versions?.[0]?.isCurrent === true, "نسخه اول جاری علامت خورده است");
+  ok(initialBody.versions?.[0]?.activities === 4, "تعداد فعالیت‌ها در نسخه ثبت شده", String(initialBody.versions?.[0]?.activities));
+
+  const editedProject = JSON.parse(JSON.stringify(historyProject));
+  editedProject.meta.name = "پروژه تاریخچه — ویرایش دوم";
+  editedProject.activities = editedProject.activities.slice(0, 2);
+  const edit1 = await call(owner, `/api/projects/${historyId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ project: editedProject }),
+  });
+  const edit1Body = JSON.parse(edit1.body || "{}") as { version?: number; unchanged?: boolean };
+  ok(edit1.status === 200, "ویرایش اول با ۲۰۰", edit1.body.slice(0, 120));
+  ok(edit1Body.version === 2, "شماره نسخه به ۲ رسید", String(edit1Body.version));
+  ok(edit1Body.unchanged === false, "ویرایش واقعی، تغییر علامت خورده است");
+
+  const editSame = await call(owner, `/api/projects/${historyId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ project: editedProject }),
+  });
+  const editSameBody = JSON.parse(editSame.body || "{}") as { version?: number; unchanged?: boolean };
+  ok(editSame.status === 200 && editSameBody.unchanged === true, "ذخیره محتوای یکسان، تغییر محسوب نمی‌شود");
+  ok(editSameBody.version === 2, "ذخیره تکراری شماره نسخه را مصرف نمی‌کند", String(editSameBody.version));
+
+  const afterEdits = JSON.parse((await call(owner, `/api/projects/${historyId}/versions`)).body || "{}") as {
+    versions?: { version: number; reason: string }[];
+  };
+  ok(afterEdits.versions?.length === 2, "دو نسخه در تاریخچه", String(afterEdits.versions?.length));
+  ok(afterEdits.versions?.[0]?.reason === "autosave", "علت نسخه دوم «ذخیره ویرایش» است", afterEdits.versions?.[0]?.reason);
+
+  const staleEdit = await call(owner, `/api/projects/${historyId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ project: historyProject, expectedVersion: 1 }),
+  });
+  const staleBody = JSON.parse(staleEdit.body || "{}") as { currentVersion?: number };
+  ok(staleEdit.status === 409, "ویرایش بر پایه نسخه قدیمی ⇒ ۴۰۹", `got ${staleEdit.status}`);
+  ok(staleBody.currentVersion === 2, "پاسخ ۴۰۹ نسخه فعلی را می‌گوید", String(staleBody.currentVersion));
+  const afterConflict = await call(owner, `/api/projects/${historyId}`);
+  ok(
+    (JSON.parse(afterConflict.body || "{}") as { project?: { meta?: { name?: string } } }).project?.meta?.name ===
+      "پروژه تاریخچه — ویرایش دوم",
+    "ویرایش ردشده هیچ تغییری اعمال نکرد",
+  );
+
+  const detail = await call(owner, `/api/projects/${historyId}/versions/1`);
+  const detailBody = JSON.parse(detail.body || "{}") as {
+    project?: { meta?: { name?: string } };
+    reasonLabel?: string;
+    createdAt?: string;
+  };
+  ok(detail.status === 200, "خواندن نسخه ۱ با ۲۰۰", detail.body.slice(0, 120));
+  ok(detailBody.project?.meta?.name === "پروژه تاریخچه", "محتوای نسخه ۱ همان وضعیت اولیه است");
+  ok(Boolean(detailBody.reasonLabel), "برچسب فارسی علت برگردانده شد");
+  ok(Boolean(detailBody.createdAt), "زمان نسخه برگردانده شد");
+
+  const restore = await call(owner, `/api/projects/${historyId}/versions/1/restore`, {
+    method: "POST",
+    body: JSON.stringify({ expectedVersion: 2 }),
+  });
+  const restoreBody = JSON.parse(restore.body || "{}") as { version?: number; restoredFrom?: number };
+  ok(restore.status === 200, "بازگردانی با ۲۰۰", restore.body.slice(0, 160));
+  ok(restoreBody.restoredFrom === 1, "پاسخ می‌گوید از کدام نسخه بازگردانی شد", String(restoreBody.restoredFrom));
+  ok(restoreBody.version === 4, "بازگردانی دو نسخه تازه می‌سازد (۳ پیش از بازگردانی، ۴ بازگردانی)", String(restoreBody.version));
+
+  const afterRestore = await call(owner, `/api/projects/${historyId}`);
+  const afterRestoreBody = JSON.parse(afterRestore.body || "{}") as {
+    project?: { meta?: { name?: string }; activities?: unknown[] };
+    version?: number;
+  };
+  ok(afterRestoreBody.project?.meta?.name === "پروژه تاریخچه", "نام به وضعیت نسخه ۱ بازگشت");
+  ok(afterRestoreBody.project?.activities?.length === 4, "فعالیت‌ها به وضعیت نسخه ۱ بازگشتند");
+  ok(afterRestoreBody.version === 4, "نسخه جاری پروژه ۴ است", String(afterRestoreBody.version));
+
+  const timeline = JSON.parse((await call(owner, `/api/projects/${historyId}/versions`)).body || "{}") as {
+    versions?: { version: number; reason: string; isCurrent: boolean }[];
+  };
+  ok(timeline.versions?.length === 4, "چهار نسخه در تاریخچه", String(timeline.versions?.length));
+  ok(
+    timeline.versions?.[0]?.reason === "restore" && timeline.versions?.[1]?.reason === "pre-restore",
+    "ترتیب «بازگردانی» و «پیش از بازگردانی» درست ثبت شده",
+    `${timeline.versions?.[0]?.reason}/${timeline.versions?.[1]?.reason}`,
+  );
+  ok(timeline.versions?.[0]?.isCurrent === true, "نسخه بازگردانی‌شده جاری است");
+  ok(
+    timeline.versions?.find((item) => item.version === 1)?.isCurrent === false,
+    "نسخه ۱ دیگر جاری نیست",
+  );
+
+  const restoreMissing = await call(owner, `/api/projects/${historyId}/versions/99/restore`, { method: "POST", body: "{}" });
+  ok(restoreMissing.status === 404, "بازگردانی نسخه ناموجود ⇒ ۴۰۴", `got ${restoreMissing.status}`);
+  const detailMissing = await call(owner, `/api/projects/${historyId}/versions/99`);
+  ok(detailMissing.status === 404, "خواندن نسخه ناموجود ⇒ ۴۰۴", `got ${detailMissing.status}`);
+
+  const strangerVersions = await call(stranger, `/api/projects/${historyId}/versions`);
+  ok(strangerVersions.status === 404, "غریبه تاریخچه را نمی‌بیند ⇒ ۴۰۴", `got ${strangerVersions.status}`);
+  const strangerRestore = await call(stranger, `/api/projects/${historyId}/versions/1/restore`, {
+    method: "POST",
+    body: "{}",
+  });
+  ok(strangerRestore.status === 404, "غریبه نمی‌تواند بازگردانی کند ⇒ ۴۰۴", `got ${strangerRestore.status}`);
+  const anonVersions = await call(new Jar(), `/api/projects/${historyId}/versions`);
+  ok(anonVersions.status === 404, "بدون کوکی، تاریخچه ⇒ ۴۰۴", `got ${anonVersions.status}`);
+
+  const shareForHistory = await call(owner, `/api/projects/${historyId}/share`, {
+    method: "POST",
+    body: "{}",
+    // Separate quota identity: this check is about history access, not throttling.
+    ip: `${CLIENT_IP}.63`,
+  });
+  const historyToken = (JSON.parse(shareForHistory.body || "{}") as { token?: string }).token ?? "";
+  ok(
+    shareForHistory.status === 201 && historyToken.length === 43,
+    "لینک اشتراک برای آزمون تاریخچه ساخته شد",
+    `status ${shareForHistory.status} — ${shareForHistory.body.slice(0, 120)}`,
+  );
+  const viaShare = await call(new Jar(), `/api/projects/${historyId}/versions`, {
+    headers: { "x-share-token": historyToken },
+  });
+  ok(viaShare.status === 404, "لینک اشتراک، تاریخچه را باز نمی‌کند ⇒ ۴۰۴", `got ${viaShare.status}`);
+  const sharePage = await call(new Jar(), `/s/${historyToken}`);
+  ok(sharePage.status === 200, "خود لینک اشتراک همچنان صفحه گزارش را نشان می‌دهد", `got ${sharePage.status}`);
+  await call(owner, `/api/projects/${historyId}/share?all=1`, { method: "DELETE" });
+
+  const restoreAudit = await dbQuery(
+    "select count(*) from project_events where project_id = $1 and kind = 'restore'",
+    [historyId],
+  );
+  ok(Number(restoreAudit) >= 1, "بازگردانی در دفتر رخدادها ثبت شد");
+  const snapshotRows = await dbQuery(
+    "select count(*) from project_versions where project_id = $1",
+    [historyId],
+  );
+  ok(Number(snapshotRows) === 4, "چهار ردیف نسخه در پایگاه", String(snapshotRows));
+
+  // Pruning: keep the newest HISTORY_LIMIT revisions and never lose the current one.
+  const bulk = JSON.parse(JSON.stringify(historyProject));
+  for (let step = 0; step < 22; step += 1) {
+    bulk.meta.name = `پروژه تاریخچه — گام ${step}`;
+    const response = await call(owner, `/api/projects/${historyId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ project: bulk }),
+      // A dedicated client identity: the write quota is per IP, and the rest of
+      // the suite must not be starved by this loop.
+      ip: `${CLIENT_IP}.31`,
+    });
+    if (response.status !== 200) {
+      ok(false, `ذخیره پیاپی گام ${step} ناموفق بود`, response.body.slice(0, 120));
+      break;
+    }
+  }
+  const pruned = JSON.parse((await call(owner, `/api/projects/${historyId}/versions?limit=100`)).body || "{}") as {
+    versions?: { version: number; isCurrent: boolean }[];
+    limits?: { count: number };
+  };
+  const limit = pruned.limits?.count ?? 20;
+  ok((pruned.versions?.length ?? 0) <= limit, `تعداد نسخه‌های نگه‌داری‌شده ≤ ${limit}`, String(pruned.versions?.length));
+  ok(
+    Boolean(pruned.versions?.some((item) => item.isCurrent)),
+    "نسخه جاری هرگز هرس نمی‌شود",
+  );
+  const newestFirst = (pruned.versions ?? []).every((item, index, all) => index === 0 || all[index - 1].version > item.version);
+  ok(newestFirst, "فهرست از جدید به قدیم مرتب است");
+
+  // Two writers, one revision: the loser must be told, not overwritten.
+  const raceProject = JSON.parse(projectJson);
+  raceProject.meta.name = "پروژه مسابقه";
+  raceProject.activities = raceProject.activities.slice(0, 3);
+  const raceCreated = await call(owner, "/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ project: raceProject, reportOptions: {} }),
+  });
+  const raceId = (JSON.parse(raceCreated.body || "{}") as { id?: string }).id ?? "";
+  const left = JSON.parse(JSON.stringify(raceProject));
+  left.meta.name = "نسخه نویسنده راست";
+  const right = JSON.parse(JSON.stringify(raceProject));
+  right.meta.name = "نسخه نویسنده چپ";
+  const [raceA, raceB] = await Promise.all([
+    call(owner, `/api/projects/${raceId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ project: left, expectedVersion: 1 }),
+      ip: `${CLIENT_IP}.41`,
+    }),
+    call(owner, `/api/projects/${raceId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ project: right, expectedVersion: 1 }),
+      ip: `${CLIENT_IP}.42`,
+    }),
+  ]);
+  const raceStatuses = [raceA.status, raceB.status].sort();
+  ok(
+    raceStatuses[0] === 200 && raceStatuses[1] === 409,
+    "دو ویرایش هم‌زمان روی یک نسخه: یکی موفق، دیگری ۴۰۹",
+    raceStatuses.join("/"),
+  );
+  const raceWinner = raceA.status === 200 ? "نسخه نویسنده راست" : "نسخه نویسنده چپ";
+  const raceFinal = await call(owner, `/api/projects/${raceId}`);
+  ok(
+    (JSON.parse(raceFinal.body || "{}") as { project?: { meta?: { name?: string } } }).project?.meta?.name === raceWinner,
+    "داده نهایی همان نوشته برنده است (بدون بازنویسی مختلط)",
+  );
+  const raceVersions = JSON.parse((await call(owner, `/api/projects/${raceId}/versions`)).body || "{}") as {
+    versions?: { version: number }[];
+  };
+  ok(raceVersions.versions?.length === 2, "مسابقه فقط یک نسخه تازه ساخت", String(raceVersions.versions?.length));
+
+  // A project whose creation snapshot is missing (created before this feature
+  // shipped, or an insert that failed) must still be undoable: the first edit
+  // back-fills the *stored* state as revision 1 before writing the new one.
+  const legacyProject = JSON.parse(projectJson);
+  legacyProject.meta.name = "پروژه بدون تاریخچه";
+  legacyProject.activities = legacyProject.activities.slice(0, 3);
+  const legacyCreated = await call(owner, "/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ project: legacyProject, reportOptions: {} }),
+  });
+  const legacyId = (JSON.parse(legacyCreated.body || "{}") as { id?: string }).id ?? "";
+  await dbRun("delete from project_versions where project_id = $1", [legacyId]);
+  legacyProject.meta.name = "پروژه بدون تاریخچه — ویرایش";
+  legacyProject.activities = legacyProject.activities.slice(0, 1);
+  const legacyEdit = await call(owner, `/api/projects/${legacyId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ project: legacyProject }),
+    ip: `${CLIENT_IP}.51`,
+  });
+  ok(legacyEdit.status === 200, "ویرایش پروژه بی‌تاریخچه موفق است", legacyEdit.body.slice(0, 120));
+  const backfilled = JSON.parse((await call(owner, `/api/projects/${legacyId}/versions`)).body || "{}") as {
+    versions?: { version: number; reason: string }[];
+  };
+  ok(backfilled.versions?.length === 2, "ویرایش، نسخه قدیمی را هم بازسازی می‌کند", String(backfilled.versions?.length));
+  ok(backfilled.versions?.[1]?.reason === "create", "نسخه بازسازی‌شده با علت «ایجاد» ثبت شد", backfilled.versions?.[1]?.reason);
+  const legacyOld = JSON.parse((await call(owner, `/api/projects/${legacyId}/versions/1`)).body || "{}") as {
+    project?: { meta?: { name?: string } };
+  };
+  ok(
+    legacyOld.project?.meta?.name === "پروژه بدون تاریخچه",
+    "نسخه ۱ محتوای پیش از ویرایش را دارد (قابل واگردانی)",
+    legacyOld.project?.meta?.name,
+  );
 
   /* ---------------- 5. اعتبارسنجی و خطاها ---------------- */
   console.log("\n▶ ۵. اعتبارسنجی ورودی");
@@ -556,6 +827,62 @@ async function main() {
 
   /* ---------------- 9. محدودیت نرخ درخواست ---------------- */
   console.log("\n▶ ۹. محدودیت نرخ درخواست");
+
+  // The documented quota is 10 link creations per hour per client, shared across
+  // every project that client owns. Prove the boundary exactly — 10 succeed, the
+  // 11th is refused with a retry hint — and that it is not the per-project cap.
+  const quotaIp = `${CLIENT_IP}.77`;
+  const quotaProjectA = JSON.parse(projectJson);
+  quotaProjectA.meta.name = "سهمیه الف";
+  const quotaProjectB = JSON.parse(projectJson);
+  quotaProjectB.meta.name = "سهمیه ب";
+  const quotaA = (
+    JSON.parse(
+      (
+        await call(owner, "/api/projects", {
+          method: "POST",
+          body: JSON.stringify({ project: quotaProjectA, reportOptions: {} }),
+          ip: `${quotaIp}.1`,
+        })
+      ).body || "{}",
+    ) as { id?: string }
+  ).id;
+  const quotaB = (
+    JSON.parse(
+      (
+        await call(owner, "/api/projects", {
+          method: "POST",
+          body: JSON.stringify({ project: quotaProjectB, reportOptions: {} }),
+          ip: `${quotaIp}.2`,
+        })
+      ).body || "{}",
+    ) as { id?: string }
+  ).id;
+  const quotaStatuses: number[] = [];
+  for (let index = 0; index < 5; index += 1) {
+    quotaStatuses.push(
+      (await call(owner, `/api/projects/${quotaA}/share`, { method: "POST", body: "{}", ip: quotaIp })).status,
+      (await call(owner, `/api/projects/${quotaB}/share`, { method: "POST", body: "{}", ip: quotaIp })).status,
+    );
+  }
+  ok(
+    quotaStatuses.length === 10 && quotaStatuses.every((status) => status === 201),
+    "۱۰ ساخت لینک در ساعت برای هر کلاینت مجاز است (دو پروژه، پنج‌تا هرکدام)",
+    quotaStatuses.join(","),
+  );
+  const quotaExceeded = await call(owner, `/api/projects/${quotaA}/share`, {
+    method: "POST",
+    body: "{}",
+    ip: quotaIp,
+  });
+  const quotaHeaders = quotaExceeded.response.headers;
+  ok(quotaExceeded.status === 429, "ساخت لینک یازدهم ⇒ ۴۲۹", `got ${quotaExceeded.status}`);
+  ok(
+    Number(quotaHeaders.get("retry-after") ?? 0) > 0,
+    "پاسخ ۴۲۹ سرآیند Retry-After دارد",
+    String(quotaHeaders.get("retry-after")),
+  );
+
   let saw429 = false;
   for (let i = 0; i < 70; i += 1) {
     const response = await fetch(`${BASE}/api/analyze`, {

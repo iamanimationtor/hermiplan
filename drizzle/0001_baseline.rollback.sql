@@ -17,7 +17,7 @@
 -- Dropping the confirmation table afterwards returns the database to a state
 -- in which this file can never run by accident.
 --
--- Rollback order: 0003 → 0002 → 0001.
+-- Rollback order: 0004 → 0003 → 0002 → 0001.
 -- ---------------------------------------------------------------------------
 
 BEGIN;
@@ -33,6 +33,7 @@ $$;
 
 -- Objects added by later migrations are dropped first so this file also works
 -- on a database where only some rollbacks were executed.
+DROP TABLE IF EXISTS "project_versions";
 DROP INDEX IF EXISTS "project_share_tokens_project_idx";
 DROP INDEX IF EXISTS "project_share_tokens_hash_idx";
 DROP TABLE IF EXISTS "project_share_tokens";

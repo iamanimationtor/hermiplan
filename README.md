@@ -25,7 +25,7 @@
 | استانداردها | ارجاع به فهرست‌بهای واحد پایه، شرایط عمومی پیمان، مبحث مقررات ملی ساختمان، PMBOK 7، ISO 21500/21502، AACE — به‌عنوان چارچوب، نه گواهی انطباق |
 | قالب‌ها | ۱۰ نوع پروژه با فیلتر حوزه/پیچیدگی/مدت و ساختار WBS آماده |
 | ورود سریع داده | افزودن با یک Enter، درون‌ریزی از Excel/CSV (تشخیص خودکار ستون‌ها، اعداد فارسی، واحدهای هفته/ماه/ساعت، اتصال خودکار پیش‌نیازها) |
-| ایمنی داده | واگردانی/انجام مجدد (۴۰ مرحله)، ذخیره خودکار پیش‌نویس، تأیید پیش از جایگزینی قالب |
+| ایمنی داده | واگردانی/انجام مجدد (۴۰ مرحله)، ذخیره خودکار پیش‌نویس، تأیید پیش از جایگزینی قالب، **تاریخچه نسخه‌های سمت سرور با بازگردانی** و محافظت از بازنویسی هم‌زمان (۴۰۹) |
 | تحلیل سناریو | What-if: تأخیر فعالیت‌های بحرانی، تغییر سرعت اجرا و اثر سناریوی افزایش هزینه بر برآورد نهایی |
 | خروجی | ۷ فرمت: PDF (A4)، XLSX، XLS، CSV، JSON، MS Project XML، بسته کامل ZIP |
 
@@ -88,16 +88,16 @@ npm run dev                     # یا: npm run build && npm start
 | `npm run test:engine:regressions` | ۱۹۱ رگرسیون: محدودیت/Milestone/Baseline/EVM/تاریخ وضعیت/گرد کردن/سیاست پول |
 | `npm run test:smoke` | دود موتور روی همه قالب‌ها |
 | `npm run test:edge` | ممیزی موارد مرزی + هر ۵ مسیر خروجی |
-| `npm run test:security` | ۲۷۰ بررسی: شماره موبایل، OTP، CSRF، محدودیت نرخ، توکن اشتراک، وضعیت اشتراک در UI |
+| `npm run test:security` | ۲۹۱ بررسی: شماره موبایل، OTP، CSRF، محدودیت نرخ، توکن اشتراک، قاعده‌های خالص تاریخچه/بازگردانی، وضعیت اشتراک در UI |
 | `npm run test:export` | صحت واقعی فایل‌های XLSX/CSV/HTML/بسته + سازگاری اعداد بین خروجی‌ها (۵۱ بررسی؛ با `BASE_URL` ۶۱) |
 | `npx tsx scripts/legacy-db-check.ts prepare\|verify\|rollback` | مهاجرت روی پایگاه داده نسخه قبل بدون از دست رفتن داده |
-| `npm run test:api` | ۹۲ سناریوی یکپارچگی روی build تولیدی (۶ مسیر OTP فقط با دمو) و ۹۷ سناریو روی dev |
+| `npm run test:api` | ۱۵۲ بررسی یکپارچگی روی build تولیدی (۶ مسیر OTP فقط با دمو) و ۱۵۲ بررسی روی dev؛ شامل تاریخچه نسخه‌ها و ۴۰۹ |
 | `npm run test:otp` | زنجیره واقعی پیامک/OTP با ارائه‌دهنده‌ی ساختگی محلی: پیکربندی، هش، یک‌بارمصرف، مهلت ارسال، ۵۰۲ در قطع سرویس (نیازمند `DATABASE_URL` و build) |
 | `npm run test:legacy-db` | مهاجرت/rollback روی پایگاه نسخه قبل (`prepare\|verify\|rollback\|verify-rollback`) |
 | `npm run test:csp` | هدر CSP، nonce روی همه اسکریپت‌های inline و مجاز بودن منابع بیرونی |
 | `npm run test:layout` | رندر واقعی نمودار (پیکسل)، قواعد چاپ A4 و پیش‌شرط‌های چیدمان موبایل |
 | `npm run test:db:integrity` | هم‌زمانی محدودیت نرخ، یکتایی/آبشاری‌شدن قیدها، `VALIDATE CONSTRAINT` |
-| `npm run db:migration-safety` | ایمنی اجراکنندهٔ مهاجرت: جفت بازگشت، idempotency، drift؛ با `MIGRATION_SAFETY_ROLLBACK=1` تمرین کامل بازگشت و بازسازی |
+| `npm run db:migration-safety` | ۳۳ بررسی ایمنی اجراکنندهٔ مهاجرت: جفت بازگشت، idempotency، drift؛ با `MIGRATION_SAFETY_ROLLBACK=1` بازگشت واقعی ۰۰۰۲–۰۰۰۴، بازگشت کامل و بازسازی هم‌ساختار |
 | `npm run test:load` | آزمون بار محلی با p50/p95/p99 و نرخ خطا |
 | `npm run test:a11y` | دسترس‌پذیری HTML سرو‌شده: زبان/جهت، `main`، یک `h1`، برچسب ورودی‌ها، `alt`، بزرگ‌نمایی موبایل |
 | `npm run test:bundle` | بودجه‌ی gzip جاوااسکریپت هر مسیر (رچت ضد رگرسیون وزن صفحه) |
@@ -126,7 +126,7 @@ npx tsx scripts/pg-dev-server.ts &            # PostgreSQL واقعی روی ۱�
 export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5544/postgres
 npm run db:migrate
 npm run build && npx next start -p 3400 &      # NODE_ENV=production
-BASE_URL=http://127.0.0.1:3400 npm run test:api        # ۹۲ سناریو
+BASE_URL=http://127.0.0.1:3400 npm run test:api        # ۱۵۲ بررسی
 npm run test:db:integrity                              # هم‌زمانی و قیدها
 npm run test:csp                                       # سیاست امنیتی محتوا
 ```
@@ -146,6 +146,8 @@ npm run test:csp                                       # سیاست امنیتی
 | `HERMIPLAN_MARKET_FEED` / `_KEY` | ✖ | فید نرخ بازار (JSON) با توکن Bearer |
 | `NEXT_PUBLIC_SITE_URL` | ✖** | دامنه عمومی برای ساختن لینک `/s/<token>` (**بدون آن، Host درخواست استفاده می‌شود که پشت پراکسی می‌تواند آدرس داخلی باشد)
 | `RATE_LIMIT_*` | ✖ | بازنویسی سهمیه هر endpoint (جدول زیر) |
+| `PROJECT_HISTORY_LIMIT` | ✖ | تعداد نسخه‌های نگه‌داری‌شده هر پروژه (پیش‌فرض ۲۰، بازه ۳–۱۰۰) |
+| `PROJECT_HISTORY_BYTES` | ✖ | سقف بایتی تاریخچه هر پروژه (پیش‌فرض ۸ مبی‌بایت؛ سه نسخه آخر همیشه می‌مانند) |
 
 ## محدودیت نرخ (سهمیه هر endpoint)
 
@@ -166,6 +168,8 @@ serverless بین نمونه‌ها مشترک باشند. در نبود پای�
 | `POST /api/projects/:id/share` (ساخت لینک) | IP | ۱۰ / ساعت | `RATE_LIMIT_SHARE_CREATE` |
 | `DELETE /api/projects/:id/share` (ابطال) | IP | ۳۰ / دقیقه | `RATE_LIMIT_SHARE_REVOKE` |
 | `GET /s/<token>` (بازدید گزارش اشتراکی) | IP | ۲۴۰ / دقیقه | `RATE_LIMIT_SHARE_READ` |
+| `GET /api/projects/:id/versions` و `…/versions/:n` | IP | ۱۲۰ / دقیقه | `RATE_LIMIT_VERSION_READ` |
+| `POST /api/projects/:id/versions/:n/restore` (بازگردانی) | IP | ۲۰ / دقیقه | `RATE_LIMIT_VERSION_RESTORE` |
 
 ## مدل دسترسی و امنیت
 
@@ -189,6 +193,12 @@ serverless بین نمونه‌ها مشترک باشند. در نبود پای�
 - **پروژه‌هایی که پیش از مهاجرت `0003` «عمومی» بودند** لینک UUID قدیمی‌شان کار نمی‌کند و هیچ
   توکنی به‌صورت خودکار برایشان ساخته نمی‌شود. `npm run db:share-audit` فهرست این پروژه‌ها را
   می‌دهد و مالک در پنل گزارش، پیام «لینک قدیمی غیرفعال است» به‌همراه دکمه ساخت لینک تازه می‌بیند.
+- **تاریخچه نسخه‌ها**: هر ذخیره، یک نسخه‌ی تغییرناپذیر در `project_versions` می‌گذارد (فقط برای
+  مالک). بازگردانی، پیش از اعمال، وضعیت فعلی را هم به‌عنوان نسخه ذخیره می‌کند؛ بنابراین خودِ
+  بازگردانی هم قابل بازگشت است. شماره نسخه به‌عنوان توکن هم‌زمانی استفاده می‌شود: اگر دو تب با
+  یک شماره ذخیره کنند، دومی **۴۰۹** می‌گیرد و نوشته اول بازنویسی نمی‌شود. تاریخچه با
+  `PROJECT_HISTORY_LIMIT` (پیش‌فرض ۲۰، حداقل ۳) و `PROJECT_HISTORY_BYTES` (پیش‌فرض ۸ مگابایت)
+  محدود می‌شود.
 - **CSP هیچ منبع بیرونی ندارد**: فونت وزیرمتن خودمیزبان است (`public/fonts/`) و `style-src`/`font-src`
   دیگر `cdn.jsdelivr.net` را مجاز نمی‌کنند.
 

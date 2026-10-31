@@ -15,7 +15,8 @@
  *  5. the baseline rollback refuses to run without its confirmation table and
  *     leaves the schema untouched when it refuses,
  *  6. a full rollback followed by `db:migrate` rebuilds the identical schema,
- *  7. the 0002/0003 rollbacks run and can be re-applied (steps 5–7 need
+ *  7. the 0004/0003/0002 rollbacks run, actually remove what they added, and
+ *     can be re-applied (steps 5–7 need
  *     MIGRATION_SAFETY_ROLLBACK=1 because they empty the database).
  *
  * It deliberately runs against a **test** database: it edits the ledger row and
@@ -26,6 +27,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client } from "pg";
+import { SCHEMA_VERSION } from "../src/db/schema";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -62,6 +64,18 @@ async function main(): Promise<void> {
     const exists = readdirSync(dir).includes(rollback);
     check(exists, `${file} → ${rollback}`, exists ? "" : "missing");
   }
+
+  // Numbering and the advertised schema version are cheap invariants that break
+  // silently: a skipped number, or a new migration without a `SCHEMA_VERSION`
+  // bump (the health endpoint would then understate the schema it needs).
+  const numbers = migrations.map((file) => Number.parseInt(file.slice(0, 4), 10));
+  const sequential = numbers.every((value, index) => value === index + 1);
+  check(sequential, "شماره‌گذاری مهاجرت‌ها پیوسته است", numbers.join(","));
+  check(
+    SCHEMA_VERSION === numbers[numbers.length - 1],
+    "SCHEMA_VERSION با آخرین مهاجرت هم‌خوان است",
+    `${SCHEMA_VERSION} در برابر ${numbers[numbers.length - 1]}`,
+  );
 
   const client = new Client({ connectionString: url });
   await client.connect();
@@ -153,12 +167,20 @@ async function main(): Promise<void> {
     const afterRebuild = await snapshot();
     check(afterRebuild === beforeRollback, "ساختار بازسازی‌شده با ساختار پیش از بازگشت یکسان است");
 
-    console.log("\n▶ ۷. بازگشت ۰۰۰۲ و ۰۰۰۳ هم اجرا می‌شود و قابل بازاعمال است");
-    for (const version of ["0003_share_tokens", "0002_security_hardening"]) {
+    console.log("\n▶ ۷. بازگشت مهاجرت‌های شماره‌دار هم اجرا می‌شود و قابل بازاعمال است");
+    for (const version of ["0004_project_versions", "0003_share_tokens", "0002_security_hardening"]) {
       await client.query(readFileSync(join(dir, `${version}.rollback.sql`), "utf8"));
       const row = await client.query("select 1 from _hermiplan_migrations where version = $1", [version]);
       check(row.rowCount === 0, `${version}: ردیف دفتر حذف شد`);
     }
+    const droppedTables = await client.query<{ count: string }>(
+      "select count(*) from information_schema.tables where table_schema='public' and table_name in ('project_versions','project_share_tokens','rate_limits')",
+    );
+    check(Number(droppedTables.rows[0]?.count) === 0, "۰۰۰۲–۰۰۰۴ جدول‌های افزوده را واقعاً حذف کردند", `left ${droppedTables.rows[0]?.count}`);
+    const versionColumn = await client.query(
+      "select 1 from information_schema.columns where table_schema='public' and table_name='projects' and column_name='version'",
+    );
+    check(versionColumn.rowCount === 0, "ستون projects.version با بازگشت ۰۰۰۴ حذف شد");
     const otpType = await client.query<{ data_type: string }>(
       "select data_type from information_schema.columns where table_schema='public' and table_name='otp_codes' and column_name='attempts'",
     );
@@ -168,7 +190,15 @@ async function main(): Promise<void> {
     );
     check(defaultFlag.rows[0]?.column_default === "true", "پیش‌فرض is_public به true بازگشت (فقط ساختار)", defaultFlag.rows[0]?.column_default);
     const reapply = runMigrate();
-    check(reapply.code === 0, "بازاعمال ۰۰۰۲ و ۰۰۰۳ موفق است", `exit=${reapply.code}`);
+    check(reapply.code === 0, "بازاعمال ۰۰۰۲–۰۰۰۴ موفق است", `exit=${reapply.code}`);
+    const reappliedTables = await client.query<{ count: string }>(
+      "select count(*) from information_schema.tables where table_schema='public' and table_name in ('project_versions','project_share_tokens','rate_limits')",
+    );
+    check(Number(reappliedTables.rows[0]?.count) === 3, "پس از بازاعمال، هر سه جدول برگشتند", `found ${reappliedTables.rows[0]?.count}`);
+    const versionDefault = await client.query<{ column_default: string }>(
+      "select column_default from information_schema.columns where table_schema='public' and table_name='projects' and column_name='version'",
+    );
+    check(versionDefault.rows[0]?.column_default === "1", "ستون projects.version با پیش‌فرض ۱ بازگشت", versionDefault.rows[0]?.column_default);
     const reapplyFlag = await client.query<{ column_default: string }>(
       "select column_default from information_schema.columns where table_schema='public' and table_name='projects' and column_name='is_public'",
     );

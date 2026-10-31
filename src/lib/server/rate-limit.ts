@@ -41,6 +41,8 @@ export const RATE_RULES = {
   shareCreate: { limit: envInt("RATE_LIMIT_SHARE_CREATE", 10), windowMs: 60 * 60_000 },
   shareRevoke: { limit: envInt("RATE_LIMIT_SHARE_REVOKE", 30), windowMs: 60_000 },
   shareRead: { limit: envInt("RATE_LIMIT_SHARE_READ", 240), windowMs: 60_000 },
+  versionRead: { limit: envInt("RATE_LIMIT_VERSION_READ", 120), windowMs: 60_000 },
+  versionRestore: { limit: envInt("RATE_LIMIT_VERSION_RESTORE", 20), windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export interface RateLimitResult {
