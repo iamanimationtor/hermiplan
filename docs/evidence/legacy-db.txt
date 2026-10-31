@@ -1,4 +1,4 @@
-# legacy database cycle (previous release schema → 0005 → rollback) — 2026-10-31T17:02:13Z
+# legacy database cycle (previous release schema → 0005 → rollback) — 2026-10-31T17:39:58Z
 
 ## prepare
 ▶ ساخت پایگاه داده نسخه قبلی (legacy) و درج داده‌های موجود
@@ -9,9 +9,6 @@
 ✔ مرحله «prepare» با 2 بررسی موفق
 
 ## migrate
-  ✓ applied
-
-▶ applying 0005_user_credentials
   ✓ applied
 
 All migrations applied.

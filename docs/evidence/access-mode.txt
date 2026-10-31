@@ -1,10 +1,12 @@
-# access mode + security + password + db integrity — 2026-10-31T17:10:23Z
-## access state
+# access mode — 2026-10-31T17:40:30Z
+$ cat config/access.json
 {
   "mode": "locked",
   "updatedAt": "2026-10-31",
   "note": "تحویل واقعی: محدودیت‌های مستندشده فعال است (سهمیهٔ هر endpoint و سقف ۱۰ لینک اشتراک)."
 }
+
+$ npm run access:status
 حالت فعال: locked  (منبع: config/access.json)
 سقف لینک فعال هر پروژه: ۱۰
 تاریخچهٔ هر پروژه: 20 نسخه / 8 مگابایت
@@ -14,14 +16,17 @@
 آخرین تغییر فایل: 2026-10-31
 یادداشت: تحویل واقعی: محدودیت‌های مستندشده فعال است (سهمیهٔ هر endpoint و سقف ۱۰ لینک اشتراک).
 
-## test:access
+$ npm run test:access
+  ✓ مقدار نامعتبر "unlimited" ⇒ locked
+
 ✔ 52 بررسی حالت دسترسی — همه موفق
 
-## test:security
-✔ 291 بررسی امنیتی — همه موفق
+$ curl -s :3400/api/health (config → locked)
+{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
+$ curl -s :3410/api/health (HERMIPLAN_ACCESS_MODE=open)
+{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"env","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
 
-## test:password
-✔ 45 بررسی رمز عبور/نام کاربری — همه موفق
-
-## test:db:integrity
-✔ 20 بررسی یکپارچگی/هم‌زمانی — همه موفق
+$ curl -s :3400/builder | grep -c "بدون سهمیه"
+0
+$ curl -s :3410/builder | grep -c "بدون سهمیه"
+1

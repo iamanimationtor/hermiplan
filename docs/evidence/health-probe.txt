@@ -1,21 +1,32 @@
-# /api/health probe — 2026-10-31T17:26:25Z (UTC)
+# /api/health probe — 2026-10-31T17:41:14Z (UTC)
 
-## 1) delivery state — config/access.json mode "locked"
-$ cat config/access.json
-{
-  "mode": "locked",
-  "updatedAt": "2026-10-31",
-  "note": "تحویل واقعی: محدودیت‌های مستندشده فعال است (سهمیهٔ هر endpoint و سقف ۱۰ لینک اشتراک)."
-}
+All servers run the same build (`next start`); only DATABASE_URL / HERMIPLAN_ACCESS_MODE differ.
 
+## 1) migrated database, delivery mode "locked" (:3400)
 $ curl -s :3400/api/health
 {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
 
-## 2) pre-release state — HERMIPLAN_ACCESS_MODE=open on the same build (:3410)
+## 2) migrated database, pre-release mode "open" (:3410)
 $ curl -s :3410/api/health
 {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"env","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
 
-## 3) page status codes (:3400)
+## 3) database without migrations (:3600)
+$ curl -s :3600/api/health
+{"ok":false,"schemaVersion":5,"database":"ok","missingTables":["projects","users","sessions","otp_codes","project_events","rate_limits","project_share_tokens","project_versions"],"missingColumns":[],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
+HTTP 503
+
+$ curl -s :3600/builder
+HTTP 200   (the page itself renders; the failure is reported when data is needed)
+
+## 4) migrated database, 0005 columns dropped (:3600 restarted)
+$ curl -s :3600/api/health
+{"ok":false,"schemaVersion":5,"database":"ok","missingTables":[],"missingColumns":["users.username","users.password_hash"],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
+HTTP 503
+
+$ curl -s -X POST :3600/api/auth (register)
+HTTP 503  {"error":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید","code":"schema_incomplete"}
+
+## 5) page status codes (:3400)
 /                                                        200
 /builder                                                 200
 /robots.txt                                              200
@@ -23,19 +34,16 @@ $ curl -s :3410/api/health
 /report/00000000-0000-4000-8000-000000000000             404
 /s/not-a-real-token                                      404
 
-## 4) the account entry point exists on both pages
-$ curl -s :3400/ | grep -o "ورود / ثبت‌نام" | wc -l
-1
-$ curl -s :3400/builder | grep -o "ورود / ثبت‌نام" | wc -l
-1
+## 6) the 404 page states the rule, without confirming which case it was
+report 404 sentence: 1
+share  404 sentence: 1
 
-## 5) cookie attributes: cross-site frame (https) vs plain http
+## 7) cookie attributes: cross-site frame (https) vs plain http
 $ POST /api/auth (register) with `x-forwarded-proto: https`
-set-cookie: hermiplan_session=<64 hex>; Path=/; Expires=…; Secure; HttpOnly; SameSite=none
-$ POST /api/auth (register) without that header (plain http, local)
-set-cookie: hermiplan_session=<64 hex>; Path=/; Expires=…; HttpOnly; SameSite=lax
+hermiplan_session=828a5c65150ad1fd499708f75780f602582df06dc23f2de1c91e858c3d11b9a1; Path=/; Expires=Wed, 30 Dec 2026 17:41:20 GMT; Secure; HttpOnly; SameSite=none
+$ same, over plain http
+hermiplan_session=cfae6398e0336737a319929ce0d676fb5806efa415496388b022ca792080efc1; Path=/; Expires=Wed, 30 Dec 2026 17:41:20 GMT; HttpOnly; SameSite=lax
 
-Reason: `SameSite=Lax` is not sent by the browser inside a cross-site frame, which
-turned every opened report into a 404 for its own owner. Over https we now use
-`SameSite=None; Secure` (the only combination browsers accept there); over http we
-keep `Lax`, because `None` without `Secure` is rejected outright.
+Reason: SameSite=Lax is not sent by browsers inside a cross-site frame; that is what made
+an owner's own report 404. Over https we send SameSite=None; Secure, the only combination
+browsers accept there. Over plain http we keep Lax, because None without Secure is rejected.

@@ -1,4 +1,4 @@
-# export quality — 2026-10-31T17:29:49Z
+# export quality — 2026-10-31T17:39:29Z
 
 ## with a live server
 ▶ ۱. XLSX — بسته واقعی Office
