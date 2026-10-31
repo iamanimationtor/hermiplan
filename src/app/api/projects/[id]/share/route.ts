@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { projects } from "@/db/schema";
 import { getCurrentUser, getGuestToken, isProjectOwner } from "@/lib/server/auth";
 import { checkRateLimit, RATE_RULES, clientKey, retryAfterHeaders } from "@/lib/server/rate-limit";
+import { ACCESS } from "@/lib/server/access-mode";
 import {
   csrfRejection,
   internalErrorResponse,
@@ -23,8 +24,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** Hard cap on live links per project — bounded blast radius for a leaked list. */
-const MAX_ACTIVE_LINKS = 10;
+/**
+ * Cap on live links per project — bounded blast radius for a leaked list.
+ * In `open` access mode the product cap is lifted (see config/access.json); a
+ * high technical ceiling remains so a script cannot fill the database.
+ */
+const MAX_ACTIVE_LINKS = ACCESS.shareLinkCap;
 
 /**
  * Share links for the printable report.

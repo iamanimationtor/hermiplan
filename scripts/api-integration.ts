@@ -82,6 +82,35 @@ const ok = (condition: boolean, message: string, detail?: string) => {
   }
 };
 
+/**
+ * برای ادعاهایی که تنها در یک حالت دسترسی معنا دارند. «نادیده» شمرده می‌شود و
+ * در خلاصهٔ پایانی جدا می‌آید — هیچ‌وقت جای «موفق» را نمی‌گیرد.
+ */
+const skip = (message: string, detail?: string) => {
+  skipped += 1;
+  console.log(`  ⋯ ${message}${detail ? ` — ${detail}` : ""}`);
+};
+
+/**
+ * حالت دسترسی سرور هدف، از `/api/health` خوانده می‌شود.
+ *
+ * در حالت «open» سهمیه‌های *محصول* برداشته شده‌اند (نه سهمیه‌های امنیتی)، پس
+ * ادعای «۱۱اُمین درخواست ۴۲۹ می‌گیرد» در آن حالت درست نیست. اگر تست به‌جای
+ * پرسیدنِ حالت، عدد را ثابت فرض کند، در یک حالت می‌شکند و در حالت دیگر بی‌آنکه
+ * چیزی اثبات کند سبز می‌شود. پس هر تستِ سهمیه اول حالت را می‌خواند.
+ */
+let accessMode: "open" | "locked" = "locked";
+let shareLinkCap = 10;
+async function readAccessMode(): Promise<void> {
+  const response = await fetch(`${BASE}/api/health`);
+  const body = (await response.json().catch(() => ({}))) as {
+    access?: { mode?: string; shareLinkCap?: number };
+  };
+  accessMode = body.access?.mode === "open" ? "open" : "locked";
+  shareLinkCap = Number(body.access?.shareLinkCap ?? 10);
+  console.log(`▶ حالت دسترسی سرور: ${accessMode} · سقف لینک فعال هر پروژه: ${shareLinkCap}`);
+}
+
 /** Minimal cookie jar so guest/session identities behave like real browsers. */
 class Jar {
   private cookies = new Map<string, string>();
@@ -129,6 +158,7 @@ function buildPayload(name: string): string {
 
 async function main() {
   console.log(`▶ سرور هدف: ${BASE} · IP آزمون: ${CLIENT_IP} · شماره‌ها: ${PHONE_A}/${PHONE_B}/${PHONE_C}\n`);
+  await readAccessMode();
 
   /* ---------------- 1. ساخت پروژه و چرخه مالکیت ---------------- */
   console.log("▶ ۱. ساخت پروژه و دسترسی مالک");
@@ -307,18 +337,29 @@ async function main() {
   }
   const listed = await call(owner, `/api/projects/${id}/share`);
   const listedBody = JSON.parse(listed.body || "{}") as { tokens?: { active: boolean }[] };
-  ok(
-    (listedBody.tokens ?? []).filter((token) => token.active).length >= 10,
-    "پایگاه اکنون ۱۰ لینک فعال دارد",
-  );
+  const activeBefore = (listedBody.tokens ?? []).filter((token) => token.active).length;
+  ok(activeBefore >= 10, "پایگاه اکنون ۱۰ لینک فعال دارد", String(activeBefore));
   const overCap = await call(owner, `/api/projects/${id}/share`, {
     method: "POST",
     body: "{}",
-    // A fresh client identity: 409 must come from the per-project cap, never from
-    // the per-IP creation quota (which would make the assertion meaningless).
+    // A fresh client identity: the answer must come from the per-project cap,
+    // never from the per-IP creation quota (which would make it meaningless).
     ip: `${CLIENT_IP}.62`,
   });
-  ok(overCap.status === 409, "سقف ۱۰ لینک فعال اعمال می‌شود ⇒ ۴۰۹ (نه ۴۲۹)", `got ${overCap.status}`);
+  if (accessMode === "open") {
+    // Open mode: the cap is no longer 10. Seeding 100 000 rows to reach the new
+    // ceiling would be absurd, so the honest assertion is the boundary that
+    // actually changed: the 11th link is created instead of refused, and the
+    // advertised cap is the raised one. The 10 link refusal itself is proved by
+    // `npm run test:access` (pure rules) in the same suite run.
+    ok(overCap.status === 201, "حالت open: ساخت لینک یازدهم دیگر ۴۰۹ نمی‌گیرد ⇒ ۲۰۱", `got ${overCap.status}`);
+    ok(shareLinkCap > 10, "سقف لینک فعال اعلام‌شده در حالت open بالاتر از ۱۰ است", String(shareLinkCap));
+    const opened = JSON.parse(overCap.body || "{}") as { token?: string };
+    ok((opened.token ?? "").length === 43, "لینک یازدهم سالم صادر شد (توکن ۴۳ نویسه)");
+  } else {
+    ok(overCap.status === 409, "سقف ۱۰ لینک فعال اعمال می‌شود ⇒ ۴۰۹ (نه ۴۲۹)", `got ${overCap.status}`);
+    ok(shareLinkCap === 10, "سقف اعلام‌شده در حالت locked دقیقاً ۱۰ است", String(shareLinkCap));
+  }
 
   // (۴) CSRF on revocation
   const crossOriginRevoke = await call(owner, `/api/projects/${id}/share?all=1`, {
@@ -834,16 +875,20 @@ async function main() {
         break;
       }
     }
-    ok(limitedAt > 0, "درخواست‌های پشت‌سرهم فهرست، در نهایت ۴۲۹ می‌گیرند", "هرگز محدود نشد");
-    // The quota is configurable, so compare against the configured value rather
-    // than hard-coding 120 — a mismatch would otherwise be a silent pass.
-    const expectedQuota = Number(process.env.RATE_LIMIT_PROJECT_READ ?? 120);
-    ok(
-      limitedAt === expectedQuota + 1,
-      `اولین ۴۲۹ دقیقاً بعد از سهمیه (${expectedQuota}) رخ می‌دهد`,
-      `محدودسازی در درخواست ${limitedAt}`,
-    );
-    ok(retryAfter.length > 0, "پاسخ ۴۲۹ هدر Retry-After دارد", `retry-after="${retryAfter}"`);
+    if (accessMode === "open") {
+      ok(limitedAt === 0, "حالت open: ۱۳۰ درخواست پیاپی فهرست هیچ ۴۲۹ نمی‌گیرد", `محدودسازی در درخواست ${limitedAt}`);
+    } else {
+      ok(limitedAt > 0, "درخواست‌های پشت‌سرهم فهرست، در نهایت ۴۲۹ می‌گیرند", "هرگز محدود نشد");
+      // The quota is configurable, so compare against the configured value rather
+      // than hard-coding 120 — a mismatch would otherwise be a silent pass.
+      const expectedQuota = Number(process.env.RATE_LIMIT_PROJECT_READ ?? 120);
+      ok(
+        limitedAt === expectedQuota + 1,
+        `اولین ۴۲۹ دقیقاً بعد از سهمیه (${expectedQuota}) رخ می‌دهد`,
+        `محدودسازی در درخواست ${limitedAt}`,
+      );
+      ok(retryAfter.length > 0, "پاسخ ۴۲۹ هدر Retry-After دارد", `retry-after="${retryAfter}"`);
+    }
   }
 
   /* ---------------- 5. اعتبارسنجی و خطاها ---------------- */
@@ -1044,7 +1089,7 @@ async function main() {
   }
   ok(
     quotaStatuses.length === 10 && quotaStatuses.every((status) => status === 201),
-    "۱۰ ساخت لینک در ساعت برای هر کلاینت مجاز است (دو پروژه، پنج‌تا هرکدام)",
+    "۱۰ ساخت لینک اول برای هر کلاینت پذیرفته می‌شود (دو پروژه، پنج‌تا هرکدام)",
     quotaStatuses.join(","),
   );
   const quotaExceeded = await call(owner, `/api/projects/${quotaA}/share`, {
@@ -1053,12 +1098,25 @@ async function main() {
     ip: quotaIp,
   });
   const quotaHeaders = quotaExceeded.response.headers;
-  ok(quotaExceeded.status === 429, "ساخت لینک یازدهم ⇒ ۴۲۹", `got ${quotaExceeded.status}`);
-  ok(
-    Number(quotaHeaders.get("retry-after") ?? 0) > 0,
-    "پاسخ ۴۲۹ سرآیند Retry-After دارد",
-    String(quotaHeaders.get("retry-after")),
-  );
+  if (accessMode === "open") {
+    ok(
+      quotaExceeded.status === 201,
+      "حالت open: ساخت لینک یازدهم سهمیه نمی‌خورد ⇒ ۲۰۱",
+      `got ${quotaExceeded.status}`,
+    );
+    ok(
+      !quotaHeaders.get("retry-after"),
+      "پاسخ موفق هیچ Retry-After ندارد",
+      String(quotaHeaders.get("retry-after")),
+    );
+  } else {
+    ok(quotaExceeded.status === 429, "ساخت لینک یازدهم ⇒ ۴۲۹", `got ${quotaExceeded.status}`);
+    ok(
+      Number(quotaHeaders.get("retry-after") ?? 0) > 0,
+      "پاسخ ۴۲۹ سرآیند Retry-After دارد",
+      String(quotaHeaders.get("retry-after")),
+    );
+  }
 
   let saw429 = false;
   for (let i = 0; i < 70; i += 1) {
@@ -1072,13 +1130,20 @@ async function main() {
       break;
     }
   }
-  ok(saw429, "درخواست‌های پیاپی بیش از حد مجاز ⇒ ۴۲۹");
-  const otherClient = await fetch(`${BASE}/api/analyze`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-forwarded-for": "10.99.99.99" },
-    body: MINIMAL_PROJECT,
-  });
-  ok(otherClient.status === 200, "محدودیت به‌ازای هر IP است، نه سراسری", `got ${otherClient.status}`);
+  if (accessMode === "open") {
+    // 70 analyses in a row are well past the 30/hour product quota; the point of
+    // the assertion is that the quota is gone, not that traffic is cheap.
+    ok(!saw429, "حالت open: ۷۰ تحلیل پیاپی هیچ ۴۲۹ نمی‌گیرد", saw429 ? "محدود شد" : "");
+    skip("محدودیت نرخ تحلیل در حالت open وجود ندارد؛ «به‌ازای هر IP» سنجیدنی نیست");
+  } else {
+    ok(saw429, "درخواست‌های پیاپی بیش از حد مجاز ⇒ ۴۲۹");
+    const otherClient = await fetch(`${BASE}/api/analyze`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "10.99.99.99" },
+      body: MINIMAL_PROJECT,
+    });
+    ok(otherClient.status === 200, "محدودیت به‌ازای هر IP است، نه سراسری", `got ${otherClient.status}`);
+  }
 
   console.log(`\n══════════ نتیجه: ${passed} موفق / ${failed} ناموفق / ${skipped} نادیده ══════════`);
   if (failures.length) failures.forEach((message) => console.error(`  • ${message}`));

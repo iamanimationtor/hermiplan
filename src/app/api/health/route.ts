@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { SCHEMA_VERSION } from "@/db/schema";
+import { describeAccessMode } from "@/lib/server/access-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,8 @@ export async function GET() {
         shareLinks: "postgres",
         revisionHistory: "postgres",
         smsConfigured: Boolean(process.env.SMS_PROVIDER_KEY),
+        // "open" = pre-release: product quotas lifted by config/access.json.
+        access: describeAccessMode(),
       },
       { headers: { "Cache-Control": "no-store" } },
     );

@@ -1,4 +1,4 @@
-# export fidelity — XLSX / CSV / HTML / package / MS Project / print HTML — 2026-10-31T16:20:27Z
+# BASE_URL=:3400 npm run test:export — 2026-10-31T16:35:57Z
 ▶ ۱. XLSX — بسته واقعی Office
   ✓ بخش [Content_Types].xml حاضر است
   ✓ xl/workbook.xml حاضر است

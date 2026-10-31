@@ -8,7 +8,7 @@
 | شاخه | `arena/2f8571d5-hermiplan` |
 | کامیت‌های این دور | `96312f1` → `19f41a6` → `ccd9c13` → `061e18e` (همه push شده) |
 | build | `next build` موفق، ۲۰ مسیر |
-| آزمون‌ها | ۱۰ مجموعه واحد/رگرسیون + ۱۹۱ سناریوی یکپارچگی روی build تولیدی (۶ نادیده) + ۱۹۶ روی `next dev` |
+| آزمون‌ها | ۱۱ مجموعه واحد/رگرسیون + ۱۹۲ سناریوی یکپارچگی روی build تولیدی در `locked` / ۱۹۰ در `open` + ۱۹۶ روی `next dev` |
 | پایگاه | PostgreSQL 18.6 واقعی روی `127.0.0.1:5544` (چهار مهاجرت `0001`–`0004`) |
 | شواهد | `docs/evidence/` (۴۰ فایل) — همه در همین دور از نو ساخته شد |
 
@@ -76,8 +76,8 @@
 | --- | --- | --- | --- |
 | build | `next build` | ✅ ۲۰ مسیر، ۰ خطا | `evidence/build.txt` |
 | نوع‌ها / لینت | `tsc --noEmit` / `eslint .` | ۰ / ۰ | `evidence/typecheck.txt`، `evidence/lint.txt` |
-| `npm test` | ۱۰ مجموعه | ✅ ۱۰/۱۰ (۳۱ بررسی فایل پشتیبان هم داخل آن) | `evidence/tests.txt` |
-| API روی build تولیدی | `BASE_URL=…:3400 npm run test:api` | ✅ **۱۹۱ / ۰ / ۶** | `evidence/api-integration.txt` |
+| `npm test` | ۱۱ مجموعه | ✅ ۱۱/۱۱ (۳۱ بررسی فایل پشتیبان و ۵۱ بررسی حالت دسترسی هم داخل آن) | `evidence/tests.txt` |
+| API روی build تولیدی | `BASE_URL=…:3400 npm run test:api` | ✅ **۱۹۰ / ۰ / ۷** (`open`) و **۱۹۲ / ۰ / ۶** (`locked`) | `evidence/api-integration.txt` |
 | API روی `next dev` + OTP دمو | `BASE_URL=…:3500 …` | ✅ **۱۹۶ / ۰ / ۰** | `evidence/api-integration-otp.txt` |
 | برش تاریخچه/مقایسه/اعتبارسنجی | §۴-ب، §۴-ج، §۴-د | ✅ **۷۵** | `evidence/versions.txt` |
 | تفاوت نسخه‌ها (خالص) | `npm run test:versions` | ✅ ۴۱ | `evidence/final-checks.txt` |
@@ -256,9 +256,10 @@
 3. `POST /api/projects/:id/share` با بدنهٔ خالی اکنون ۲۰۱ می‌دهد (قبلاً ۴۰۰ می‌داد) و بدنهٔ ناقص
    همچنان ۴۰۰ — `api-integration` §۳-ب-۲ (۴ بررسی).
 
-**اعداد تازه بعد از این تغییرات:** API روی build تولیدی **۱۹۱/۰/۶**، روی `next dev` **۱۹۶/۰/۰**،
-`npm test` **۱۰/۱۰**، a11y ۳۲، export ۶۴، layout ۲۴، versions ۴۱، project-file ۳۱، bundle ۶/۶،
-CSP ۲۴/۹۲، امنیت ۲۹۱، db-integrity ۲۰، migration-safety ۳۳، legacy ۲/۳۱/۹.
+**اعداد تازه بعد از این تغییرات:** API روی build تولیدی **۱۹۲/۰/۶** (`locked`) و **۱۹۰/۰/۷** (`open`)،
+روی `next dev` **۱۹۶/۰/۰**، `npm test` **۱۱/۱۱**، a11y ۳۲، export ۷۲، layout ۲۴، versions ۴۱،
+project-file ۳۱، access ۵۱، bundle ۶/۶، CSP ۲۴/۹۲/۷۸، امنیت ۲۹۱، db-integrity ۲۰،
+migration-safety ۳۳، legacy ۲/۳۱/۹.
 
 ---
 
@@ -274,6 +275,27 @@ CSP ۲۴/۹۲، امنیت ۲۹۱، db-integrity ۲۰، migration-safety ۳۳، 
 **افزودهٔ این بازبینی:** پوشش امضای بایتی هر ۷ فرمت خروجی از سرویس (xlsx/xls/csv/json/msproject/package/pdf-print)
 با بررسی `magic bytes` + `content-type` + حجم — `export-check` از ۶۴ به **۷۲** بررسی رسید، و
 `csp-real-routes` (۷۸) به فهرست شواهد اضافه شد.
+
+---
+
+## ۱۱. حالت دسترسی — پلتفرم پیش از انتشار، بی‌سهمیه
+
+**درخواست:** پلتفرم هنوز عمومی نشده؛ همه بتوانند بی‌محدودیت پروژه بسازند و خروجی بگیرند، و همهٔ
+این تصمیم در **یک فایل** باشد تا بعداً با یک فرمان برگردد.
+
+| تصمیم | پیاده‌سازی | آزمون |
+| --- | --- | --- |
+| یک کلید برای کل سهمیه‌های محصول | `config/access.json` (`{"mode":"open"}`) — تنها منبع | `access-mode-check` §۱ |
+| قواعد در یک ماژول خالص، بدون سرور | `src/lib/access-mode.ts`: `accessProfile()`, `normalizeAccessMode()`, `PRODUCT_QUOTA_KEYS` | `access-mode-check` (پروفایل `open`/`locked`، ۱۰ مقدار نامعتبر ⇒ `locked`) |
+| خواندن قطعی در سرور | `src/lib/server/access-mode.ts` با `import` ایستای JSON (نه `fs`) و بازنویسی با `HERMIPLAN_ACCESS_MODE` | `/api/health` ⇒ `access.mode`/`source` |
+| برداشتن سهمیه‌ها در نقطهٔ واحد | `checkRateLimit` برای فهرست معاف (`analyze`, `export`, `projects`, `projectRead`, `projectsList`, `shareCreate`, `shareRevoke`, `shareRead`, `versionRead`, `versionRestore`) با `bypassed: true` | `api` §۴-و (۱۳۰ درخواست بدون ۴۲۹)، §۹ (۱۱ لینک، ۷۰ تحلیل) |
+| سقف لینک فعال | `ACCESS.shareLinkCap` = ۱۰۰٬۰۰۰ در `open` (۱۰ در `locked`) | `api` §۳-ب: ۴۰۹ در `locked`، ۲۰۱ برای یازدهمی در `open` |
+| تاریخچه | ۱۰۰ نسخه / ۳۲MB در `open` (۲۰ / ۸MB در `locked`)، متغیر محیطی همچنان مقدم | `access-mode-check`, `project-versions-core` |
+| آنچه برداشته **نمی‌شود** | سهمیهٔ `auth`/`otpRequest`/`otpVerify`، مالکیت `/report/<id>`، انقضا/ابطال/یک‌بارمصرف توکن، سقف بدنه ۳MB و طرح Zod (۱۰۰۰ فعالیت و…) | `access-mode-check` §۳؛ `security` ۲۹۱؛ `api` §۲/§۳/§۵ |
+| بازگشت به سهمیه‌ها | `npm run access:locked` (نیازمند build) یا `HERMIPLAN_ACCESS_MODE=locked` (بدون build) | `api` روی `:3410` با env ⇒ ۱۹۲/۰/۶ |
+
+نشان وضعیت هم به‌صورت اختیاری زیر سربرگ سازنده نمایش داده می‌شود (`BuilderApp` prop `accessBadge`،
+مقدارش را سرور تعیین می‌کند) تا کاربر بداند چرا سهمیه‌ای نمی‌بیند.
 
 ---
 

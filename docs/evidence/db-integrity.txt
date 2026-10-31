@@ -1,4 +1,4 @@
-# db integrity / concurrency — 2026-10-31T16:20:05Z
+# npm run test:db:integrity — 2026-10-31T16:33:48Z
 ▶ بررسی یکپارچگی پایگاه داده روی PostgreSQL واقعی
   سرور: PostgreSQL 18.6
 ▶ ۱. هم‌زمانی محدودیت نرخ روی PostgreSQL واقعی

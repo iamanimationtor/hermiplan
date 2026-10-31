@@ -1,6 +1,6 @@
-# revision history, restore, compare and parameter validation — 2026-10-31T16:12:38Z
-sections §۴-ب (history), §۴-ج (diff) and §۴-د (parameter validation) of `npm run test:api`
-against the production build on :3400 with real PostgreSQL.
+# revision history, restore, compare and parameter validation — 2026-10-31T16:32:53Z
+sections §۴-ب (history: 42), §۴-ج (diff: 14) and §۴-د (parameter validation: 19) of
+`npm run test:api` against the production build on :3400 (real PostgreSQL, access mode open).
 
 ▶ ۴-ب. تاریخچه نسخه‌ها، بازگردانی و ویرایش هم‌زمان
   ✓ پروژه آزمون تاریخچه ساخته شد
@@ -72,7 +72,7 @@ against the production build on :3400 with real PostgreSQL.
   ✓ limit غیرعددی ⇒ ۴۰۰ (نه ۲۰۰/۵۰۰)
   ✓ limit بیش از سقف ⇒ ۴۰۰ (نه ۲۰۰/۵۰۰)
   ✓ limit=۲ حداکثر دو نسخه برمی‌گرداند
-  ✓ تعداد نسخه‌های نگه‌داری‌شده ≤ 20
+  ✓ تعداد نسخه‌های نگه‌داری‌شده ≤ 100
   ✓ نسخه جاری هرگز هرس نمی‌شود
   ✓ فهرست از جدید به قدیم مرتب است
   ✓ دو ویرایش هم‌زمان روی یک نسخه: یکی موفق، دیگری ۴۰۹
@@ -83,5 +83,4 @@ against the production build on :3400 with real PostgreSQL.
   ✓ نسخه بازسازی‌شده با علت «ایجاد» ثبت شد
   ✓ نسخه ۱ محتوای پیش از ویرایش را دارد (قابل واگردانی)
 
-
-── 75 بررسی موفق / ۰ ناموفق ──
+# 75 checks in these sections

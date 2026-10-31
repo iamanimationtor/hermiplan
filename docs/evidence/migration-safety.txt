@@ -1,4 +1,4 @@
-# migration safety + idempotency + drift — 2026-10-31T16:20:05Z
+# MIGRATION_SAFETY_ROLLBACK=1 npm run db:migration-safety (scratch db) — 2026-10-31T16:33:49Z
 ▶ ۱. هر مهاجرت فایل بازگشت جفت‌شده دارد
   ✓ 0001_baseline.sql → 0001_baseline.rollback.sql
   ✓ 0002_security_hardening.sql → 0002_security_hardening.rollback.sql

@@ -1,4 +1,4 @@
-# production bundle budget — 2026-10-31T16:12:38Z
+# BASE_URL=:3400 npm run test:bundle — 2026-10-31T16:35:57Z
 ▶ بودجه‌ی جاوااسکریپت هر مسیر (gzip)
   ✓ /builder             176.9 KB  (سقف 210 KB)
   ✓ /report/[id]           139 KB  (سقف 170 KB)

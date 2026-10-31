@@ -6,6 +6,7 @@
  * do can be unit-tested without PostgreSQL.
  */
 import { createHash } from "node:crypto";
+import { ACCESS } from "@/lib/server/access-mode";
 import type { ProjectInput } from "@/lib/engine/types";
 import type { ReportOptions } from "@/lib/validation";
 
@@ -13,13 +14,15 @@ export type VersionReason = "create" | "autosave" | "restore" | "pre-restore";
 
 const RAW_LIMIT = Number.parseInt(process.env.PROJECT_HISTORY_LIMIT ?? "", 10);
 /** Newest revisions kept per project (3–100). */
-export const HISTORY_LIMIT = Number.isFinite(RAW_LIMIT) ? Math.min(Math.max(RAW_LIMIT, 3), 100) : 20;
+export const HISTORY_LIMIT = Number.isFinite(RAW_LIMIT)
+  ? Math.min(Math.max(RAW_LIMIT, 3), 100)
+  : ACCESS.history.count;
 
 const RAW_BYTES = Number.parseInt(process.env.PROJECT_HISTORY_BYTES ?? "", 10);
 /** Upper bound for one project's history; the newest three are always kept. */
 export const HISTORY_BYTES_LIMIT = Number.isFinite(RAW_BYTES)
   ? Math.max(RAW_BYTES, 512 * 1024)
-  : 8 * 1024 * 1024;
+  : ACCESS.history.bytes;
 
 /** Never prune below this many revisions, whatever the byte budget says. */
 export const KEEP_AT_LEAST = 3;

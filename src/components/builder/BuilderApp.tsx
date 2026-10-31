@@ -40,7 +40,14 @@ interface SavedProject {
   updatedAt: string;
 }
 
-export function BuilderApp({ initial }: { initial: ProjectInput }) {
+export function BuilderApp({
+  initial,
+  accessBadge = "",
+}: {
+  initial: ProjectInput;
+  /** «نسخهٔ عمومی — همهٔ امکانات رایگان» when access mode is open; empty otherwise. */
+  accessBadge?: string;
+}) {
   const [project, setProjectState] = useState<ProjectInput | null>(null);
   const api = useProject(project ?? initial);
   const [step, setStep] = useState(0);
@@ -338,6 +345,12 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
             <p className="text-[11px] text-slate-500">
               {api.isStale ? "در حال محاسبه…" : "ذخیره خودکار فعال"} · برآورد {formatCompact(analysis.pricing.breakdown.total)}
             </p>
+            {accessBadge ? (
+              <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-800">
+                <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                {accessBadge}
+              </p>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden lg:inline-flex"><AuthMenu /></span>

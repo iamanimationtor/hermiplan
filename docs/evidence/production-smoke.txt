@@ -1,17 +1,20 @@
-# production smoke — 2026-10-31T16:20:14Z
+# production smoke — 2026-10-31T16:36:34Z
 $ curl -s http://127.0.0.1:3400/api/health
-{"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false}
+{"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"config","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
 /                                                    200
 /builder                                             200
 /robots.txt                                          200
 /sitemap.xml                                         200
 /report/00000000-0000-4000-8000-000000000000         404
-/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa       404
-/api/projects                                        200
+/s/not-a-real-token                                  404
 
-## share page headers (noindex / no-store / referrer)
+$ curl -s -X POST /api/auth (no SMS provider)
+400
+
+$ security headers on /
 X-Content-Type-Options: nosniff
-Referrer-Policy: no-referrer
-X-Robots-Tag: noindex, nofollow, noarchive
-Cache-Control: no-store, max-age=0
-Content-Type: text/html; charset=utf-8
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+content-security-policy: default-src 'self'; script-src 'self' 'nonce-MDMxMmU5ZTgtNmJiNC00Mzg1LWFkYWItYWZhYmZmOGM1ZmJm' 

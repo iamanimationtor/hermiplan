@@ -16,6 +16,7 @@
     "test:export": "tsx scripts/export-check.ts",
     "test:versions": "tsx scripts/version-diff-check.ts",
     "test:project-file": "tsx scripts/project-file-check.ts",
+    "test:access": "tsx scripts/access-mode-check.ts",
     "test:api": "tsx scripts/api-integration.ts",
     "test:otp": "tsx scripts/otp-sms-check.ts",
     "test:legacy-db": "tsx scripts/legacy-db-check.ts",
@@ -30,7 +31,10 @@
     "db:preflight": "tsx scripts/db-preflight.ts",
     "db:dev-server": "tsx scripts/pg-dev-server.ts",
     "db:share-audit": "tsx scripts/share-audit.ts",
-    "db:migration-safety": "tsx scripts/migration-safety.ts"
+    "db:migration-safety": "tsx scripts/migration-safety.ts",
+    "access:status": "tsx scripts/access-mode.ts status",
+    "access:open": "tsx scripts/access-mode.ts open",
+    "access:locked": "tsx scripts/access-mode.ts locked"
   },
   "dependencies": {
     "dotenv": "17.3.1",

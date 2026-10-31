@@ -34,7 +34,8 @@ export default async function SharedReportPage({ params }: { params: Promise<{ t
     requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     requestHeaders.get("x-real-ip")?.trim() ||
     "local";
-  const limited = await checkRateLimit(`share:ip:${ip}`, RATE_RULES.shareRead);
+  // Scope must match `PRODUCT_QUOTA_KEYS` so `open` access mode can lift it.
+  const limited = await checkRateLimit(`shareRead:ip:${ip}`, RATE_RULES.shareRead);
   if (!limited.allowed) {
     return (
       <main className="mx-auto max-w-xl px-4 py-24 text-center">

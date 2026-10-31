@@ -13,6 +13,7 @@
  */
 import { sql } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/db";
+import { ACCESS } from "@/lib/server/access-mode";
 
 export interface RateLimitRule {
   /** requests allowed inside the window */
@@ -51,6 +52,8 @@ export interface RateLimitResult {
   retryAfterSeconds: number;
   /** true when the distributed store was unavailable and an in-memory counter was used */
   degraded: boolean;
+  /** true when the product quota is lifted by `open` access mode (config/access.json) */
+  bypassed?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -92,6 +95,20 @@ interface LimitRow {
  * concurrent requests can never both observe the same count.
  */
 export async function checkRateLimit(key: string, rule: RateLimitRule): Promise<RateLimitResult> {
+  /*
+   * `open` access mode (config/access.json) lifts the *product* quotas so that a
+   * pre-release deployment has no artificial ceiling — while the security
+   * buckets (sign-in, OTP request/verify) stay in force, because those defend
+   * against guessing an account rather than limiting a feature.
+   *
+   * The scope is the first segment of the key (`export:ip:1.2.3.4` → `export`),
+   * which is how every caller already names its bucket.
+   */
+  const scope = key.split(":")[0] ?? "";
+  if (!ACCESS.enforcesQuota(scope)) {
+    return { allowed: true, remaining: rule.limit, retryAfterSeconds: 0, degraded: false, bypassed: true };
+  }
+
   if (!isDatabaseConfigured()) return memoryLimit(key, rule);
 
   try {

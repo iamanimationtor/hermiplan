@@ -19,6 +19,7 @@ const SUITES: { name: string; file: string }[] = [
   { name: "رگرسیون قالب‌ها", file: "scripts/template-regression.ts" },
   { name: "تاریخچه — تفاوت نسخه‌ها", file: "scripts/version-diff-check.ts" },
   { name: "فایل پشتیبان پروژه — رفت‌وبرگشت و ردِ فایل نامعتبر", file: "scripts/project-file-check.ts" },
+  { name: "حالت دسترسی — برداشتن سهمیه‌های محصول، حفظ سدهای امنیتی", file: "scripts/access-mode-check.ts" },
   // No server required: the local half of the artifact checks runs here, and the
   // HTTP half activates by itself when BASE_URL is set.
   { name: "خروجی — صحت فایل‌های XLSX/CSV/HTML/بسته", file: "scripts/export-check.ts" },
