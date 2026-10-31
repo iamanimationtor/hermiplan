@@ -14,7 +14,8 @@ const dateLike = z
 const dependency = z.object({
   predecessorId: z.string().min(1).max(64),
   type: z.enum(["FS", "SS", "FF", "SF"]).default("FS"),
-  lag: z.coerce.number().min(-365).max(365).default(0),
+  // lag is expressed in whole working days (see engine/normalize-input.ts)
+  lag: z.coerce.number().min(-365).max(365).default(0).transform((value) => Math.round(value)),
 });
 
 const activityResource = z.object({
@@ -27,7 +28,13 @@ const activity = z.object({
   code: z.string().max(32).default(""),
   name: z.string().min(1).max(200),
   phase: z.string().min(1).max(120).default("فاز ۱"),
-  duration: z.coerce.number().min(0).max(3650).default(1),
+  /**
+   * Whole working days. The scheduling model cannot represent half-day offsets,
+   * so fractional input is rounded once here (the engine repeats the operation,
+   * which makes it idempotent) instead of being rounded in one place and kept in
+   * another. See docs/ENGINE.md → «مدت‌ها و Lag — سیاست واحد».
+   */
+  duration: z.coerce.number().min(0).max(3650).default(1).transform((value) => Math.round(value)),
   predecessors: z.array(dependency).max(40).default([]),
   progress: z.coerce.number().min(0).max(100).default(0),
   resources: z.array(activityResource).max(30).default([]),
@@ -35,12 +42,33 @@ const activity = z.object({
   materialCost: z.coerce.number().min(0).default(0),
   actualCost: z.coerce.number().min(0).optional(),
   constraintType: z.enum(["ASAP", "SNET", "MSO", "FNLT"]).default("ASAP"),
-  constraintDate: z.string().optional(),
+  // empty string (the UI's "cleared" date input) means "no constraint date"
+  constraintDate: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value ? value : undefined))
+    .refine((value) => value === undefined || isIsoDate(value), {
+      message: "تاریخ محدودیت باید در قالب YYYY-MM-DD باشد",
+    }),
   milestone: z.boolean().default(false),
   deliverable: z.string().max(300).optional(),
   notes: z.string().max(1000).optional(),
   riskProbability: z.coerce.number().min(0).max(5).optional(),
   riskImpact: z.coerce.number().min(0).max(5).optional(),
+  /**
+   * Measured work (optional). Enables quantity-based physical progress
+   * (Actual / Planned). `approved` is the quantity authorised by a reviewer and
+   * is kept separate from the raw site entry.
+   */
+  quantity: z
+    .object({
+      unit: z.string().trim().min(1).max(32),
+      planned: z.coerce.number().min(0).max(1_000_000_000),
+      actual: z.coerce.number().min(0).max(1_000_000_000),
+      approved: z.coerce.number().min(0).max(1_000_000_000).optional(),
+    })
+    .optional(),
 });
 
 const resource = z.object({
@@ -71,7 +99,14 @@ const pricing = z
 const milestone = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(200),
-  date: z.string().optional(),
+  date: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value ? value : undefined))
+    .refine((value) => value === undefined || isIsoDate(value), {
+      message: "تاریخ نقطه کنترل باید در قالب YYYY-MM-DD باشد",
+    }),
   activityId: z.string().optional(),
   phase: z.string().max(120).optional(),
 });

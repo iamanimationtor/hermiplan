@@ -4,7 +4,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "rea
 import { analyzeProject } from "@/lib/engine/analysis";
 import { createBaseline } from "@/lib/engine/normalize";
 import { buildProjectFromTemplate } from "@/lib/templates";
-import { applyMarketRates, DEFAULT_PRICING, effectiveRate } from "@/lib/market/engine";
+import { applyMarketRates, DEFAULT_PRICING, effectiveRate, type RateSnapshotMap } from "@/lib/market/engine";
 import { toLatinDigits } from "@/lib/date-fa";
 import { RATE_CATALOG, findRate, guessRateKey, resolveRate, SERIES_LABELS } from "@/lib/market/rates";
 import type { ProjectAnalysis, ProjectInput, ProjectPricing } from "@/lib/engine/types";
@@ -295,9 +295,13 @@ export function useProject(initial: ProjectInput) {
           d.pricing = { ...DEFAULT_PRICING, ...(d.pricing ?? {}), ...changes };
         });
       },
-      /** اعمال نرخ لحظه‌ای بازار ایران روی همه منابع پروژه */
-      applyMarketRates() {
-        commit((prev) => applyMarketRates(prev, { ...DEFAULT_PRICING, ...(prev.pricing ?? {}) }));
+      /**
+       * اعمال نرخ بازار روی همه منابع پروژه.
+       * `snapshot` همان عکس لحظه‌ای است که در پنل نمایش داده شده؛ بدون آن،
+       * نرخ نمایش‌داده‌شده و نرخ اعمال‌شده می‌توانند متفاوت باشند.
+       */
+      applyMarketRates(snapshot?: RateSnapshotMap) {
+        commit((prev) => applyMarketRates(prev, { ...DEFAULT_PRICING, ...(prev.pricing ?? {}) }, snapshot));
       },
       /** اتصال یک منبع به ردیف مشخصی از فهرست نرخ بازار */
       linkResourceRate(resourceId: string, rateKey: string) {

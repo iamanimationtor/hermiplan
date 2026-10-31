@@ -8,6 +8,7 @@ import type { ProjectAnalysis, ProjectInput } from "@/lib/engine/types";
 import { DEFAULT_REPORT_SECTIONS, REPORT_SECTIONS } from "@/lib/validation";
 import { TEMPLATES, type TemplateDomain } from "@/lib/templates";
 import { marketCatalog } from "./useProject";
+import type { RateSnapshotMap } from "@/lib/market/engine";
 import { QuickAdd, ImportDialog } from "./QuickCapture";
 import { ScenarioPanel } from "./ScenarioPanel";
 import type { ProjectPricing } from "@/lib/engine/types";
@@ -282,14 +283,47 @@ const CATALOG = marketCatalog();
 
 interface MarketFeed {
   asOfJalali: string;
+  asOf?: string;
   isLive: boolean;
   feedConfigured: boolean;
   sources: string[];
+  quarantined?: number;
+  feedError?: string;
   indices: { label: string; value: number; change: string }[];
+  /** rates exactly as delivered/validated by the server */
+  rates?: { key: string; market: number; official1405?: number; official1404?: number }[];
 }
 
 export function PricingPanel({ project, analysis, api }: { project: ProjectInput; analysis: ProjectAnalysis; api: ProjectApi }) {
   const [feed, setFeed] = useState<MarketFeed | null>(null);
+
+  /**
+   * The snapshot shown in this panel is the snapshot applied to the project.
+   * Both the visible table and "اعمال نرخ بازار" read from `snapshotRates`.
+   */
+  const snapshotRates = useMemo<RateSnapshotMap>(() => {
+    const map: RateSnapshotMap = {};
+    for (const rate of feed?.rates ?? []) {
+      map[rate.key] = {
+        market: rate.market,
+        official1405: rate.official1405,
+        official1404: rate.official1404,
+      };
+    }
+    return map;
+  }, [feed]);
+
+  const catalogRows = useMemo(
+    () =>
+      CATALOG.map((item) => {
+        const snapshot = snapshotRates[item.key];
+        const official1405 = snapshot?.official1405 ?? item.official1405;
+        const official1404 = snapshot?.official1404 ?? item.official1404;
+        const market = snapshot?.market ?? item.market;
+        return { ...item, official1405, official1404, market };
+      }),
+    [snapshotRates],
+  );
   const [refreshing, setRefreshing] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
   const pricing: ProjectPricing = { ...{ series: "official-1405", region: "tehran", indexFactor: 100, escalationEnabled: true, escalationRatePerMonth: 3, overheadPercent: 17, profitPercent: 10, contingencyPercent: 5 }, ...project.pricing };
@@ -318,12 +352,12 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
   return (
     <Card>
       <CardHeader
-        title="قیمت‌گذاری بر مبنای بازار ایران"
-        subtitle="نرخ‌های نیروی انسانی، ماشین‌آلات و مصالح بر پایه مصوبات رسمی و میانگین بازار، همراه با تعدیل ماهانه."
+        title="برآورد هزینه با نرخ‌های مرجع"
+        subtitle="نرخ‌های نیروی انسانی، ماشین‌آلات و مصالح از کاتالوگ مرجع داخلی (بدون سند رسمی پیوست) یا فید بازار، همراه با سناریوی افزایش هزینه."
         icon={<span className="text-lg">📈</span>}
         action={
           <Badge tone={feed?.isLive ? "ok" : "info"}>
-            {feed?.isLive ? "قیمت لحظه‌ای" : `نرخ مرجع ${feed?.asOfJalali ?? "…"}`}
+            {feed?.isLive ? "فید بازار متصل" : `کاتالوگ مرجع ${feed?.asOfJalali ?? "…"}`}
           </Badge>
         }
       />
@@ -331,9 +365,9 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
         <div className="grid gap-4 md:grid-cols-4">
           <Field label="مبنای دستمزد">
             <Select value={pricing.series} onChange={(e) => api.setPricing({ series: e.target.value as ProjectPricing["series"] })}>
-              <option value="official-1405">مصوب رسمی ۱۴۰۵</option>
-              <option value="official-1404">مصوب رسمی ۱۴۰۴</option>
-              <option value="market">میانگین بازار آزاد</option>
+              <option value="official-1405">مرجع ۱۴۰۵ (بدون سند)</option>
+              <option value="official-1404">مرجع ۱۴۰۴ (بدون سند)</option>
+              <option value="market">بازار (تخمینی)</option>
             </Select>
           </Field>
           <Field label="منطقه اجرا">
@@ -371,7 +405,9 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
             <Input type="number" min={0} max={200} value={pricing.contingencyPercent} onChange={(e) => api.setPricing({ contingencyPercent: Number(e.target.value) })} />
           </Field>
           <div className="flex items-end gap-2">
-            <Button onClick={() => api.applyMarketRates()} className="flex-1">اعمال نرخ بازار</Button>
+            <Button onClick={() => api.applyMarketRates(snapshotRates)} className="flex-1">
+              اعمال همین نرخ‌های نمایش‌داده‌شده
+            </Button>
           </div>
         </div>
 
@@ -442,8 +478,20 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
 
         {feed && !feed.feedConfigured ? (
           <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11.5px] leading-6 text-slate-500">
-            فید لحظه‌ای بازار فعال نیست؛ نرخ‌های نمایش‌داده‌شده نسخه مرجع ({feed.asOfJalali}) هستند و برای پروژه شما قابل
-            اصلاح‌اند (ضریب تعدیل، منطقه و نرخ هر منبع).
+            فید لحظه‌ای بازار فعال نیست؛ نرخ‌های نمایش‌داده‌شده «داده مرجع» ({feed.asOfJalali}) هستند و برای پروژه شما قابل
+            اصلاح‌اند (ضریب تعدیل، منطقه و نرخ هر منبع). این ارقام سند رسمی ندارند و برای برآورد قراردادی باید با
+            فهرست‌بهای سال مربوطه جایگزین شوند.
+          </p>
+        ) : null}
+        {feed?.feedError ? (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] leading-6 text-amber-800">
+            فید بازار در دسترس نبود ({feed.feedError})؛ نرخ‌های نمایش‌داده‌شده نسخه مرجع تاریخ {feed.asOfJalali} هستند و
+            «زنده» محسوب نمی‌شوند.
+          </p>
+        ) : null}
+        {feed?.quarantined ? (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] leading-6 text-amber-800">
+            {toPersianDigits(feed.quarantined)} ردیف از فید بازار اعتبارسنجی نشد و کنار گذاشته شد.
           </p>
         ) : null}
 
@@ -456,13 +504,13 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
               <table className="w-full text-[11.5px]">
                 <thead className="bg-slate-50 text-slate-500">
                   <tr>
-                    {["شرح", "دسته", "واحد", "مصوب ۱۴۰۵", "بازار آزاد"].map((h) => (
+                    {["شرح", "دسته", "واحد", "مبنای ۱۴۰۵ (تأییدنشده)", "بازار آزاد"].map((h) => (
                       <th key={h} className="px-2.5 py-2 text-right font-semibold">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {CATALOG.map((item) => (
+                  {catalogRows.map((item) => (
                     <tr key={item.key} className="border-t border-slate-100">
                       <td className="px-2.5 py-1.5">{item.name}</td>
                       <td className="px-2.5 py-1.5 text-slate-500">
@@ -477,7 +525,7 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
               </table>
             </div>
             <p className="border-t border-slate-100 px-4 py-2 text-[11px] leading-6 text-slate-500">
-              منابع: {feed?.sources?.join(" • ") ?? "مصوبه شورای عالی کار، فهرست‌بهای واحد پایه، میانگین بازار مصالح"}
+              منابع: {feed?.sources?.join(" • ") ?? "کاتالوگ مرجع HERMIPLAN — ردیف‌های بدون سند رسمی (وضعیت اعتبار: unverified)"}
               {feed?.feedConfigured ? " — فید لحظه‌ای فعال است." : " — برای اتصال فید لحظه‌ای، آدرس فید را در تنظیمات سرور ثبت کنید."}
             </p>
           </div>
@@ -487,22 +535,93 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
   );
 }
 
+/* --------------------------- analysis alerts -------------------------- */
+
+const ANALYSIS_STATUS: Record<ProjectAnalysis["status"], { label: string; tone: string; hint: string }> = {
+  valid: {
+    label: "تحلیل معتبر",
+    tone: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    hint: "همه فعالیت‌ها زمان‌بندی شدند و هیچ خطا یا هشداری وجود ندارد.",
+  },
+  warning: {
+    label: "تحلیل معتبر با هشدار",
+    tone: "border-amber-200 bg-amber-50 text-amber-900",
+    hint: "اعداد محاسبه شده‌اند، اما موارد زیر نیاز به بررسی دارند.",
+  },
+  inconsistent: {
+    label: "زمان‌بندی ناسازگار",
+    tone: "border-orange-300 bg-orange-50 text-orange-900",
+    hint: "شبکه محاسبه شد، اما محدودیت‌ها یا شناوری منفی با منطق پروژه سازگار نیستند؛ تاریخ‌ها را با احتیاط استفاده کنید.",
+  },
+  invalid: {
+    label: "تحلیل نامعتبر",
+    tone: "border-red-300 bg-red-50 text-red-900",
+    hint: "تا رفع خطاهای داده، تاریخ‌ها و شاخص‌ها قابل استناد نیستند.",
+  },
+  "internal-error": {
+    label: "خطای داخلی محاسبه",
+    tone: "border-red-300 bg-red-50 text-red-900",
+    hint: "موتور محاسبات متوقف شد؛ اعداد این صفحه صفر و غیرقابل استناد هستند. داده پروژه آسیب ندیده است.",
+  },
+};
+
+/**
+ * Surfaces the structured diagnostics of the engine: status, every warning and
+ * error with the activities it affects, and the activities that could not be
+ * scheduled at all. Nothing is hidden — the previous UI only listed free-text
+ * warnings and silently dropped the affected-activity information.
+ */
+export function AnalysisAlerts({ analysis }: { analysis: ProjectAnalysis }) {
+  const status = ANALYSIS_STATUS[analysis.status] ?? ANALYSIS_STATUS.valid;
+  const codeOf = (id: string) => analysis.activities.find((a) => a.id === id)?.code ?? id.slice(0, 8);
+  const hasDetails = analysis.diagnostics.length > 0 || analysis.unschedulable.length > 0;
+  if (analysis.status === "valid" && !hasDetails) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className={`rounded-2xl border p-4 text-[12.5px] leading-6 ${status.tone}`}>
+        <p className="font-bold">{status.label}</p>
+        <p className="mt-0.5 text-[11.5px] opacity-90">{status.hint}</p>
+        {hasDetails ? (
+          <ul className="mt-2 space-y-1 text-[11.5px]">
+            {analysis.diagnostics.slice(0, 12).map((diagnostic, index) => (
+              <li key={`${diagnostic.code}-${index}`} className="flex gap-1.5">
+                <span className="shrink-0">{diagnostic.severity === "error" ? "⛔" : "⚠️"}</span>
+                <span>
+                  {diagnostic.message}
+                  {diagnostic.activityIds?.length ? (
+                    <span className="opacity-75"> — فعالیت: {diagnostic.activityIds.map(codeOf).join("، ")}</span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+            {analysis.unschedulable.map((item) => (
+              <li key={item.id} className="flex gap-1.5">
+                <span className="shrink-0">⛔</span>
+                <span>
+                  «{item.name}» ({item.code}) زمان‌بندی نشد — {item.reason}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {analysis.diagnostics.length > 12 ? (
+          <p className="mt-1 text-[11px] opacity-75">
+            و {toPersianDigits(analysis.diagnostics.length - 12)} مورد دیگر — فهرست کامل در گزارش.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 /* ----------------------------- step 2 -------------------------------- */
 
 export function StepActivities({ project, analysis, api }: { project: ProjectInput; analysis: ProjectAnalysis; api: ProjectApi }) {
   const [importOpen, setImportOpen] = useState(false);
   return (
     <div className="space-y-5">
-      {analysis.warnings.length || analysis.errors.length ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[12.5px] leading-6 text-amber-800">
-          {analysis.errors.map((e) => (
-            <p key={e}>⛔ {e}</p>
-          ))}
-          {analysis.warnings.map((w) => (
-            <p key={w}>⚠️ {w}</p>
-          ))}
-        </div>
-      ) : null}
+      <AnalysisAlerts analysis={analysis} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="تعداد فعالیت" value={toPersianDigits(analysis.activities.length)} hint={`${toPersianDigits(analysis.schedule.phases.length)} فاز کاری`} />

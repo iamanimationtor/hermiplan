@@ -12,9 +12,9 @@ import { formatCompact, formatJalali, formatPercent, toPersianDigits } from "@/l
 const FEATURES = [
   { icon: "🧮", title: "موتور محاسباتی CPM", body: "زمان‌بندی پیشرفته با مسیر بحرانی، شناوری کل و آزاد، وابستگی‌های FS/SS/FF/SF با Lag و تقویم کاری واقعی پروژه." },
   { icon: "📊", title: "گانت چارت حرفه‌ای", body: "نمودار گانت استاندارد با مسیر بحرانی، درصد پیشرفت، خط تاریخ وضعیت، نقاط کنترل و نمودار شبکه‌ای." },
-  { icon: "👷", title: "تخصیص و هموارسازی منابع", body: "ظرفیت، نرخ، اوج تخصیص و بهره‌وری هر منبع به‌صورت خودکار محاسبه و بیش‌تخصیص‌ها شناسایی می‌شود." },
+  { icon: "👷", title: "تخصیص منابع و شناسایی بیش‌تخصیص", body: "ظرفیت، نرخ، اوج تخصیص و بهره‌وری هر منبع محاسبه و بیش‌تخصیص‌ها شناسایی می‌شود (تسطیح خودکار منابع انجام نمی‌شود؛ تصمیم با برنامه‌ریز است)." },
   { icon: "💰", title: "کنترل هزینه و EVM", body: "بودجه، هزینه واقعی، ارزش کسب‌شده، شاخص‌های SPI/CPI و برآورد هزینه در پایان (EAC)." },
-  { icon: "📈", title: "قیمت‌گذاری لحظه‌ای بازار ایران", body: "نرخ مصوب دستمزد، ماشین‌آلات و مصالح با میانگین بازار، ضریب منطقه‌ای، بالاسری، سود، ذخیره احتیاطی و تعدیل ماهانه." },
+  { icon: "📈", title: "نرخ‌های مرجع و برآورد هزینه", body: "کاتالوگ نرخ مرجع (با نوع، تاریخ و وضعیت اعتبار هر ردیف)، ضریب منطقه‌ای، بالاسری، سود، ذخیره احتیاطی و سناریوی افزایش هزینه. نرخ زنده فقط وقتی فید بازار متصل باشد." },
   { icon: "⚠️", title: "تحلیل ریسک و تأخیر", body: "ماتریس احتمال–اثر، ارزش در معرض ریسک و شناسایی خودکار فعالیت‌های دارای تأخیر." },
   { icon: "📄", title: "خروجی چندفرمته حرفه‌ای", body: "گزارش A4 با جلد و امضا، کارپوشه اکسل چندشییتی، CSV، JSON و فایل قابل بازکردن در Microsoft Project." },
   { icon: "⚡", title: "سرعت و سادگی", body: "محاسبات در مرورگر و بدون انتظار؛ بدون نیاز به نصب، ثبت‌نام یا آموزش تخصصی." },
@@ -254,17 +254,19 @@ export default function HomePage() {
             <div>
               <span className="text-[12px] font-bold tracking-widest text-accent-400">بازار ایران</span>
               <h2 className="mt-3 text-[26px] font-black leading-tight sm:text-[32px]">
-                هزینه‌ها با نرخ‌های به‌روز بازار محاسبه می‌شوند
+                هزینه‌ها با نرخ‌های مرجع قابل بازبینی محاسبه می‌شوند
               </h2>
               <p className="mt-4 text-[13.5px] leading-8 text-slate-300">
-                نرخ نیروی انسانی بر مبنای مصوبات رسمی دستمزد، و نرخ مصالح و ماشین‌آلات بر مبنای میانگین بازار.
-                ضریب منطقه‌ای، بالاسری، سود پیمانکار، ذخیره احتیاطی و تعدیل ماهانه به‌صورت خودکار اعمال می‌شود.
+                نرخ‌ها از یک کاتالوگ مرجع داخلی می‌آیند که سند رسمی هر ردیف در سامانه نگهداری نمی‌شود؛
+                بنابراین هر نرخ با نوع، واحد، تاریخ مرجع و وضعیت اعتبار («بدون سند» / «تأییدشده» / «برآوردی») نمایش داده می‌شود
+                و برای برآورد قراردادی باید با فهرست‌بهای سال مربوطه جایگزین شود. ضریب منطقه‌ای، بالاسری، سود،
+                ذخیره احتیاطی و سناریوی افزایش هزینه اعمال می‌شود.
               </p>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 {[
-                  ["۳ سری نرخ", "مصوب ۱۴۰۵ / مصوب ۱۴۰۴ / بازار آزاد"],
-                  ["۳۷ ردیف نرخ", "نیروی انسانی، ماشین‌آلات و مصالح"],
-                  ["تعدیل ماهانه", "بر پایه کارکرد واقعی هر ماه"],
+                  ["۳ سری نرخ", "مرجع ۱۴۰۵ / مرجع ۱۴۰۴ / بازار (تخمینی)"],
+                  ["۳۷ ردیف نرخ", "نیروی انسانی، ماشین‌آلات و مصالح — بدون سند رسمی"],
+                  ["سناریوی افزایش هزینه", "تورم مرکب ماهانه — نه تعدیل قراردادی"],
                   ["ساختار برآورد", "مستقیم + بالاسری + سود + احتیاط"],
                 ].map(([title, body]) => (
                   <div key={title} className="rounded-2xl border border-white/12 bg-white/6 p-4">
@@ -293,8 +295,8 @@ export default function HomePage() {
                 <thead>
                   <tr className="text-slate-400">
                     <th className="py-2 text-right font-semibold">شرح</th>
-                    <th className="py-2 text-right font-semibold">مصوب ۱۴۰۵</th>
-                    <th className="py-2 text-right font-semibold">بازار آزاد</th>
+                    <th className="py-2 text-right font-semibold">مرجع ۱۴۰۵*</th>
+                    <th className="py-2 text-right font-semibold">بازار (تخمینی)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -310,13 +312,17 @@ export default function HomePage() {
                   ))}
                 </tbody>
               </table>
+              <p className="mt-3 text-[10.5px] leading-5 text-slate-400">
+                * «مرجع» یعنی داده داخلی بدون سند پیوست؛ نه مصوبه و نه نرخ رسمی. هر ردیف در گزارش با نوع، تاریخ و
+                وضعیت اعتبار خودش نمایش داده می‌شود و کاربر می‌تواند آن را اصلاح کند.
+              </p>
               <div className="mt-4 rounded-2xl bg-slate-50 p-3">
                 <p className="text-[11px] font-bold text-ink-900">نمونه ساختار برآورد (پروژه ساختمانی نمونه)</p>
                 <div className="mt-2 space-y-1.5 text-[11px]">
                   {[
                     ["هزینه‌های مستقیم", formatCompact(demo.pricing.breakdown.direct)],
                     ["بالاسری + سود + احتیاط", formatCompact(demo.pricing.breakdown.overhead + demo.pricing.breakdown.profit + demo.pricing.breakdown.contingency)],
-                    ["تعدیل قیمت", formatCompact(demo.pricing.breakdown.escalation)],
+                    ["سناریوی افزایش هزینه (تورم مرکب)", formatCompact(demo.pricing.breakdown.escalation)],
                   ].map(([label, value]) => (
                     <div key={label} className="flex items-center justify-between text-slate-500">
                       <span>{label}</span>

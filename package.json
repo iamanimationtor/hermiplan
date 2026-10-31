@@ -9,7 +9,10 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx scripts/run-tests.ts",
     "test:engine": "tsx scripts/engine-verification.ts",
+    "test:engine:regressions": "tsx scripts/engine-regressions.ts",
+    "test:smoke": "tsx scripts/engine-smoke.ts",
     "test:edge": "tsx scripts/edge-case-audit.ts",
+    "test:security": "tsx scripts/security-checks.ts",
     "test:api": "tsx scripts/api-integration.ts",
     "db:status": "tsx scripts/migrate.ts --status",
     "db:migrate": "tsx scripts/migrate.ts"
@@ -34,7 +37,7 @@
     "eslint-config-next": "16.2.6",
     "postcss": "8.5.8",
     "tailwindcss": "4.1.17",
-    "tsx": "4.20.6",
+    "tsx": "4.23.15",
     "typescript": "5.9.3"
   }
 }

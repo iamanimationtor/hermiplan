@@ -21,14 +21,77 @@ export interface RateItem {
   name: string;
   category: "labor" | "equipment" | "material";
   unit: string;
-  /** نرخ مصوب رسمی سال ۱۴۰۵ (ریال) */
+  /**
+   * ارقام «مصوب» فهرست. مقدار عددی حفظ شده است، اما سند پشتیبان آن در مخزن
+   * موجود نیست؛ بنابراین هرگز نباید بدون بازبینی به‌عنوان نرخ رسمی قطعی ارائه شود
+   * (به `RATE_DATA_POLICY` و `rateProvenance()` مراجعه کنید).
+   */
   official1405?: number;
-  /** نرخ مصوب رسمی سال ۱۴۰۴ (ریال) */
+  /** نرخ سال ۱۴۰۴ — همان ملاحظه `official1405` */
   official1404?: number;
-  /** میانگین بازار آزاد (ریال) */
+  /** میانگین بازار آزاد (ریال) — برآورد مرجع، نه نرخ معامله‌شده */
   market: number;
   volatility: "low" | "medium" | "high";
   note?: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* Provenance of the rate data                                        */
+/* ------------------------------------------------------------------ */
+
+export type RateVerification = "verified" | "unverified" | "reference-estimate";
+
+export interface RateProvenance {
+  /** what the number physically is */
+  kind: "official-wage" | "market-quote" | "reference-estimate";
+  verification: RateVerification;
+  /** publisher / origin of the figure */
+  source: string;
+  /** period the figure belongs to */
+  asOfIso: string;
+  region: RateRegion | "national";
+  note: string;
+}
+
+/**
+ * وضعیت واقعی داده‌ها — این بلوک «قرارداد صداقت» محصول با کاربر است:
+ *
+ *  • ارقام موجود در فهرست، **داده مرجع (reference)** هستند و سند رسمی هر ردیف
+ *    (شماره بخشنامه، تاریخ انتشار، صفحه فهرست‌بها) در مخزن نگهداری نمی‌شود.
+ *  • بنابراین هیچ ردیفی با وضعیت `verified` علامت‌گذاری نمی‌شود و برچسب «مصوب
+ *    رسمی قطعی» روی آن‌ها مجاز نیست.
+ *  • استفاده قراردادی از این ارقام باید با فهرست‌بهای سال مربوطه و نرخ‌های
+ *    مصوب پروژه جایگزین شود.
+ *  • تاریخ مرجع داده `MARKET_AS_OF` است و در همه خروجی‌ها نمایش داده می‌شود.
+ */
+export const RATE_DATA_POLICY = {
+  verification: "unverified" as RateVerification,
+  verifiedAt: null as string | null,
+  reviewedBy: null as string | null,
+  note:
+    "ارقام این فهرست «داده مرجع» است و سند رسمی هر ردیف در سامانه نگهداری نمی‌شود؛ " +
+    "برای برآورد قراردادی باید با فهرست‌بهای سال مربوطه و نرخ‌های مصوب پروژه جایگزین شود.",
+  requiredForVerified: [
+    "شماره و تاریخ بخشنامه/بخشنامه شورای عالی کار",
+    "ردیف و فصل فهرست‌بهای واحد پایه",
+    "تاریخ اعتبار نرخ و منطقه جغرافیایی",
+    "پیوند یا تصویر سند منتشرشده",
+  ],
+} as const;
+
+/** پرووننس هر ردیف بر اساس دسته و منبع عدد انتخابی. */
+export function rateProvenance(item: RateItem, series: RateSeries = "official-1405"): RateProvenance {
+  const usesOfficial = item.category === "labor" && series !== "market" && Boolean(item[series as "official1405"]);
+  return {
+    kind: usesOfficial ? "official-wage" : "reference-estimate",
+    verification: RATE_DATA_POLICY.verification,
+    source: usesOfficial
+      ? "جدول دستمزد شورای عالی کار (سند در مخزن موجود نیست)"
+      : "میانگین مرجع بازار (برآورد، نه نرخ معامله‌شده)",
+    asOfIso: MARKET_AS_OF.iso,
+    region: "national",
+    note: RATE_DATA_POLICY.note,
+  };
 }
 
 export const RATE_CATALOG: RateItem[] = [
@@ -203,10 +266,15 @@ export const REGION_FACTORS: Record<RateRegion, { label: string; factor: number 
   other: { label: "سایر شهرها", factor: 0.86 },
 };
 
+/**
+ * برچسب‌های سری نرخ. عبارت «رسمی» حذف شده است: تا زمانی که سند هر ردیف
+ * (بخشنامه/فهرست‌بها) در سامانه ثبت و بازبینی نشود، این ارقام «مبنای مرجع»
+ * هستند و نه نرخ رسمی قطعی.
+ */
 export const SERIES_LABELS: Record<RateSeries, string> = {
-  "official-1405": "مصوب رسمی ۱۴۰۵ (شورای عالی کار)",
-  "official-1404": "مصوب رسمی ۱۴۰۴ (شورای عالی کار)",
-  market: "میانگین بازار آزاد",
+  "official-1405": "مبنای مرجع ۱۴۰۵ (منبع تأییدنشده)",
+  "official-1404": "مبنای مرجع ۱۴۰۴ (منبع تأییدنشده)",
+  market: "میانگین مرجع بازار (برآورد)",
 };
 
 /** شاخص‌های مرجع برای تحلیل روند (منبع: مرکز آمار ایران / گزارش‌های بازار) */

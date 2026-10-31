@@ -59,6 +59,22 @@ function kpiCard(label: string, value: string, tone = "g") {
   return `<div class="kpi"><span style="font-size:9.5px;color:#64748b">${esc(label)}</span><b>${esc(value)}</b><span class="badge ${tone}" style="margin-top:4px">${tone === "g" ? "مطلوب" : tone === "w" ? "قابل پایش" : "بحرانی"}</span></div>`;
 }
 
+const CONSTRAINT_NAMES: Record<string, string> = {
+  ASAP: "در اولین زمان ممکن",
+  SNET: "شروع نه زودتر از",
+  MSO: "باید در تاریخ شروع شود",
+  FNLT: "پایان نه دیرتر از",
+};
+
+/** Human readable constraint cell, including a violation marker. */
+function constraintLabel(activity: { constraint: { type: string; date?: string; conflict?: string } }): string {
+  const type = activity.constraint?.type ?? "ASAP";
+  if (type === "ASAP") return "—";
+  const name = CONSTRAINT_NAMES[type] ?? type;
+  const date = activity.constraint.date ? ` ${activity.constraint.date}` : "";
+  return activity.constraint.conflict ? `${name}${date} ⚠ ${esc(activity.constraint.conflict)}` : `${name}${date}`;
+}
+
 export function buildReportHtml(
   project: ProjectInput,
   analysis: ProjectAnalysis,
@@ -77,6 +93,44 @@ export function buildReportHtml(
   sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>خلاصه مدیریتی</h2></div>
     <div class="callout"><b>${esc(a.summary.headline)}</b></div>
     <ul style="font-size:11px;line-height:2">${a.summary.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul></div>`);
+
+  if (a.diagnostics.length || a.unschedulable.length) {
+    const statusLabel =
+      a.status === "valid"
+        ? "تحلیل معتبر"
+        : a.status === "warning"
+          ? "تحلیل معتبر همراه با هشدار"
+          : a.status === "inconsistent"
+            ? "زمان‌بندی ناسازگار (تعارض محدودیت/منطق)"
+            : "تحلیل نامعتبر (خطای داده یا گراف وابستگی)";
+    sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>وضعیت تحلیل و هشدارهای مهندسی</h2></div>
+      <div class="callout"><b>${esc(statusLabel)}</b></div>
+      ${table(
+        ["شدت", "دسته", "پیام"],
+        a.diagnostics.map((d) => [
+          d.severity === "error" ? "<b>خطا</b>" : "هشدار",
+          d.kind === "data"
+            ? "داده"
+            : d.kind === "cycle"
+              ? "چرخه وابستگی"
+              : d.kind === "dependency"
+                ? "منطق شبکه"
+                : d.kind === "constraint"
+                  ? "محدودیت زمانی"
+                  : d.kind === "capacity"
+                    ? "ظرفیت منابع"
+                    : "تقویم",
+          esc(d.message),
+        ]),
+      )}
+      ${
+        a.unschedulable.length
+          ? `<p class="note">فعالیت‌های بدون زمان‌بندی معتبر: ${a.unschedulable
+              .map((u) => esc(`${u.code} — ${u.name} (${u.reason})`))
+              .join(" · ")}</p>`
+          : ""
+      }</div>`);
+  }
 
   sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>مشخصات پروژه</h2></div>
     <table class="kv"><tbody>${[
@@ -135,7 +189,7 @@ export function buildReportHtml(
 
   sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>زمان‌بندی و شناوری فعالیت‌ها</h2></div>
     ${table(
-      ["کد", "فعالیت", "مدت", "شروع", "پایان", "شناوری کل", "شناوری آزاد", "بحرانی"],
+      ["کد", "فعالیت", "مدت", "شروع", "پایان", "شناوری کل", "شناوری آزاد", "بحرانی", "محدودیت"],
       a.activities.map((act) => [
         act.code,
         act.name,
@@ -145,6 +199,7 @@ export function buildReportHtml(
         act.totalFloat === 0 ? "بحرانی" : toPersianDigits(act.totalFloat),
         toPersianDigits(act.freeFloat),
         act.critical ? "● بله" : "خیر",
+        constraintLabel(act),
       ]),
     )}</div>`);
 
@@ -153,7 +208,60 @@ export function buildReportHtml(
       <div style="border:1px solid var(--line);border-radius:8px;padding:6px;overflow:auto">${ganttSvg}</div></div>`);
   }
 
-  sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>هزینه، تعدیل و برآورد نهایی</h2></div>
+  sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>پیشرفت و مدیریت ارزش کسب‌شده (EVM)</h2></div>
+    ${table(
+      ["سنجه", "مقدار", "تعریف"],
+      [
+        ["پیشرفت زمان‌محور (وزن: مدت کاری)", `${formatPercent(a.progress.timeBased, 1)}`, "Σ(مدت × کسر برنامه‌ای) ÷ Σ مدت"],
+        [
+          "پیشرفت فیزیکی (وزن: بودجه)",
+          a.progress.physical === null ? "اندازه‌گیری نشده" : `${formatPercent(a.progress.physical, 1)} (پوشش ${formatPercent(a.progress.physicalCoverage, 0)} بودجه)`,
+          "Σ(مقدار اجرا ÷ مقدار برنامه) × بودجه فعالیت",
+        ],
+        ["پیشرفت برنامه‌ای تا تاریخ وضعیت", `${formatPercent(a.progress.planned, 1)}`, "تاریخ وضعیت = آغاز همان روز کاری"],
+        ["PV / EV", `${money(a.evm.pv)} / ${money(a.evm.ev)}`, "ارزش برنامه‌ای / ارزش کسب‌شده"],
+        ["AC", a.evm.ac === null ? "ثبت نشده" : money(a.evm.ac), `پوشش هزینه واقعی: ${formatPercent(a.evm.costDataCoverage, 0)} بودجه`],
+        ["SV / CV", `${money(a.evm.sv)} / ${a.evm.cv === null ? "قابل محاسبه نیست" : money(a.evm.cv)}`, "EV − PV / EV − AC"],
+        ["SPI / CPI", `${a.evm.spi === null ? "قابل محاسبه نیست" : toPersianDigits(a.evm.spi)} / ${a.evm.cpi === null ? "قابل محاسبه نیست" : toPersianDigits(a.evm.cpi)}`, "EV ÷ PV / EV ÷ AC"],
+        ["BAC / EAC / ETC / VAC", `${money(a.evm.bac)} / ${a.evm.eac === null ? "—" : money(a.evm.eac)} / ${a.evm.etc === null ? "—" : money(a.evm.etc)} / ${a.evm.vac === null ? "—" : money(a.evm.vac)}`, "EAC = BAC ÷ CPI"],
+      ],
+    )}
+    ${a.evm.notes.map((note) => `<p class="note">⚠ ${esc(note)}</p>`).join("")}</div>`);
+
+  if (a.milestones.length) {
+    sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>نقاط کنترل (Milestones)</h2></div>
+      ${table(
+        ["عنوان", "فاز", "تاریخ", "وضعیت", "فعالیت مرتبط"],
+        a.milestones.map((m) => [
+          m.name,
+          m.phase,
+          m.date ? formatJalali(m.date) : "بدون تاریخ",
+          m.status === "reached" ? "محقق‌شده" : m.status === "late" ? "در تأخیر" : m.status === "unscheduled" ? "زمان‌بندی‌نشده" : "در پیش رو",
+          m.linkedActivityCode ?? "—",
+        ]),
+      )}</div>`);
+  }
+
+  if (a.baseline.available) {
+    sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>مقایسه با مبنای برنامه (Baseline)</h2></div>
+      <p class="note">بیشینه جابه‌جایی شروع: ${toPersianDigits(a.baseline.maxStartSlipDays)} روز کاری — بیشینه جابه‌جایی پایان: ${toPersianDigits(a.baseline.maxFinishSlipDays)} روز کاری — تغییر هزینه: ${money(a.baseline.costVariance)}</p>
+      ${table(
+        ["کد", "فعالیت", "شروع مبنا", "شروع فعلی", "انحراف شروع", "پایان مبنا", "پایان فعلی", "انحراف پایان", "تغییر مدت"],
+        a.baseline.changedActivities.map((c) => [
+          c.code,
+          c.name,
+          formatJalali(c.baselineStart, { withMonthName: false }),
+          formatJalali(c.currentStart, { withMonthName: false }),
+          toPersianDigits(c.startVarianceDays),
+          formatJalali(c.baselineFinish, { withMonthName: false }),
+          formatJalali(c.currentFinish, { withMonthName: false }),
+          toPersianDigits(c.finishVarianceDays),
+          toPersianDigits(c.durationChange),
+        ]),
+      )}</div>`);
+  }
+
+  sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>هزینه، سناریوی افزایش هزینه و برآورد نهایی</h2></div>
     ${table(
       ["شرح", "مبلغ"],
       [
@@ -161,15 +269,17 @@ export function buildReportHtml(
         [`هزینه‌های بالاسری (${toPersianDigits(a.pricing.breakdown.overhead ? project.pricing?.overheadPercent ?? 17 : 0)}٪)`, money(a.pricing.breakdown.overhead)],
         [`سود پیمانکار (${toPersianDigits(project.pricing?.profitPercent ?? 10)}٪)`, money(a.pricing.breakdown.profit)],
         [`ذخیره احتیاطی (${toPersianDigits(project.pricing?.contingencyPercent ?? 5)}٪)`, money(a.pricing.breakdown.contingency)],
-        ["تعدیل قیمت (بر پایه کارکرد ماهانه)", money(a.pricing.breakdown.escalation)],
+        ["سناریوی افزایش هزینه (تورم مرکب ماهانه — نه تعدیل قراردادی)", money(a.pricing.breakdown.escalation)],
         ["<b>جمع برآورد نهایی</b>", `<b>${money(a.pricing.breakdown.total)}</b>`],
       ],
     )}
-    <p class="note">مبنای نرخ‌ها: ${a.pricing.seriesLabel} — ${a.pricing.asOfJalali}؛ منطقه: ${a.pricing.regionLabel}؛ ضریب تعدیل عمومی: ${toPersianDigits(a.pricing.indexFactor)}٪</p>
+    <p class="note">مبنای نرخ‌ها: ${a.pricing.seriesLabel} — ${a.pricing.asOfJalali}؛ منطقه: ${a.pricing.regionLabel}؛ ضریب تعدیل عمومی: ${toPersianDigits(a.pricing.indexFactor)}٪`
+      + `${a.pricing.ratePolicy ? ` — ${a.pricing.ratePolicy.note}` : ""}`
+      + `${a.pricing.escalation.note ? ` — ${a.pricing.escalation.note}` : ""}</p>
     ${
       a.pricing.escalation.months.length
         ? table(
-            ["ماه", "روز کاری", "هزینه برنامه‌ای", "ضریب تعدیل", "هزینه تعدیل‌شده", "مبلغ تعدیل"],
+            ["ماه", "روز کاری", "هزینه برنامه‌ای", "ضریب افزایش هزینه", "هزینه افزایش‌یافته", "مبلغ افزایش"],
             a.pricing.escalation.months.map((m) => [
               m.label,
               toPersianDigits(m.workingDays),
@@ -182,7 +292,7 @@ export function buildReportHtml(
         : ""
     }</div>`);
 
-  sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>منابع و تخصیص</h2></div>
+  sections.push(`<div class="sec"><div class="t"><span class="idx">${toPersianDigits(next())}</span><h2>منابع و تخصیص (بدون تسطیح خودکار)</h2></div>
     ${table(
       ["منبع", "واحد", "ظرفیت", "واحد-روز", "اوج تخصیص", "بهره‌وری", "هزینه", "مبنای نرخ"],
       a.resources.map((r) => [

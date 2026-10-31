@@ -74,7 +74,7 @@ export function ScenarioPanel({
       tone: scenarios.paceScenario.schedule.workingDays > analysis.schedule.workingDays ? "warn" : "ok",
     },
     {
-      label: `نرخ تعدیل ماهانه ${toPersianDigits(deferred.inflation)}٪`,
+      label: `سناریوی افزایش هزینه ${toPersianDigits(deferred.inflation)}٪ در ماه (مرکب)`,
       base: formatCompact(analysis.pricing.breakdown.total),
       what: formatCompact(scenarios.costScenario.pricing.breakdown.total),
       delta: formatCompact(scenarios.costScenario.pricing.breakdown.total - analysis.pricing.breakdown.total),
@@ -129,7 +129,7 @@ export function ScenarioPanel({
           </div>
           <div>
             <label className="mb-1.5 block text-[12.5px] font-semibold text-slate-700">
-              نرخ تعدیل ماهانه: {toPersianDigits(deferred.inflation)}٪
+              سناریوی افزایش هزینه: {toPersianDigits(deferred.inflation)}٪ در ماه
             </label>
             <input
               type="range"
@@ -139,9 +139,12 @@ export function ScenarioPanel({
               value={inflation}
               onChange={(e) => setInflation(Number(e.target.value))}
               className="w-full accent-brand-600"
-              aria-label="نرخ تعدیل ماهانه"
+              aria-label="نرخ افزایش هزینه ماهانه (سناریو)"
             />
-            <p className="mt-1 text-[11px] text-slate-500">اثر تورم بر برآورد نهایی پروژه.</p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              نرخ فرضی تورم ماهانه که به‌صورت مرکب روی کارکرد ماه‌های آینده اعمال می‌شود. این یک سناریوی
+              تحلیلی است، نه تعدیل قراردادی یا شاخص رسمی.
+            </p>
           </div>
         </div>
 
@@ -178,7 +181,8 @@ export function ScenarioPanel({
         </div>
 
         <p className="text-[11px] leading-6 text-slate-500">
-          محاسبات این بخش با همان موتور اصلی پروژه (CPM و تعدیل کارکرد ماهانه) انجام می‌شود و هیچ تغییری در داده پروژه شما ایجاد نمی‌کند.
+          محاسبات این بخش با همان موتور اصلی پروژه (CPM و سناریوی افزایش هزینه ماهانه) انجام می‌شود و هیچ تغییری در داده پروژه شما ایجاد نمی‌کند.
+          ارقام تعدیل، سناریو هستند و جایگزین تعدیل قراردادی یا شاخص‌های رسمی نیستند.
           برای اعمال دائمی یک سناریو، مدت فعالیت‌ها یا نرخ تعدیل را در مراحل قبل تغییر دهید.
         </p>
       </div>

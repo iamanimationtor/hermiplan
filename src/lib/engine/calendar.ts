@@ -198,6 +198,51 @@ export function offsetFromDate(cal: WorkCalendar, anchor: string, date: string):
   return axis.offsetAt.get(date) ?? 0;
 }
 
+/**
+ * Where a calendar date sits on the project's working-day axis.
+ *
+ * All date→position decisions (status date, deadline, constraint dates) go
+ * through this single function so the four boundary cases are handled — and
+ * disclosed — identically:
+ *
+ *   • before the project start            → negative offset, zone "before-start"
+ *   • on a working day inside the project → its own index, zone "in-range"
+ *   • on a non-working day                → index of the *next* working day,
+ *                                           `isWorkday: false` so callers can say so
+ *   • after the last working day          → zone "after-finish"
+ *
+ * The previous code path could silently resolve an out-of-range or holiday date
+ * to index 0, which made a status date in the past look like "project start".
+ */
+export interface DatePosition {
+  /** requested calendar date */
+  requested: string;
+  /** working day the position resolves to (the same date when it is a workday) */
+  effectiveDate: string;
+  /** working-day index of `effectiveDate` relative to the anchor (can be negative) */
+  offset: number;
+  isWorkday: boolean;
+  zone: "before-start" | "in-range" | "after-finish";
+}
+
+export function resolveDatePosition(
+  cal: WorkCalendar,
+  anchor: string,
+  date: string,
+  projectWorkingDays = 0,
+): DatePosition {
+  const anchorWd = nextWorkday(cal, anchor);
+  const workday = isWorkday(cal, date);
+  const effectiveDate = workday ? date : nextWorkday(cal, date);
+  const offset = offsetFromDate(cal, anchorWd, effectiveDate);
+
+  let zone: DatePosition["zone"] = "in-range";
+  if (effectiveDate < anchorWd || offset < 0) zone = "before-start";
+  else if (projectWorkingDays > 0 && offset >= projectWorkingDays) zone = "after-finish";
+
+  return { requested: date, effectiveDate, offset, isWorkday: workday, zone };
+}
+
 export function workingDaysBetween(cal: WorkCalendar, start: string, end: string): string[] {
   if (end < start) return [];
   const axis = getAxis(cal, nextWorkday(cal, start));

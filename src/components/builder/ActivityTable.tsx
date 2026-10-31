@@ -193,10 +193,13 @@ export function ActivityTable({
                   <input
                     type="number"
                     min={0}
+                    step={1}
                     value={input?.duration ?? 0}
-                    onChange={(e) => api.updateActivity(a.id, { duration: Number(e.target.value) })}
+                    onChange={(e) =>
+                      api.updateActivity(a.id, { duration: Math.max(0, Math.round(Number(e.target.value) || 0)) })
+                    }
                     className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center text-[12px] outline-none focus:border-brand-400"
-                    aria-label="مدت فعالیت به روز کاری"
+                    aria-label="مدت فعالیت به روز کاری (عدد صحیح)"
                   />
                 </td>
                 <td className="px-3 py-2 text-slate-500">{toPersianDigits(input?.predecessors.length ?? 0)}</td>
@@ -406,12 +409,15 @@ function ActivityEditor({
           ))}
         </Select>
       </Field>
-      <Field label="مدت (روز کاری)">
+      <Field label="مدت (روز کاری)" hint="مدل زمان‌بندی روزمحور است؛ مدت به عدد صحیح روز کاری گرد می‌شود">
         <Input
           type="number"
           min={0}
+          step={1}
           value={activity.duration}
-          onChange={(e) => api.updateActivity(activity.id, { duration: Number(e.target.value) })}
+          onChange={(e) =>
+            api.updateActivity(activity.id, { duration: Math.max(0, Math.round(Number(e.target.value) || 0)) })
+          }
         />
       </Field>
       <Field label="درصد پیشرفت">
@@ -592,8 +598,9 @@ function ActivityEditor({
           }
         >
           <option value="ASAP">در اولین زمان ممکن (پیش‌فرض)</option>
-          <option value="SNET">شروع نه زودتر از تاریخ</option>
-          <option value="MSO">باید در تاریخ مشخص شروع شود</option>
+          <option value="SNET">شروع نه زودتر از تاریخ (SNET)</option>
+          <option value="MSO">باید در تاریخ مشخص شروع شود (MSO)</option>
+          <option value="FNLT">پایان نه دیرتر از تاریخ (FNLT)</option>
         </Select>
       </Field>
       <Field label="تاریخ محدودیت">

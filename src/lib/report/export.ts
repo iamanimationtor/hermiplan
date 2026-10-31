@@ -41,10 +41,17 @@ export function buildSheets(analysis: ProjectAnalysis, input: ProjectInput): She
       ["تعداد فاز", a.schedule.phases.length],
       ["بودجه تجمیعی", a.costs.budget],
       ["هزینه واقعی تا امروز", a.costs.actual],
-      ["پیشرفت فیزیکی (٪)", a.progress.overall],
+      ["پیشرفت زمان‌محور — مدت‌وزنی (٪)", a.progress.timeBased],
+      ["پیشرفت فیزیکی — مقدار اجرا (٪)", a.progress.physical ?? "ثبت نشده"],
+      ["پوشش پیشرفت فیزیکی (٪ بودجه)", a.progress.physicalCoverage],
       ["پیشرفت برنامه‌ای (٪)", a.progress.planned],
-      ["SPI", a.progress.schedulePerformanceIndex],
-      ["CPI", a.progress.costPerformanceIndex],
+      ["SPI (EV/PV)", a.evm.spi ?? "قابل محاسبه نیست"],
+      ["CPI (EV/AC)", a.evm.cpi ?? "قابل محاسبه نیست"],
+      ["EAC = BAC/CPI", a.evm.eac ?? "قابل محاسبه نیست"],
+      ["ETC = EAC − AC", a.evm.etc ?? "قابل محاسبه نیست"],
+      ["VAC = BAC − EAC", a.evm.vac ?? "قابل محاسبه نیست"],
+      ["پوشش داده هزینه واقعی (٪ بودجه)", a.evm.costDataCoverage],
+      ["وضعیت تحلیل", a.status],
       ["امتیاز سلامت", a.health.score],
     ],
   });
@@ -65,6 +72,8 @@ export function buildSheets(analysis: ProjectAnalysis, input: ProjectInput): She
       "شناوری آزاد",
       "بحرانی",
       "پیشرفت (٪)",
+      "محدودیت",
+      "وضعیت محدودیت",
       "بودجه",
       "هزینه واقعی",
       "منابع",
@@ -83,6 +92,8 @@ export function buildSheets(analysis: ProjectAnalysis, input: ProjectInput): She
       act.freeFloat,
       act.critical ? "بله" : "خیر",
       act.progress,
+      act.constraint.type ?? "ASAP",
+      act.constraint.conflict ?? (act.constraint.applied ? "اعمال‌شده" : "بدون اثر"),
       act.budgetCost,
       act.actualCost,
       act.resourceNames.join("، "),
@@ -96,7 +107,13 @@ export function buildSheets(analysis: ProjectAnalysis, input: ProjectInput): She
       m.name,
       m.phase,
       m.date,
-      m.status === "reached" ? "محقق‌شده" : m.status === "late" ? "در تأخیر" : "در پیش رو",
+      m.status === "reached"
+        ? "محقق‌شده"
+        : m.status === "late"
+          ? "در تأخیر"
+          : m.status === "unscheduled"
+            ? "زمان‌بندی‌نشده"
+            : "در پیش رو",
       m.linkedActivityCode ?? "",
     ]),
   });
@@ -206,15 +223,31 @@ export function buildSheets(analysis: ProjectAnalysis, input: ProjectInput): She
   if (a.baseline.available) {
     sheets.push({
       name: "Baseline",
-      headers: ["کد", "فعالیت", "شروع مبنا", "شروع فعلی", "پایان مبنا", "پایان فعلی", "انحراف (روز)", "بودجه مبنا", "بودجه فعلی"],
+      headers: [
+        "کد",
+        "فعالیت",
+        "شروع مبنا",
+        "شروع فعلی",
+        "انحراف شروع (روز کاری)",
+        "پایان مبنا",
+        "پایان فعلی",
+        "انحراف پایان (روز کاری)",
+        "تغییر مدت (روز کاری)",
+        "وضعیت نسبت به مبنا",
+        "بودجه مبنا",
+        "بودجه فعلی",
+      ],
       rows: a.baseline.changedActivities.map((c) => [
         c.code,
         c.name,
         c.baselineStart,
         c.currentStart,
+        c.startVarianceDays,
         c.baselineFinish,
         c.currentFinish,
-        c.varianceDays,
+        c.finishVarianceDays,
+        c.durationChange,
+        c.status === "later" ? "عقب‌تر" : c.status === "earlier" ? "زودتر" : c.status === "unknown" ? "نامشخص" : "مطابق برنامه",
         c.baselineCost,
         c.currentCost,
       ]),

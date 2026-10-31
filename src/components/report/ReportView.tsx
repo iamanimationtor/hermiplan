@@ -37,6 +37,58 @@ const SECTION_RENDER_ORDER = [
   "signature",
 ] as const;
 
+const CONSTRAINT_NAMES: Record<string, string> = {
+  ASAP: "بدون محدودیت",
+  SNET: "شروع نه زودتر از",
+  MSO: "باید در تاریخ شروع شود",
+  FF: "پایان تا پایان",
+  FNLT: "پایان نه دیرتر از",
+};
+
+/** Constraint cell: type + date, with an explicit conflict marker. */
+function constraintCell(activity: ProjectAnalysis["activities"][number]): string {
+  const constraint = activity.constraint;
+  if (!constraint || constraint.type === "ASAP") return "—";
+  const name = CONSTRAINT_NAMES[constraint.type] ?? constraint.type;
+  const date = constraint.date ? ` ${constraint.date}` : "";
+  if (constraint.conflict) return `⚠ ${name}${date} — ${constraint.conflict}`;
+  return `${name}${date}`;
+}
+
+/** Signed working-day value, e.g. "+2", "−1", "0". */
+function signedDays(value: number): string {
+  if (!Number.isFinite(value) || value === 0) return "۰";
+  return `${value > 0 ? "+" : "−"}${toPersianDigits(Math.abs(value))}`;
+}
+
+const STATUS_LABELS: Record<ProjectAnalysis["status"], { label: string; tone: string; hint: string }> = {
+  valid: {
+    label: "تحلیل معتبر",
+    tone: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    hint: "همه فعالیت‌ها زمان‌بندی شدند و هیچ خطا یا هشداری وجود ندارد.",
+  },
+  warning: {
+    label: "تحلیل معتبر همراه با هشدار",
+    tone: "border-amber-200 bg-amber-50 text-amber-900",
+    hint: "زمان‌بندی محاسبه شده است اما مواردی نیاز به بازبینی دارند.",
+  },
+  inconsistent: {
+    label: "زمان‌بندی ناسازگار",
+    tone: "border-orange-300 bg-orange-50 text-orange-900",
+    hint: "محدودیت‌های زمانی و منطق شبکه با هم قابل اجرا نیستند؛ شناوری منفی نشانه این تعارض است.",
+  },
+  invalid: {
+    label: "تحلیل نامعتبر",
+    tone: "border-red-300 bg-red-50 text-red-900",
+    hint: "گراف وابستگی یا داده ورودی معتبر نیست؛ اعداد این گزارش قابل استناد نیستند.",
+  },
+  "internal-error": {
+    label: "خطای داخلی محاسبات",
+    tone: "border-red-400 bg-red-50 text-red-900",
+    hint: "موتور محاسباتی با خطای غیرمنتظره متوقف شد؛ نتیجه‌ای تولید نشده است.",
+  },
+};
+
 const TYPE_LABELS: Record<string, string> = {
   construction: "ساختمان (مسکونی / اداری)",
   civil: "پل و راه (مهندسی عمران)",
@@ -394,7 +446,11 @@ export function ReportView({
 
               <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-4">
                 {[
-                  ["پیشرفت فیزیکی", formatPercent(a.progress.overall, 1)],
+                  ["پیشرفت زمان‌محور (وزن: مدت)", formatPercent(a.progress.timeBased, 1)],
+                  [
+                    a.progress.physical === null ? "پیشرفت فیزیکی (اندازه‌گیری‌نشده)" : "پیشرفت فیزیکی (وزن: بودجه)",
+                    a.progress.physical === null ? "—" : formatPercent(a.progress.physical, 1),
+                  ],
                   ["بودجه تجمیعی", number(a.costs.budget)],
                   ["فعالیت‌ها", toPersianDigits(a.activities.length)],
                   ["وضعیت پروژه", statusText],
@@ -423,6 +479,43 @@ export function ReportView({
           {has("executive") ? (
             <div className="rpt-section mb-6">
               <SectionTitle index={sectionNumber("executive")} title="خلاصه مدیریتی (Executive Summary)" subtitle="جمع‌بندی خودکار وضعیت پروژه بر اساس شاخص‌های محاسباتی" />
+              {(() => {
+                const status = STATUS_LABELS[a.status] ?? STATUS_LABELS.valid;
+                return (
+                  <div className={`mb-3 rounded-lg border px-3 py-2 text-[11px] leading-6 ${status.tone}`}>
+                    <b>{status.label}</b> — {status.hint}
+                  </div>
+                );
+              })()}
+              {a.diagnostics.length || a.unschedulable.length ? (
+                <div className="mb-3 rounded-lg border border-slate-200 bg-white">
+                  <p className="border-b border-slate-100 px-3 py-2 text-[11px] font-bold text-ink-900">
+                    هشدارها و خطاهای تحلیل ({toPersianDigits(a.diagnostics.length)})
+                  </p>
+                  <ul className="thin-scroll max-h-[220px] space-y-1.5 overflow-y-auto px-3 py-2 text-[10.5px] leading-6">
+                    {a.diagnostics.map((diagnostic, index) => (
+                      <li key={`${diagnostic.code}-${index}`} className="flex gap-2">
+                        <span
+                          className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${
+                            diagnostic.severity === "error" ? "bg-red-500" : "bg-amber-400"
+                          }`}
+                        />
+                        <span className={diagnostic.severity === "error" ? "text-red-800" : "text-slate-700"}>
+                          {diagnostic.message}
+                        </span>
+                      </li>
+                    ))}
+                    {a.unschedulable.map((item) => (
+                      <li key={item.id} className="flex gap-2">
+                        <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                        <span className="text-red-800">
+                          «{item.name}» ({item.code}) زمان‌بندی نشد: {item.reason}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               <div className="flex flex-wrap items-start gap-6">
                 <div className="min-w-[260px] flex-1">
                   <div className="rpt-callout">
@@ -578,7 +671,7 @@ export function ReportView({
             <div className="rpt-section mb-6">
               <SectionTitle index={sectionNumber("activities")} title="فهرست فعالیت‌ها (Activity List)" />
               <DataTable
-                headers={["کد", "عنوان فعالیت", "فاز", "مدت", "تاریخ شروع", "تاریخ پایان", "پیشرفت", "منابع", "بودجه"]}
+                headers={["کد", "عنوان فعالیت", "فاز", "مدت", "تاریخ شروع", "تاریخ پایان", "پیشرفت اعلامی", "محدودیت", "منابع", "بودجه"]}
                 rows={a.activities.map((act) => [
                   act.code,
                   act.name,
@@ -587,10 +680,11 @@ export function ReportView({
                   formatJalali(act.startDate, { withMonthName: false }),
                   formatJalali(act.finishDate, { withMonthName: false }),
                   formatPercent(act.progress, 0),
+                  constraintCell(act),
                   act.resourceNames.join("، ") || "—",
                   number(act.budgetCost),
                 ])}
-                footer={["", "جمع کل", `${toPersianDigits(a.activities.length)} فعالیت`, toPersianDigits(a.schedule.workingDays), "", "", formatPercent(a.progress.overall, 1), "", number(a.costs.budget)]}
+                footer={["", "جمع کل", `${toPersianDigits(a.activities.length)} فعالیت`, toPersianDigits(a.schedule.workingDays), "", "", formatPercent(a.progress.overall, 1), "", "", number(a.costs.budget)]}
               />
               {options.includeNotes && a.activities.some((act) => act.milestone) ? (
                 <p className="rpt-note">فعالیت‌های با مدت صفر، نقاط کنترل (Milestone) پروژه هستند.</p>
@@ -602,7 +696,7 @@ export function ReportView({
             <div className="rpt-section mb-6">
               <SectionTitle index={sectionNumber("schedule")} title="زمان‌بندی و شناوری فعالیت‌ها (Schedule & Float)" subtitle="محاسبه‌شده بر اساس الگوریتم CPM با تقویم کاری پروژه" />
               <DataTable
-                headers={["کد", "فعالیت", "زودترین شروع", "زودترین پایان", "دیرترین شروع", "دیرترین پایان", "شناوری کل", "شناوری آزاد", "بحرانی"]}
+                headers={["کد", "فعالیت", "زودترین شروع", "زودترین پایان", "دیرترین شروع", "دیرترین پایان", "شناوری کل", "شناوری آزاد", "بحرانی", "محدودیت"]}
                 rows={a.activities.map((act) => [
                   act.code,
                   act.name,
@@ -617,6 +711,7 @@ export function ReportView({
                       : toPersianDigits(act.totalFloat),
                   toPersianDigits(act.freeFloat),
                   act.critical ? "● بله" : "خیر",
+                  constraintCell(act),
                 ])}
               />
               <p className="rpt-note">
@@ -685,8 +780,14 @@ export function ReportView({
                 rows={a.milestones.map((m) => [
                   m.name,
                   m.phase,
-                  formatJalali(m.date),
-                  m.status === "reached" ? "محقق‌شده" : m.status === "late" ? "در تأخیر" : "در پیش رو",
+                  m.date ? formatJalali(m.date) : "بدون تاریخ",
+                  m.status === "reached"
+                    ? "محقق‌شده"
+                    : m.status === "late"
+                      ? "در تأخیر"
+                      : m.status === "unscheduled"
+                        ? "زمان‌بندی‌نشده"
+                        : "در پیش رو",
                   m.linkedActivityCode ?? "—",
                 ])}
               />
@@ -727,16 +828,21 @@ export function ReportView({
                 <table className="rpt-kv">
                   <tbody>
                     {[
-                      ["بودجه در تکمیل (BAC)", money(a.costs.budget)],
-                      ["ارزش برنامه‌ریزی‌شده تا امروز (PV)", money(a.costs.plannedToDate)],
-                      ["ارزش کسب‌شده (EV)", money(a.costs.earned)],
-                      ["هزینه واقعی (AC)", money(a.costs.actual)],
-                      ["انحراف زمان‌بندی (SV)", money(a.progress.scheduleVariance)],
-                      ["انحراف هزینه (CV)", money(a.progress.costVariance)],
-                      ["شاخص عملکرد زمان‌بندی (SPI)", toPersianDigits(a.progress.schedulePerformanceIndex)],
-                      ["شاخص عملکرد هزینه (CPI)", toPersianDigits(a.progress.costPerformanceIndex)],
-                      ["برآورد هزینه در پایان (EAC)", money(a.costs.estimateAtCompletion)],
-                      ["انحراف در پایان (VAC)", money(a.costs.varianceAtCompletion)],
+                      ["بودجه در تکمیل (BAC)", money(a.evm.bac)],
+                      ["ارزش برنامه‌ریزی‌شده تا تاریخ وضعیت (PV)", money(a.evm.pv)],
+                      ["ارزش کسب‌شده (EV)", money(a.evm.ev)],
+                      ["هزینه واقعی (AC)", a.evm.ac === null ? "ثبت نشده" : money(a.evm.ac)],
+                      ["انحراف زمان‌بندی (SV = EV − PV)", money(a.evm.sv)],
+                      ["انحراف هزینه (CV = EV − AC)", a.evm.cv === null ? "قابل محاسبه نیست" : money(a.evm.cv)],
+                      ["شاخص عملکرد زمان‌بندی (SPI)", a.evm.spi === null ? "قابل محاسبه نیست" : toPersianDigits(a.evm.spi)],
+                      ["شاخص عملکرد هزینه (CPI)", a.evm.cpi === null ? "قابل محاسبه نیست" : toPersianDigits(a.evm.cpi)],
+                      ["برآورد هزینه در پایان (EAC = BAC ÷ CPI)", a.evm.eac === null ? "قابل محاسبه نیست" : money(a.evm.eac)],
+                      ["برآورد هزینه باقی‌مانده (ETC = EAC − AC)", a.evm.etc === null ? "—" : money(a.evm.etc)],
+                      ["انحراف در پایان (VAC = BAC − EAC)", a.evm.vac === null ? "—" : money(a.evm.vac)],
+                      ["پوشش داده هزینه واقعی", `${toPersianDigits(a.evm.costDataCoverage)}٪ از بودجه`],
+                      ["پیشرفت زمان‌محور (مدت‌وزنی)", formatPercent(a.progress.timeBased, 1)],
+                      ["پیشرفت فیزیکی (مقدار اجرا)", a.progress.physical === null ? "ثبت نشده" : formatPercent(a.progress.physical, 1)],
+                      ["پوشش پیشرفت فیزیکی", `${toPersianDigits(a.progress.physicalCoverage)}٪ از بودجه`],
                     ].map(([label, value]) => (
                       <tr key={label}>
                         <td className="k">{label}</td>
@@ -746,6 +852,13 @@ export function ReportView({
                   </tbody>
                 </table>
                 <div>
+                  {a.evm.notes.length ? (
+                    <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10.5px] leading-6 text-amber-900">
+                      {a.evm.notes.map((note) => (
+                        <p key={note}>• {note}</p>
+                      ))}
+                    </div>
+                  ) : null}
                   <p className="mb-2 text-[10.5px] font-bold text-slate-600">پیشرفت فازها</p>
                   <BarChart
                     data={a.schedule.phases.map((p) => ({ label: p.name, value: p.progress, tone: "info" }))}
@@ -785,7 +898,7 @@ export function ReportView({
               />
               {a.overallocatedResources > 0 ? (
                 <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[10.5px] leading-6 text-amber-800">
-                  ⚠ در {toPersianDigits(a.overallocatedResources)} منبع، میزان تخصیص از ظرفیت مجاز روزانه بیشتر است. پیشنهاد: افزایش ظرفیت، تخصیص موازی منابع دیگر یا جابه‌جایی فعالیت‌های غیربحرانی در محدوده شناوری آن‌ها (Resource Leveling).
+                  ⚠ در {toPersianDigits(a.overallocatedResources)} منبع، میزان تخصیص از ظرفیت مجاز روزانه بیشتر است. این موتور فقط «مصرف و ظرفیت» را محاسبه می‌کند و تسطیح خودکار منابع انجام نمی‌دهد؛ رفع آن نیازمند تصمیم برنامه‌ریز است (افزایش ظرفیت، تخصیص منبع دیگر یا جابه‌جایی فعالیت غیربحرانی در محدوده شناوری).
                 </div>
               ) : null}
               {a.resources.find((r) => r.demand.length) ? (
@@ -842,7 +955,7 @@ export function ReportView({
 
           {has("pricing") ? (
             <div className="rpt-section mb-6">
-              <SectionTitle index={sectionNumber("pricing")} title="قیمت‌گذاری بازار، تعدیل و برآورد نهایی" subtitle={`مبنای نرخ: ${a.pricing.seriesLabel} — منطقه ${a.pricing.regionLabel} — تاریخ نرخ: ${a.pricing.asOfJalali}`} />
+              <SectionTitle index={sectionNumber("pricing")} title="نرخ‌های مرجع، سناریوی افزایش هزینه و برآورد نهایی" subtitle={`مبنای نرخ: ${a.pricing.seriesLabel} — منطقه ${a.pricing.regionLabel} — تاریخ نرخ: ${a.pricing.asOfJalali}`} />
               <table className="rpt-kv mb-3">
                 <tbody>
                   {[
@@ -850,7 +963,7 @@ export function ReportView({
                     ["منطقه اجرا", `${a.pricing.regionLabel} (ضریب منطقه‌ای اعمال‌شده)`],
                     ["تاریخ مرجع نرخ بازار", `${a.pricing.asOfJalali} (${a.pricing.asOf})`],
                     ["ضریب تعدیل عمومی", `${toPersianDigits(a.pricing.indexFactor)}٪`],
-                    ["نرخ تعدیل ماهانه", a.pricing.escalationEnabled ? `${toPersianDigits(a.pricing.escalationRatePerMonth)}٪ در ماه` : "تعدیل غیرفعال"],
+                    ["نرخ سناریوی افزایش هزینه (ماهانه)", a.pricing.escalationEnabled ? `${toPersianDigits(a.pricing.escalationRatePerMonth)}٪ در ماه (مرکب)` : "سناریو غیرفعال"],
                     ["منابع داده", a.pricing.sources.join(" • ")],
                   ].map(([label, value]) => (
                     <tr key={label}>
@@ -869,16 +982,16 @@ export function ReportView({
                   ["هزینه‌های بالاسری", `${toPersianDigits(project.pricing?.overheadPercent ?? 17)}٪ مستقیم`, money(a.pricing.breakdown.overhead)],
                   ["سود پیمانکار", `${toPersianDigits(project.pricing?.profitPercent ?? 10)}٪ (مستقیم + بالاسری)`, money(a.pricing.breakdown.profit)],
                   ["ذخیره احتیاطی", `${toPersianDigits(project.pricing?.contingencyPercent ?? 5)}٪ مستقیم`, money(a.pricing.breakdown.contingency)],
-                  ["تعدیل قیمت (Escalation)", `${toPersianDigits(a.pricing.escalationRatePerMonth)}٪ ماهانه بر کارکرد`, money(a.pricing.breakdown.escalation)],
+                  ["سناریوی افزایش هزینه (نه تعدیل قراردادی)", `${toPersianDigits(a.pricing.escalationRatePerMonth)}٪ ماهانه مرکب بر کارکرد`, money(a.pricing.breakdown.escalation)],
                 ]}
                 footer={["جمع برآورد نهایی پروژه", "—", money(a.pricing.breakdown.total)]}
               />
 
               {a.pricing.escalation.months.length ? (
                 <div className="mt-3">
-                  <p className="mb-1.5 text-[10.5px] font-bold text-slate-600">جدول تعدیل بر پایه کارکرد ماهانه</p>
+                  <p className="mb-1.5 text-[10.5px] font-bold text-slate-600">جدول سناریوی افزایش هزینه بر پایه کارکرد ماهانه</p>
                   <DataTable
-                    headers={["ماه", "روز کاری", "هزینه برنامه‌ای", "ضریب تعدیل", "هزینه تعدیل‌شده", "مبلغ تعدیل"]}
+                    headers={["ماه", "روز کاری", "هزینه برنامه‌ای", "ضریب افزایش هزینه", "هزینه افزایش‌یافته", "مبلغ افزایش"]}
                     rows={a.pricing.escalation.months.map((m) => [
                       m.label,
                       toPersianDigits(m.workingDays),
@@ -895,17 +1008,18 @@ export function ReportView({
               <div className="mt-3">
                 <p className="mb-1.5 text-[10.5px] font-bold text-slate-600">نرخ‌های اعمال‌شده روی منابع پروژه</p>
                 <DataTable
-                  headers={["منبع", "واحد", "نرخ", "مبنای نرخ"]}
+                  headers={["منبع", "واحد", "نرخ اعمال‌شده", "مبنای نرخ", "اعتبار منبع"]}
                   rows={a.pricing.rates.map((rate) => [
                     rate.name,
                     rate.unit ?? "—",
                     money(rate.rate),
                     rate.source,
+                    rate.verified ? "تأییدشده" : "تأییدنشده (داده مرجع)",
                   ])}
                 />
               </div>
               <p className="rpt-note">
-                نرخ‌ها بر مبنای مصوبات رسمی دستمزد و میانگین بازار مصالح ایران تنظیم شده‌اند؛ در صورت نیاز، ضریب تعدیل عمومی یا نرخ هر منبع در پنل قیمت‌گذاری قابل اصلاح است.
+                نرخ نمایش‌داده‌شده در ستون «نرخ» همان نرخی است که در محاسبات این پروژه اعمال شده است. مبنای نرخ (ستون آخر) و وضعیت اعتبارسنجی آن ذکر شده است. این ارقام «داده مرجع» هستند و سند رسمی هر ردیف در سامانه نگهداری نمی‌شود؛ برای برآورد قراردادی باید با فهرست‌بهای سال مربوطه و نرخ‌های مصوب پروژه جایگزین شوند.
               </p>
             </div>
           ) : null}
@@ -993,8 +1107,12 @@ export function ReportView({
                         <td>{a.baseline.name ?? "—"}</td>
                       </tr>
                       <tr>
-                        <td className="k">حداکثر انحراف زمان‌بندی</td>
-                        <td>{toPersianDigits(a.baseline.scheduleVarianceDays)} روز کاری</td>
+                        <td className="k">حداکثر تأخیر پایان نسبت به مبنا</td>
+                        <td>{toPersianDigits(a.baseline.maxFinishSlipDays)} روز کاری</td>
+                      </tr>
+                      <tr>
+                        <td className="k">حداکثر تأخیر شروع نسبت به مبنا</td>
+                        <td>{toPersianDigits(a.baseline.maxStartSlipDays)} روز کاری</td>
                       </tr>
                       <tr>
                         <td className="k">انحراف تجمیعی هزینه</td>
@@ -1003,16 +1121,18 @@ export function ReportView({
                     </tbody>
                   </table>
                   <DataTable
-                    headers={["کد", "فعالیت", "شروع مبنا", "شروع فعلی", "پایان مبنا", "پایان فعلی", "انحراف (روز)", "بودجه مبنا", "بودجه فعلی"]}
+                    headers={["کد", "فعالیت", "شروع مبنا", "شروع فعلی", "انحراف شروع", "پایان مبنا", "پایان فعلی", "انحراف پایان", "تغییر مدت", "وضعیت", "بودجه فعلی"]}
                     rows={a.baseline.changedActivities.map((c) => [
                       c.code,
                       c.name,
                       formatJalali(c.baselineStart, { withMonthName: false }),
                       formatJalali(c.currentStart, { withMonthName: false }),
+                      signedDays(c.startVarianceDays),
                       formatJalali(c.baselineFinish, { withMonthName: false }),
                       formatJalali(c.currentFinish, { withMonthName: false }),
-                      toPersianDigits(c.varianceDays),
-                      number(c.baselineCost),
+                      signedDays(c.finishVarianceDays),
+                      signedDays(c.durationChange),
+                      c.status === "later" ? "عقب‌تر" : c.status === "earlier" ? "زودتر" : c.status === "unknown" ? "نامشخص" : "مطابق برنامه",
                       number(c.currentCost),
                     ])}
                   />
@@ -1069,7 +1189,7 @@ export function ReportView({
                   ])}
                 />
                 <p className="rpt-note">
-                  روش‌های محاسباتی: مسیر بحرانی با شبکه پیش‌نیازی (CPM/PDM)، مدیریت ارزش کسب‌شده (EVM)، تخصیص و هموارسازی منابع، تعدیل قیمت بر پایه کارکرد ماهانه و ارزیابی ریسک به روش احتمال–اثر.
+                  روش‌های محاسباتی: مسیر بحرانی با شبکه پیش‌نیازی (CPM/PDM)، مدیریت ارزش کسب‌شده (EVM)، تخصیص و مصرف منابع (بدون تسطیح خودکار)، سناریوی افزایش هزینه بر پایه کارکرد ماهانه و ارزیابی ریسک به روش احتمال–اثر.
                 </p>
               </div>
             ) : null}

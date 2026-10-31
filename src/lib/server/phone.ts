@@ -60,22 +60,26 @@ export function parsePhone(input: string): PhoneParseResult {
   const hasPlus = compact.startsWith("+");
   const digits = hasPlus ? compact.slice(1) : compact;
 
-  // International → national
-  let national: string;
+  // International → national. The international form carries 98 + ten
+  // subscriber digits, the national form 0 + ten digits, so both paths are
+  // normalised to "0" + subscriber and then validated once.
+  let subscriber: string;
   if (hasPlus) {
     if (!digits.startsWith("98")) return { ok: false, reason: "invalid-prefix" };
-    national = digits.slice(2);
+    subscriber = digits.slice(2);
   } else if (digits.startsWith("0098")) {
-    national = digits.slice(4);
+    subscriber = digits.slice(4);
   } else if (digits.startsWith("98") && digits.length === 12) {
-    national = digits.slice(2);
+    subscriber = digits.slice(2);
   } else if (digits.startsWith("0")) {
-    national = digits;
+    subscriber = digits.slice(1);
   } else if (digits.startsWith("9")) {
-    national = `0${digits}`;
+    subscriber = digits;
   } else {
     return { ok: false, reason: "invalid-prefix" };
   }
+
+  const national = `0${subscriber}`;
 
   // Iranian mobile numbers are 09 + 9 digits (11 digits total).
   if (national.length !== 11) return { ok: false, reason: "invalid-length" };

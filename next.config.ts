@@ -6,8 +6,9 @@ import type { NextConfig } from "next";
  * A strict CSP is intentionally NOT set: the Persian webfont is loaded from a
  * CDN through a CSS `@import`, and Next.js injects inline bootstrap scripts, so
  * a policy written without browser testing would either break the UI or be
- * meaningless. This is a documented, known gap (see AUDIT.md § بقایای امنیتی)
- * rather than a guessed configuration.
+ * meaningless. This is a documented, known gap (see
+ * docs/AUDIT-REPORT.md → «معیارهای پذیرش ناتمام») rather than a guessed
+ * configuration.
  */
 const baseSecurityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },

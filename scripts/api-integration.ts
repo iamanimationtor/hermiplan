@@ -8,7 +8,8 @@ import "dotenv/config";
  *
  * Verifies the real user journey with real cookies and real downloaded files.
  */
-import { execSync } from "node:child_process";
+import { inflateRawSync } from "node:zlib";
+import { Client } from "pg";
 import { buildProjectFromTemplate } from "../src/lib/templates";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3100";
@@ -32,6 +33,71 @@ const PG = process.env.DATABASE_URL;
 if (!PG) {
   console.error("DATABASE_URL must be set (see .env.example) to run the database assertions.");
   process.exit(1);
+}
+
+/**
+ * Read-only database assertions go through the same `pg` driver the application
+ * uses, so the suite needs nothing beyond Node and the project dependencies.
+ * (The previous implementation shelled out to `psql`, which is not installed on
+ * managed runtimes such as Netlify and made the suite unrunnable there.)
+ */
+let client: Client | null = null;
+async function dbQuery(text: string, params: unknown[] = []): Promise<string> {
+  if (!client) {
+    client = new Client({ connectionString: PG });
+    await client.connect();
+  }
+  const result = await client.query(text, params);
+  return String(result.rows[0] ? Object.values(result.rows[0])[0] ?? "" : "");
+}
+async function closeDb(): Promise<void> {
+  if (client) {
+    await client.end();
+    client = null;
+  }
+}
+
+/**
+ * Minimal ZIP reader (central directory + inflate) used to verify that the
+ * produced package is a real archive whose CRCs match. Deliberately test-local:
+ * the application only ever *writes* archives, so no runtime dependency is
+ * added.
+ */
+function readZip(buffer: Buffer): { name: string; data: Buffer; crcOk: boolean }[] {
+  const eocd = buffer.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  if (eocd < 0) throw new Error("ZIP end-of-central-directory not found");
+  const count = buffer.readUInt16LE(eocd + 10);
+  let offset = buffer.readUInt32LE(eocd + 16);
+  const entries: { name: string; data: Buffer; crcOk: boolean }[] = [];
+  for (let i = 0; i < count; i += 1) {
+    if (buffer.readUInt32LE(offset) !== 0x02014b50) throw new Error("bad central directory header");
+    const method = buffer.readUInt16LE(offset + 10);
+    const crc = buffer.readUInt32LE(offset + 16);
+    const compressedSize = buffer.readUInt32LE(offset + 20);
+    const nameLength = buffer.readUInt16LE(offset + 28);
+    const extraLength = buffer.readUInt16LE(offset + 30);
+    const commentLength = buffer.readUInt16LE(offset + 32);
+    const localOffset = buffer.readUInt32LE(offset + 42);
+    const name = buffer.subarray(offset + 46, offset + 46 + nameLength).toString("utf8");
+    offset += 46 + nameLength + extraLength + commentLength;
+
+    const localNameLength = buffer.readUInt16LE(localOffset + 26);
+    const localExtraLength = buffer.readUInt16LE(localOffset + 28);
+    const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+    const raw = buffer.subarray(dataStart, dataStart + compressedSize);
+    const data = method === 0 ? Buffer.from(raw) : inflateRawSync(raw);
+    entries.push({ name, data, crcOk: crc32(data) === crc });
+  }
+  return entries;
+}
+
+function crc32(data: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < data.length; i += 1) {
+    crc ^= data[i];
+    for (let bit = 0; bit < 8; bit += 1) crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+  }
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 let passed = 0;
@@ -74,6 +140,10 @@ async function call(
   init: RequestInit = {},
 ): Promise<{ status: number; body: string; response: Response }> {
   const headers = new Headers(init.headers ?? {});
+  // Every request carries the run's own client IP: the rate limiter is backed by
+  // PostgreSQL, so without this header all runs would share one bucket and a
+  // previous run could exhaust the quota of the next one.
+  headers.set("x-forwarded-for", CLIENT_IP);
   if (jar && jar.header()) headers.set("cookie", jar.header());
   if (init.body) headers.set("content-type", "application/json");
   const response = await fetch(`${BASE}${path}`, { ...init, headers, redirect: "manual" });
@@ -110,40 +180,64 @@ async function main() {
 
   /* ---------------- 2. جداسازی کاربران ---------------- */
   console.log("\n▶ ۲. جداسازی کاربران (Tenant Isolation)");
+  // Design decision: a non-owner must not be able to distinguish "does not
+  // exist" from "belongs to someone else", so the answer is 404 — never 403,
+  // which would confirm the UUID is real.
   const stranger = new Jar();
   const strangerRead = await call(stranger, `/api/projects/${id}`);
-  ok(strangerRead.status === 403, "خواندن داده خام پروژه توسط غریبه ⇒ ۴۰۳", `got ${strangerRead.status}`);
+  ok(strangerRead.status === 404, "خواندن داده خام پروژه توسط غریبه ⇒ ۴۰۴ (بدون افشای وجود)", `got ${strangerRead.status}`);
+  ok(!strangerRead.body.includes("پروژه تست یکپارچگی"), "پاسخ به غریبه هیچ داده‌ای از پروژه را افشا نمی‌کند", strangerRead.body.slice(0, 80));
 
   const strangerPatch = await call(stranger, `/api/projects/${id}`, {
     method: "PATCH",
     body: JSON.stringify({ project: JSON.parse(projectJson) }),
   });
-  ok(strangerPatch.status === 403, "ویرایش پروژه توسط غریبه ⇒ ۴۰۳", `got ${strangerPatch.status}`);
+  ok(strangerPatch.status === 404, "ویرایش پروژه توسط غریبه ⇒ ۴۰۴", `got ${strangerPatch.status}`);
 
   const strangerDelete = await call(stranger, `/api/projects/${id}`, { method: "DELETE" });
-  ok(strangerDelete.status === 403, "حذف پروژه توسط غریبه ⇒ ۴۰۳", `got ${strangerDelete.status}`);
+  ok(strangerDelete.status === 404, "حذف پروژه توسط غریبه ⇒ ۴۰۴", `got ${strangerDelete.status}`);
+
+  const strangerVisibility = await call(stranger, `/api/projects/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ isPublic: true }),
+  });
+  ok(strangerVisibility.status === 404, "غریبه نمی‌تواند پروژه را عمومی کند ⇒ ۴۰۴", `got ${strangerVisibility.status}`);
 
   const badId = await call(owner, "/api/projects/not-a-uuid");
   ok(badId.status === 400, "شناسه نامعتبر ⇒ ۴۰۰");
 
-  /* ---------------- 3. گزارش قابل اشتراک و حالت خصوصی ---------------- */
-  console.log("\n▶ ۳. لینک گزارش و کلید خصوصی");
+  /* ---------------- 3. گزارش: خصوصی به‌صورت پیش‌فرض + انتشار قابل بازگشت ---------------- */
+  console.log("\n▶ ۳. گزارش خصوصی، انتشار صریح و لغو انتشار");
+  const defaultReport = await call(new Jar(), `/report/${id}`);
+  ok(defaultReport.status === 404, "گزارش به‌صورت پیش‌فرض خصوصی است (غریبه ⇒ ۴۰۴)", `got ${defaultReport.status}`);
+  const ownerReportDefault = await call(owner, `/report/${id}`);
+  ok(ownerReportDefault.status === 200, "مالک گزارش خصوصی خود را می‌بیند", `got ${ownerReportDefault.status}`);
+
+  const publish = await call(owner, `/api/projects/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ isPublic: true }),
+  });
+  ok(publish.status === 200, "مالک می‌تواند گزارش را منتشر کند", publish.body.slice(0, 120));
+
   const publicReport = await call(new Jar(), `/report/${id}`);
-  ok(publicReport.status === 200, "صفحه گزارش به‌صورت پیش‌فرض قابل اشتراک است");
+  ok(publicReport.status === 200, "پس از انتشار، گزارش برای غریبه قابل مشاهده است", `got ${publicReport.status}`);
+
+  const rawAfterPublish = await call(stranger, `/api/projects/${id}`);
+  ok(rawAfterPublish.status === 404, "انتشار گزارش، دسترسی به داده خام را باز نمی‌کند", `got ${rawAfterPublish.status}`);
 
   const privatise = await call(owner, `/api/projects/${id}`, {
     method: "PATCH",
     body: JSON.stringify({ isPublic: false }),
   });
-  ok(privatise.status === 200, "مالک می‌تواند گزارش را خصوصی کند");
+  ok(privatise.status === 200, "مالک می‌تواند انتشار را لغو کند");
 
   const privateReport = await call(new Jar(), `/report/${id}`);
-  ok(privateReport.status === 404, "گزارش خصوصی برای غریبه ⇒ ۴۰۴", `got ${privateReport.status}`);
+  ok(privateReport.status === 404, "گزارش لغو‌شده برای غریبه ⇒ ۴۰۴", `got ${privateReport.status}`);
   const ownerReport = await call(owner, `/report/${id}`);
-  ok(ownerReport.status === 200, "مالک همچنان گزارش خصوصی را می‌بیند");
+  ok(ownerReport.status === 200, "مالک همچنان گزارش را می‌بیند");
 
   const apiAfterPrivate = await call(stranger, `/api/projects/${id}`);
-  ok(apiAfterPrivate.status === 403, "داده خام پس از خصوصی‌سازی هم محدود است");
+  ok(apiAfterPrivate.status === 404, "داده خام پس از خصوصی‌سازی هم محدود است");
 
   /* ---------------- 4. ویرایش و ماندگاری ---------------- */
   console.log("\n▶ ۴. ویرایش، ماندگاری و رفرش");
@@ -195,22 +289,23 @@ async function main() {
   });
   const requestBody = JSON.parse(request.body);
 
-  if (requestBody.loginUnavailable) {
+  if (request.status === 503) {
     // Production configuration: no SMS provider and demo OTP not explicitly
     // enabled. Login must be refused, no code may be leaked, and nothing may
     // be written to the database.
     skipped += 6;
     ok(request.status === 503, "بدون سرویس پیامک و بدون فعال‌سازی صریح دمو ⇒ ۵۰۳", `got ${request.status}`);
     ok(!requestBody.code, "هیچ کدی در پاسخ فاش نمی‌شود");
-    const rows = execSync(
-      `psql "${PG}" -t -A -c "select count(*) from otp_codes where phone='${phone}'"`,
-      { encoding: "utf-8" },
-    ).trim();
+    const rows = await dbQuery("select count(*) from otp_codes where phone = $1", [phone]);
     ok(rows === "0", "هیچ ردیف OTP نوشته نمی‌شود", rows);
     console.log("  ⚠ مسیر ورود (۶ بررسی) در این پیکربندی نادیده گرفته شد — حالت دمو فعال نیست");
     console.log("    (برای آزمودن ورود: HERMIPLAN_ALLOW_DEMO_OTP=1 را تنظیم کنید)");
   } else {
-    ok(request.status === 200 && typeof requestBody.code === "string", "کد نمایشی صادر شد (حالت بدون سرویس پیامک)");
+    ok(
+      request.status === 200 && requestBody.demoMode === true && typeof requestBody.code === "string",
+      "کد نمایشی صادر شد (حالت دمو با فعال‌سازی صریح)",
+      `${request.status} ${request.body.slice(0, 120)}`,
+    );
 
     // تلاش‌های نادرست ⇒ محدودیت brute-force
     let attemptsMessage = "";
@@ -244,10 +339,7 @@ async function main() {
 
     const claimed = JSON.parse(verified.body).claimedProjects ?? 0;
     ok(claimed >= 1, "پروژه‌های مهمان به حساب منتقل شدند", `claimed=${claimed}`);
-    const ownerInDb = execSync(
-      `psql "${PG}" -t -A -c "select coalesce(owner_user::text,'NULL') from projects where id='${guestId}'"`,
-      { encoding: "utf-8" },
-    ).trim();
+    const ownerInDb = await dbQuery("select coalesce(owner_user::text, 'NULL') from projects where id = $1", [guestId]);
     ok(ownerInDb !== "NULL" && ownerInDb.length > 10, "owner_user در پایگاه داده ثبت شد", ownerInDb);
 
     const sessionUser = await call(otpJar, "/api/auth");
@@ -277,14 +369,17 @@ async function main() {
     body: exportPayload,
   });
   ok(pkg.status === 200, "بسته کامل دریافت شد");
-  const zipBytes = new Uint8Array(await pkg.arrayBuffer());
-  const fs = await import("node:fs");
-  fs.writeFileSync("/tmp/it-package.zip", zipBytes);
-  const names = execSync("python3 -c \"import zipfile;z=zipfile.ZipFile('/tmp/it-package.zip');print(','.join(z.namelist()));print(z.testzip())\"", {
-    encoding: "utf-8",
-  }).trim().split("\n");
-  ok(names[0].split(",").length === 6, "بسته شامل ۶ فایل است", names[0]);
-  ok(names[1] === "None", "یکپارچگی ZIP (CRC) تأیید شد", names[1]);
+  const zipBytes = Buffer.from(await pkg.arrayBuffer());
+  const entries = readZip(zipBytes);
+  ok(entries.length === 6, "بسته شامل ۶ فایل است", entries.map((entry) => entry.name).join(","));
+  ok(entries.every((entry) => entry.crcOk), "یکپارچگی ZIP (CRC) تأیید شد");
+  ok(
+    entries.some((entry) => entry.name.endsWith(".xlsx")) &&
+      entries.some((entry) => entry.name.endsWith(".html")) &&
+      entries.some((entry) => entry.name.endsWith(".json")),
+    "بسته شامل XLSX، HTML و JSON است",
+    entries.map((entry) => entry.name).join(","),
+  );
 
   const jsonExport = await fetch(`${BASE}/api/export`, {
     method: "POST",
@@ -341,10 +436,12 @@ async function main() {
 
   console.log(`\n══════════ نتیجه: ${passed} موفق / ${failed} ناموفق / ${skipped} نادیده ══════════`);
   if (failures.length) failures.forEach((message) => console.error(`  • ${message}`));
+  await closeDb();
   process.exit(failed === 0 ? 0 : 1);
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error("خطای اجرای آزمون:", error);
+  await closeDb().catch(() => undefined);
   process.exit(1);
 });

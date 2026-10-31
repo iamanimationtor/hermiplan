@@ -5,16 +5,22 @@ import {
   diffCalendarDays,
   ensureViableCalendar,
   isIsoDate,
-  isWorkday,
   offsetFromDate,
+  resolveDatePosition,
   workingDaysBetween,
 } from "./calendar";
 import { computeAllocations, computeSchedule, type Allocation, type ScheduleResult } from "./schedule";
+import { normalizeActivityInputs } from "./normalize-input";
 import { formatJalali, toPersianDigits } from "@/lib/date-fa";
 import { computePricing } from "@/lib/market/engine";
 import { standardsFor } from "@/lib/standards";
 import type {
   ActivityInput,
+  ActivityQuantity,
+  AnalysisStatus,
+  BaselineVarianceRow,
+  Diagnostic,
+  EvmResult,
   ActivityResult,
   CostResult,
   DailyDemand,
@@ -41,6 +47,78 @@ const round = (v: number, digits = 2): number => {
   return Math.round(v * f) / f;
 };
 
+/**
+ * Planned progress of one activity at the status date.
+ *
+ * Definition (documented, single source of truth):
+ *   planned = clamp01((statusOffset − ES) / duration)
+ *
+ * `statusOffset` counts the working days from the project anchor to the status
+ * date, so the status date is treated as the *beginning* of that working day:
+ * work performed on the status date itself is not yet part of "planned". This
+ * matches MS Project's status-date convention and keeps `planned = 0` on the
+ * project start date instead of reporting a full day of planned work.
+ *
+ * Milestones (duration 0) are 100 % planned once their date has been reached.
+ */
+function plannedFraction(statusOffset: number, es: number, duration: number): number {
+  if (duration <= 0) return statusOffset >= es ? 1 : 0;
+  if (statusOffset <= es) return 0;
+  return clamp01((statusOffset - es) / duration);
+}
+
+/**
+ * Quantity-based progress for one activity: Actual / Planned, per the unit of
+ * measure. Deliberately **not** clamped to 100 %: executing more than planned is
+ * a real condition that must stay visible.
+ */
+function quantityProgress(quantity?: ActivityQuantity): {
+  physical: number | null;
+  detail: NonNullable<AnalysisActivity["quantity"]> | undefined;
+} {
+  if (!quantity || !quantity.unit) return { physical: null, detail: undefined };
+  const planned = quantity.planned;
+  const actual = quantity.actual;
+  const approved = quantity.approved ?? 0;
+  if (!(planned > 0)) {
+    return {
+      physical: null,
+      detail: {
+        unit: quantity.unit,
+        planned,
+        actual,
+        approved,
+        ratio: 0,
+        overrun: false,
+        status: "invalid",
+        note: "مقدار برنامه‌ریزی‌شده صفر است؛ درصد پیشرفت قابل محاسبه نیست",
+      },
+    };
+  }
+  const ratio = actual / planned;
+  return {
+    physical: round(ratio * 100, 2),
+    detail: {
+      unit: quantity.unit,
+      planned,
+      actual,
+      approved,
+      ratio: round(ratio, 4),
+      overrun: ratio > 1,
+      status: ratio > 1 ? "over" : "normal",
+      note: ratio > 1 ? "مقدار اجراشده از مقدار برنامه‌ریزی‌شده بیشتر است" : undefined,
+    },
+  };
+}
+
+/** Working-day distance between two ISO dates on the project calendar. */
+function workingDayDiff(calendar: Parameters<typeof offsetFromDate>[0], from: string, to: string): number {
+  if (!isIsoDate(from) || !isIsoDate(to)) return 0;
+  return offsetFromDate(calendar, from, to);
+}
+
+type AnalysisActivity = ActivityResult;
+
 function activityBudget(activity: ActivityInput, rateById: Map<string, number>): number {
   const resourceCost = activity.resources.reduce((sum, assignment) => {
     const rate = rateById.get(assignment.resourceId) ?? 0;
@@ -66,9 +144,29 @@ function statusFromScore(score: number): Status {
  * The single deterministic entry point of the HERMIPLAN engine.
  * Takes a validated project input and returns a full engineering analysis.
  */
-export function analyzeProject(input: ProjectInput): ProjectAnalysis {
+/**
+ * Public entry point. Any unexpected failure inside the engine is converted into
+ * an explicit `internal-error` analysis instead of a stack trace: the UI can then
+ * say "the calculation failed" rather than showing zeros that look like real
+ * results, and the API never leaks internals.
+ */
+export function analyzeProject(rawInput: ProjectInput): ProjectAnalysis {
+  try {
+    return analyzeProjectUnchecked(rawInput);
+  } catch (error) {
+    console.error("[engine] analysis failed:", error);
+    return failedAnalysis(rawInput);
+  }
+}
+
+function analyzeProjectUnchecked(rawInput: ProjectInput): ProjectAnalysis {
   const errors: string[] = [];
   const warnings: string[] = [];
+
+  // Numeric policy (integer durations, clamped progress) is applied once, here.
+  const normalized = normalizeActivityInputs(rawInput.activities ?? []);
+  const diagnostics: Diagnostic[] = [...normalized.diagnostics];
+  const input: ProjectInput = { ...rawInput, activities: normalized.activities };
 
   // defensive normalisation: a malformed calendar must never hang the scheduler
   const calendar = ensureViableCalendar(input.calendar);
@@ -92,9 +190,48 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
 
   const rateById = new Map(input.resources.map((r) => [r.id, r.rate]));
   const resourceById = new Map(input.resources.map((r) => [r.id, r]));
-  const statusOffset = offsetFromDate(calendar, schedule.anchor, input.meta.statusDate);
-  // When the status date is a working day, that day's work counts as performed.
-  const statusDayCredit = isWorkday(calendar, input.meta.statusDate) ? 1 : 0;
+  /**
+   * Status-date position — one shared resolver (see `resolveDatePosition`).
+   * The four boundary cases are classified and, where the user's date could be
+   * misread, disclosed as a diagnostic instead of being silently snapped.
+   */
+  const statusPosition = resolveDatePosition(
+    calendar,
+    schedule.anchor,
+    input.meta.statusDate,
+    schedule.duration,
+  );
+  const statusOffset = statusPosition.offset;
+  const statusEffective = statusPosition.effectiveDate;
+  if (statusPosition.zone === "before-start") {
+    diagnostics.push({
+      kind: "calendar",
+      severity: "warning",
+      code: "status-date-before-start",
+      message:
+        `تاریخ وضعیت (${input.meta.statusDate}) پیش از شروع پروژه (${schedule.start}) است؛ ` +
+        `پیشرفت برنامه‌ای صفر در نظر گرفته شد و باقی‌مانده مدت برابر کل برنامه است`,
+    });
+  } else if (statusPosition.zone === "after-finish") {
+    diagnostics.push({
+      kind: "calendar",
+      severity: "warning",
+      code: "status-date-after-finish",
+      message:
+        `تاریخ وضعیت (${input.meta.statusDate}) پس از پایان برنامه (${schedule.finish}) است؛ ` +
+        `پیشرفت برنامه‌ای ۱۰۰٪ و «مانده مدت» صفر در نظر گرفته شد`,
+    });
+  }
+  if (!statusPosition.isWorkday) {
+    diagnostics.push({
+      kind: "calendar",
+      severity: "warning",
+      code: "status-date-non-working",
+      message:
+        `تاریخ وضعیت (${input.meta.statusDate}) روز غیرکاری است؛ موقعیت زمانی آن با ابتدای روز کاری ` +
+        `${statusEffective} محاسبه شد`,
+    });
+  }
 
   const phaseOrder: string[] = [];
   for (const activity of input.activities) {
@@ -136,18 +273,13 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
     const duration = Math.max(activity.duration, 0);
     const progress = Math.min(100, Math.max(0, activity.progress));
     const earned = round((budget * progress) / 100);
-    // elapsed working days INCLUDING the status day itself: a status date at the
-    // end of the 5th working day of a 10-day activity means 50% planned, not 40%
-    const plannedFrac =
-      duration > 0
-        ? statusOffset < sched.es
-          ? 0
-          : clamp01((statusOffset - sched.es + statusDayCredit) / duration)
-        : statusOffset >= sched.es
-          ? 1
-          : 0;
+    // see plannedFraction(): the status date is the beginning of that workday
+    const plannedFrac = plannedFraction(statusOffset, sched.es, duration);
     const plannedValue = round(budget * plannedFrac);
+    // When the user recorded no actual cost, earned value is used as a proxy and
+    // the fact is surfaced (see the EVM block and `costs.actual`).
     const actualCost = activity.actualCost ?? earned;
+    const quantity = quantityProgress(activity.quantity);
 
     let slipDays = 0;
     if (progress < 100 && statusOffset > sched.ee) {
@@ -199,6 +331,17 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
       riskScore: (activity.riskProbability ?? 0) * (activity.riskImpact ?? 0),
       level: 2,
       successors: successorMap.get(activity.id) ?? [],
+      constraint: {
+        type: sched.constraint.type,
+        date: sched.constraint.date,
+        offset: sched.constraint.offset,
+        applied: sched.constraint.applied,
+        conflict: sched.constraint.conflict,
+      },
+      // the progress reported for this activity, aggregated duration-weighted
+      timeProgress: progress,
+      physicalProgress: quantity.physical,
+      quantity: quantity.detail,
     });
   }
 
@@ -265,32 +408,63 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
   const criticalPathRatio = round(safeDiv(criticalDuration, totalDuration) * 100, 1);
 
   /* ---------------------------- milestones --------------------------- */
+  /**
+   * A milestone is "reached" when its own date is on/before the status date.
+   * Nothing is inferred from internal offsets or default values:
+   *  • standalone milestone → compare its date with the status date
+   *  • milestone linked to an activity → compare that activity's forecast finish,
+   *    and mark it "late" when the date passed while the work is unfinished
+   *  • milestone with neither a date nor a link → "unscheduled" (never a
+   *    fabricated date borrowed from the last activity)
+   */
   const milestones: MilestoneResult[] = [];
   for (const milestone of input.milestones) {
-    let date = milestone.date && isIsoDate(milestone.date) ? milestone.date : undefined;
-    let linkedCode: string | undefined;
-    if (milestone.activityId && activityById.has(milestone.activityId)) {
-      const linked = activityById.get(milestone.activityId) as ActivityResult;
-      date = linked.finishDate;
-      linkedCode = linked.code;
-    }
+    const linkedActivity =
+      milestone.activityId && activityById.has(milestone.activityId)
+        ? (activityById.get(milestone.activityId) as ActivityResult)
+        : undefined;
+
+    let date = milestone.date && isIsoDate(milestone.date) ? milestone.date : "";
+    if (linkedActivity) date = linkedActivity.finishDate;
+
     if (!date) {
-      const last = activities[activities.length - 1];
-      date = last?.finishDate ?? schedule.finish;
-      linkedCode = last?.code;
+      diagnostics.push({
+        kind: "data",
+        severity: "warning",
+        code: "milestone-without-date",
+        message: `نقطه کنترل «${milestone.name}» نه تاریخ دارد و نه به فعالیتی متصل است؛ زمان‌بندی نشده در نظر گرفته شد`,
+        activityIds: milestone.activityId ? [milestone.activityId] : undefined,
+      });
+      milestones.push({
+        id: milestone.id,
+        name: milestone.name,
+        phase: milestone.phase ?? "—",
+        date: "",
+        status: "unscheduled",
+        linkedActivityCode: undefined,
+      });
+      continue;
     }
+
+    let status: MilestoneResult["status"];
+    if (linkedActivity) {
+      if (linkedActivity.progress >= 100) status = "reached";
+      else if (date <= input.meta.statusDate) status = "late";
+      else status = "upcoming";
+    } else {
+      status = date <= input.meta.statusDate ? "reached" : "upcoming";
+    }
+
     milestones.push({
       id: milestone.id,
       name: milestone.name,
-      phase: milestone.phase ?? "—",
+      phase: milestone.phase ?? linkedActivity?.phase ?? "—",
       date,
-      status:
-        statusOffset >= (schedule.activities.get(milestone.activityId ?? "")?.ee ?? 0)
-          ? "reached"
-          : "upcoming",
-      linkedActivityCode: linkedCode,
+      status,
+      linkedActivityCode: linkedActivity?.code,
     });
   }
+
   for (const activity of activities.filter((a) => a.milestone)) {
     if (input.milestones.some((m) => m.activityId === activity.id)) continue;
     milestones.push({
@@ -298,11 +472,16 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
       name: activity.name,
       phase: activity.phase,
       date: activity.finishDate,
-      status: activity.progress >= 100 ? "reached" : statusOffset >= activity.ee ? "late" : "upcoming",
+      status:
+        activity.progress >= 100
+          ? "reached"
+          : activity.finishDate <= input.meta.statusDate
+            ? "late"
+            : "upcoming",
       linkedActivityCode: activity.code,
     });
   }
-  milestones.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  milestones.sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? -1 : 1));
 
   /* ----------------------------- resources --------------------------- */
   const allocations = computeAllocations(input, schedule);
@@ -346,26 +525,79 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
   });
   const overallocatedResources = resources.filter((r) => r.overallocated).length;
   if (overallocatedResources > 0) {
+    // This engine computes resource USAGE only. It does not level resources, so
+    // the warning must not promise levelling.
     warnings.push(
-      `${overallocatedResources} منبع بیش از ظرفیت تعریف‌شده تخصیص یافته‌اند (نیاز به Resource Leveling دارد)`,
+      `${overallocatedResources} منبع بیش از ظرفیت تعریف‌شده تخصیص یافته‌اند (تسطیح خودکار منابع انجام نشده است؛ نیازمند تصمیم برنامه‌ریز)`,
     );
   }
 
   /* ------------------------------- costs ----------------------------- */
-  const budget = round(activities.reduce((s, a) => s + a.budgetCost, 0));
-  const earned = round(activities.reduce((s, a) => s + a.earnedValue, 0));
-  const actual = round(activities.reduce((s, a) => s + a.actualCost, 0));
-  const plannedToDate = round(activities.reduce((s, a) => s + a.plannedValue, 0));
-  const cpi = round(safeDiv(earned, actual), 3);
-  const eac = cpi > 0 ? round(safeDiv(budget, cpi)) : budget;
+  /**
+   * EVM definitions used throughout the application (also documented in
+   * docs/ENGINE.md):
+   *   PV  = Σ BAC_i × planned fraction at the status date
+   *   EV  = Σ BAC_i × reported progress
+   *   AC  = Σ recorded actual costs (+ EV as a proxy where none was recorded)
+   *   SV  = EV − PV        CV  = EV − AC
+   *   SPI = EV / PV        CPI = EV / AC
+   *   EAC = BAC / CPI      ETC = EAC − AC      VAC = BAC − EAC
+   * Every division is guarded: an undefined index is `null`, never 0, Infinity
+   * or NaN.
+   */
+  const budget = round(activities.reduce((s2, a) => s2 + a.budgetCost, 0));
+  const earned = round(activities.reduce((s2, a) => s2 + a.earnedValue, 0));
+  const actual = round(activities.reduce((s2, a) => s2 + a.actualCost, 0));
+  const plannedToDate = round(activities.reduce((s2, a) => s2 + a.plannedValue, 0));
+
+  const withRecordedCost = input.activities.filter((a) => typeof a.actualCost === "number");
+  const recordedBudget = withRecordedCost.reduce((s2, a) => s2 + activityBudget(a, rateById), 0);
+  const costDataCoverage = budget > 0 ? round((recordedBudget / budget) * 100, 1) : 0;
+
+  const ac = actual;
+  const spi = plannedToDate > 0 ? round(earned / plannedToDate, 3) : null;
+  const cpi = ac > 0 ? round(earned / ac, 3) : null;
+  const eac = cpi !== null && cpi > 0 ? round(budget / cpi) : null;
+  const etc = eac !== null ? round(eac - ac) : null;
+  const evmNotes: string[] = [];
+  if (costDataCoverage < 100) {
+    evmNotes.push(
+      costDataCoverage === 0
+        ? "برای هیچ فعالیتی هزینه واقعی ثبت نشده است؛ AC برابر ارزش کسب‌شده در نظر گرفته شده و CPI=۱ نتیجه‌گیری معتبری نیست"
+        : `برای ${round(100 - costDataCoverage, 1)}٪ از بودجه، هزینه واقعی ثبت نشده و ارزش کسب‌شده به‌عنوان هزینه فرض شده است؛ CPI تقریبی است`,
+    );
+  }
+  if (plannedToDate === 0) {
+    evmNotes.push("PV تا تاریخ وضعیت صفر است؛ SPI قابل محاسبه نیست");
+  }
+
+  const evm: EvmResult = {
+    pv: plannedToDate,
+    ev: earned,
+    ac: ac > 0 ? ac : null,
+    sv: round(earned - plannedToDate),
+    cv: ac > 0 ? round(earned - ac) : null,
+    spi,
+    cpi,
+    bac: budget,
+    eac,
+    etc,
+    vac: eac !== null ? round(budget - eac) : null,
+    eacMethod: "bac-cpi",
+    costDataCoverage,
+    notes: evmNotes,
+  };
+
   const costs: CostResult = {
     currency: input.meta.currency,
     budget,
     plannedToDate,
     earned,
     actual,
-    estimateAtCompletion: eac,
-    varianceAtCompletion: round(budget - eac),
+    // CostResult keeps plain numbers for the report/export layer; when CPI is
+    // undefined the documented fallback is EAC = BAC (no inferred overrun).
+    estimateAtCompletion: eac ?? budget,
+    varianceAtCompletion: round(budget - (eac ?? budget)),
     byPhase: phases.map((p) => ({
       phase: p.name,
       budget: p.budget,
@@ -375,34 +607,60 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
   };
 
   /* ------------------------------ progress --------------------------- */
-  const overall = round(safeDiv(activities.reduce((s, a) => s + (a.duration * a.progress) / 100, 0), totalDuration) * 100, 1);
+  /**
+   * Time-based progress = duration-weighted progress of the schedule.
+   * It is NOT physical progress: physical progress comes from measured
+   * quantities (Actual / Planned) and is reported separately.
+   */
+  const overall = round(
+    safeDiv(activities.reduce((s2, a) => s2 + (a.duration * a.timeProgress) / 100, 0), totalDuration) * 100,
+    1,
+  );
   const planned = round(
     safeDiv(
-      activities.reduce(
-        (sum, a) =>
-          sum +
-          a.duration *
-            (statusOffset < a.es ? 0 : clamp01((statusOffset - a.es + statusDayCredit) / Math.max(a.duration, 1))),
-        0,
-      ),
+      activities.reduce((s2, a) => s2 + a.duration * plannedFraction(statusOffset, a.es, a.duration), 0),
       totalDuration,
     ) * 100,
     1,
   );
-  const spi = round(safeDiv(earned, plannedToDate), 3);
+
+  const measured = activities.filter((a) => a.physicalProgress !== null && a.quantity?.status !== "invalid");
+  const measuredBudget = measured.reduce((s2, a) => s2 + a.budgetCost, 0);
+  const physical =
+    measuredBudget > 0
+      ? round(
+          measured.reduce((s2, a) => s2 + (a.physicalProgress as number) * a.budgetCost, 0) / measuredBudget,
+          1,
+        )
+      : null;
+  const physicalCoverage = budget > 0 ? round((measuredBudget / budget) * 100, 1) : 0;
+
+  /**
+   * Elapsed working days, clamped to [0, schedule.duration]. `statusOffset` may
+   * be negative (status date before the project) or larger than the plan
+   * (after it); the clamp keeps `elapsedDays`/`remainingDays` meaningful while
+   * the diagnostics above state what happened.
+   */
+  const elapsedDays = Math.min(Math.max(Math.round(statusOffset), 0), schedule.duration);
+
   const progress: ProgressResult = {
     overall,
+    timeBased: overall,
+    physical,
+    physicalCoverage,
     planned,
     scheduleVariance: round(earned - plannedToDate),
     costVariance: round(earned - actual),
-    schedulePerformanceIndex: spi,
-    costPerformanceIndex: cpi,
+    schedulePerformanceIndex: spi ?? 0,
+    costPerformanceIndex: cpi ?? 0,
     started: activities.filter((a) => a.progress > 0).length,
     completed: activities.filter((a) => a.progress >= 100).length,
     notStarted: activities.filter((a) => a.progress === 0).length,
     late: activities.filter((a) => a.status === "late").length,
-    remainingDays: Math.max(0, schedule.duration - Math.round(statusOffset)),
-    elapsedDays: Math.round(statusOffset),
+    // Clamped to the real project window: a status date outside it must not
+    // produce negative "elapsed" or an elapsed time beyond the plan.
+    remainingDays: Math.max(0, schedule.duration - elapsedDays),
+    elapsedDays,
   };
 
   /* ------------------------------- risks ----------------------------- */
@@ -445,45 +703,77 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
     }));
 
   /* ----------------------------- baseline ---------------------------- */
+  /**
+   * Baseline variance is reported per dimension. The previous implementation
+   * subtracted the start deviation from the finish deviation, so moving an
+   * activity by two days without changing its duration produced a variance of
+   * ZERO — a two-day delay reported as on-plan. Each deviation is now computed
+   * independently, in working days of the current project calendar.
+   */
   const baselineActivities = input.baseline?.activities ?? [];
-  const baselineMap = new Map(baselineActivities.map((b) => [b.activityId, b]));
-  const changedActivities =
-    baselineActivities.length > 0
-      ? baselineActivities
-          .map((b) => {
-            const current = activityById.get(b.activityId);
-            if (!current) return null;
-            return {
-              code: current.code,
-              name: current.name,
-              baselineStart: b.startDate,
-              currentStart: current.startDate,
-              baselineFinish: b.finishDate,
-              currentFinish: current.finishDate,
-              varianceDays:
-                diffCalendarDays(b.finishDate, current.finishDate) -
-                diffCalendarDays(b.startDate, current.startDate),
-              baselineCost: b.cost,
-              currentCost: current.budgetCost,
-            };
-          })
-          .filter((x): x is NonNullable<typeof x> => x !== null)
-          .filter((x) => x.varianceDays !== 0 || x.baselineCost !== x.currentCost)
-      : [];
+  const changedActivities: BaselineVarianceRow[] = [];
+  if (baselineActivities.length > 0) {
+    for (const b of baselineActivities) {
+      const current = activityById.get(b.activityId);
+      if (!current) continue;
+      const startVarianceDays = workingDayDiff(calendar, b.startDate, current.startDate);
+      const finishVarianceDays = workingDayDiff(calendar, b.finishDate, current.finishDate);
+      // Forecast finish for unfinished work equals the scheduled finish.
+      const completionVarianceDays = finishVarianceDays;
+      const status: BaselineVarianceRow["status"] =
+        !isIsoDate(b.startDate) || !isIsoDate(b.finishDate)
+          ? "unknown"
+          : finishVarianceDays > 0 || startVarianceDays > 0
+            ? "later"
+            : finishVarianceDays < 0 || startVarianceDays < 0
+              ? "earlier"
+              : "on-plan";
+      changedActivities.push({
+        activityId: current.id,
+        code: current.code,
+        name: current.name,
+        baselineStart: b.startDate,
+        currentStart: current.startDate,
+        baselineFinish: b.finishDate,
+        currentFinish: current.finishDate,
+        startVarianceDays,
+        finishVarianceDays,
+        durationChange: round(current.duration - b.duration, 2),
+        completionVarianceDays,
+        status,
+        varianceDays: finishVarianceDays,
+        baselineCost: b.cost,
+        currentCost: current.budgetCost,
+      });
+    }
+    changedActivities.sort((a, b) => b.finishVarianceDays - a.finishVarianceDays);
+  }
 
+  const trackedActivities = changedActivities.filter(
+    (c) => c.finishVarianceDays !== 0 || c.startVarianceDays !== 0 || c.baselineCost !== c.currentCost,
+  );
   const baselineScheduleVariance = changedActivities.length
-    ? Math.max(
-        0,
-        ...changedActivities.map((c) => Math.max(0, diffCalendarDays(c.baselineFinish, c.currentFinish))),
-      )
+    ? Math.max(0, ...changedActivities.map((c) => c.finishVarianceDays))
     : 0;
   const baselineCostVariance = changedActivities.length
-    ? round(changedActivities.reduce((s, c) => s + (c.currentCost - c.baselineCost), 0))
+    ? round(changedActivities.reduce((s2, c) => s2 + (c.currentCost - c.baselineCost), 0))
+    : 0;
+  const maxFinishSlipDays = changedActivities.length
+    ? Math.max(0, ...changedActivities.map((c) => c.finishVarianceDays))
+    : 0;
+  const maxStartSlipDays = changedActivities.length
+    ? Math.max(0, ...changedActivities.map((c) => c.startVarianceDays))
     : 0;
 
   /* ------------------------------- gantt ----------------------------- */
   const ganttRows: GanttRow[] = [];
   phases.forEach((phase, index) => {
+    // A phase may contain only unschedulable activities (dependency cycle); the
+    // row must then fall back to zero instead of Math.min() of an empty array,
+    // which would leak Infinity into the Gantt model and the JSON export.
+    const phaseActivities = activities.filter((a) => a.phase === phase.name);
+    const startOffset = phaseActivities.length ? Math.min(...phaseActivities.map((a) => a.es)) : 0;
+    const endOffset = phaseActivities.length ? Math.max(...phaseActivities.map((a) => a.ee)) : 0;
     ganttRows.push({
       id: `phase-${index}`,
       code: phase.wbs,
@@ -491,8 +781,8 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
       wbs: phase.wbs,
       kind: "phase",
       level: 0,
-      startOffset: Math.min(...activities.filter((a) => a.phase === phase.name).map((a) => a.es)),
-      endOffset: Math.max(...activities.filter((a) => a.phase === phase.name).map((a) => a.ee)),
+      startOffset,
+      endOffset,
       progress: phase.progress,
       critical: phase.critical,
     });
@@ -525,23 +815,44 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
     {
       key: "spi",
       label: "شاخص عملکرد زمان‌بندی (SPI)",
-      value: spi ? spi.toFixed(2) : "—",
-      hint: spi >= 1 ? "پیشرفت هم‌راستا یا جلوتر از برنامه" : "عقب‌ماندگی نسبت به برنامه",
-      status: spi === 0 ? "watch" : spi >= 0.95 ? "good" : spi >= 0.85 ? "watch" : "critical",
+      value: spi !== null ? spi.toFixed(2) : "—",
+      hint:
+        spi === null
+          ? "PV تا تاریخ وضعیت صفر است؛ شاخص قابل محاسبه نیست"
+          : spi >= 1
+            ? "پیشرفت هم‌راستا یا جلوتر از برنامه"
+            : "عقب‌ماندگی نسبت به برنامه",
+      status: spi === null ? "watch" : spi >= 0.95 ? "good" : spi >= 0.85 ? "watch" : "critical",
     },
     {
       key: "cpi",
       label: "شاخص عملکرد هزینه (CPI)",
-      value: cpi ? cpi.toFixed(2) : "—",
-      hint: cpi >= 1 ? "هزینه در محدوده بودجه" : "بیش‌هزینه نسبت به بودجه",
-      status: cpi === 0 ? "watch" : cpi >= 0.95 ? "good" : cpi >= 0.85 ? "watch" : "critical",
+      value: cpi !== null ? cpi.toFixed(2) : "—",
+      hint:
+        costDataCoverage === 0
+          ? "هزینه واقعی ثبت نشده است؛ CPI معتبر نیست"
+          : cpi !== null && cpi >= 1
+            ? "هزینه در محدوده بودجه"
+            : "بیش‌هزینه نسبت به بودجه",
+      status:
+        costDataCoverage === 0 ? "watch" : cpi === null ? "watch" : cpi >= 0.95 ? "good" : cpi >= 0.85 ? "watch" : "critical",
     },
     {
       key: "progress",
-      label: "پیشرفت فیزیکی",
+      label: "پیشرفت زمان‌محور (مدت‌وزنی)",
       value: `${overall.toFixed(1)}٪`,
       hint: `پیشرفت برنامه‌ریزی‌شده تا تاریخ وضعیت: ${planned.toFixed(1)}٪`,
       status: overall >= planned - 2 ? "good" : overall >= planned - 10 ? "watch" : "critical",
+    },
+    {
+      key: "physical",
+      label: "پیشرفت فیزیکی (مقدار اجرا)",
+      value: physical !== null ? `${physical.toFixed(1)}٪` : "—",
+      hint:
+        physical !== null
+          ? `مبنای محاسبه: مقدار اجراشده / مقدار برنامه‌ریزی‌شده — پوشش ${toPersianDigits(physicalCoverage)}٪ بودجه`
+          : "مقدار اجرایی برای فعالیت‌ها ثبت نشده است؛ پیشرفت مقداری قابل محاسبه نیست",
+      status: physical === null ? "watch" : physical >= 100 ? "good" : "watch",
     },
     {
       key: "deadline",
@@ -608,17 +919,21 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
       label: "زمان‌بندی",
       status: kpis.find((k) => k.key === "spi")?.status ?? "watch",
       detail:
-        spi >= 1
-          ? "پروژه طبق برنامه یا جلوتر از برنامه پیش می‌رود."
-          : `پیشرفت واقعی ${Math.abs(round(planned - overall, 1))} واحد از برنامه عقب‌تر است.`,
+        spi === null
+          ? "شاخص SPI قابل محاسبه نیست (PV صفر است)."
+          : spi >= 1
+            ? "پروژه طبق برنامه یا جلوتر از برنامه پیش می‌رود."
+            : `پیشرفت زمان‌محور ${Math.abs(round(planned - overall, 1))} واحد از برنامه عقب‌تر است.`,
     },
     {
       label: "هزینه",
       status: kpis.find((k) => k.key === "cpi")?.status ?? "watch",
       detail:
-        cpi >= 1
-          ? "مصرف هزینه در محدوده بودجه تأییدشده است."
-          : `انحراف هزینه: ${progress.costVariance.toLocaleString("en-US")} (منفی = بیش‌هزینه)`,
+        cpi === null || costDataCoverage === 0
+          ? "هزینه واقعی برای محاسبه CPI ثبت نشده است."
+          : cpi >= 1
+            ? "مصرف هزینه در محدوده بودجه تأییدشده است."
+            : `انحراف هزینه: ${progress.costVariance.toLocaleString("en-US")} (منفی = بیش‌هزینه)`,
     },
     {
       label: "مسیر بحرانی",
@@ -630,7 +945,7 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
       status: overallocatedResources > 0 ? "critical" : "good",
       detail:
         overallocatedResources > 0
-          ? `${overallocatedResources} منبع نیازمند هموارسازی (Leveling) است.`
+          ? `${overallocatedResources} منبع بیش از ظرفیت است؛ موتور فقط مصرف را محاسبه می‌کند و تسطیح خودکار انجام نمی‌دهد.`
           : "ظرفیت منابع برای اجرای برنامه کافی است.",
     },
     {
@@ -662,12 +977,23 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
     statusLabel === "good" ? "در وضعیت مطلوب" : statusLabel === "watch" ? "نیازمند پایش" : "در وضعیت بحرانی";
   const bullets: string[] = [
     `پروژه «${input.meta.name}» از ${schedule.start} آغاز می‌شود و پایان آن ${schedule.finish} برآورد شده است؛ مدت اجرا ${schedule.duration} روز کاری (${diffCalendarDays(schedule.start, schedule.finish) + 1} روز تقویمی) است.`,
-    `پیشرفت فیزیکی فعلی ${overall.toFixed(1)}٪ در برابر ${planned.toFixed(1)}٪ برنامه، با ${activities.length} فعالیت در ${phases.length} فاز و ${milestones.length} نقطه کنترل (Milestone).`,
+    `پیشرفت زمان‌محور (مدت‌وزنی) ${overall.toFixed(1)}٪ در برابر ${planned.toFixed(1)}٪ برنامه، با ${activities.length} فعالیت در ${phases.length} فاز و ${milestones.length} نقطه کنترل (Milestone).`,
     `مسیر بحرانی شامل ${criticalActivities.length} فعالیت است و ${criticalPathRatio}٪ ماندهزمان پروژه را در بر می‌گیرد؛ هرگونه تأخیر در این فعالیت‌ها مستقیماً پایان پروژه را جابه‌جا می‌کند.`,
-    `بودجه تجمیعی پروژه ${budget.toLocaleString("en-US")} ${currencyLabel(input.meta.currency)} و هزینه پیش‌بینی‌شده تا پایان (EAC) ${eac.toLocaleString("en-US")} است.`,
+    `بودجه تجمیعی پروژه ${budget.toLocaleString("en-US")} ${currencyLabel(input.meta.currency)} و هزینه پیش‌بینی‌شده تا پایان (EAC) ${
+      eac === null
+        ? "قابل محاسبه نیست (هزینه واقعی ثبت نشده است)"
+        : eac.toLocaleString("en-US")
+    } است.`,
   ];
   if (overallocatedResources > 0) {
-    bullets.push(`${overallocatedResources} منبع بیش از ظرفیت مجاز تخصیص یافته و نیازمند هموارسازی منابع است.`);
+    bullets.push(
+      `${overallocatedResources} منبع بیش از ظرفیت مجاز تخصیص یافته است؛ موتور فعلی تسطیح خودکار منابع ندارد و رفع آن نیازمند تصمیم برنامه‌ریز است.`,
+    );
+  }
+  if (physical !== null) {
+    bullets.push(
+      `پیشرفت فیزیکی مبتنی بر مقدار اجرا ${physical.toFixed(1)}٪ است (پوشش ${physicalCoverage}٪ از بودجه پروژه).`,
+    );
   }
   if (delays.length > 0) {
     bullets.push(`${delays.length} فعالیت دارای تأخیر است که مهم‌ترین آن «${delays[0].name}» با ${delays[0].slipDays} روز تأخیر است.`);
@@ -677,6 +1003,25 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
   }
   bullets.push(`وضعیت کلان پروژه بر اساس شاخص‌های زمان‌بندی، هزینه، منابع و ریسک: ${statusText}.`);
 
+  /* --------------------------- diagnostics --------------------------- */
+  diagnostics.push(...schedule.diagnostics);
+  const uniqueDiagnostics = dedupeDiagnostics(diagnostics);
+
+  const hasDataError = uniqueDiagnostics.some(
+    (d) => d.severity === "error" && (d.kind === "data" || d.kind === "cycle" || d.kind === "calendar"),
+  );
+  const hasConstraintConflict = uniqueDiagnostics.some(
+    (d) => d.severity === "error" && (d.kind === "constraint" || d.kind === "dependency"),
+  );
+  const hasNegativeFloat = activities.some((a) => a.totalFloat < -0.001);
+  const analysisStatus: AnalysisStatus = hasDataError
+    ? "invalid"
+    : hasConstraintConflict || hasNegativeFloat
+      ? "inconsistent"
+      : uniqueDiagnostics.length > 0
+        ? "warning"
+        : "valid";
+
   const pricingBasis = { costs, gantt, activities };
   const pricing = computePricing(input, pricingBasis, input.pricing);
   const basis = standardsFor(input.meta.type);
@@ -685,7 +1030,11 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
     generatedAt: new Date().toISOString(),
     errors,
     warnings,
+    diagnostics: uniqueDiagnostics,
+    status: analysisStatus,
+    unschedulable: schedule.unschedulable,
     schedule: {
+      status: analysisStatus,
       startDate: schedule.start,
       finishDate: schedule.finish,
       workingDays: schedule.duration,
@@ -696,6 +1045,7 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
       deadline: deadline ?? undefined,
       deadlineMet: deadline === null ? null : (deadlineVarianceDays ?? 0) >= 0,
       deadlineVarianceDays,
+      naturalWorkingDays: schedule.duration,
       phases,
     },
     activities,
@@ -706,6 +1056,7 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
     resources,
     overallocatedResources,
     costs,
+    evm,
     progress,
     risks,
     riskExposure,
@@ -715,7 +1066,9 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
       name: input.baseline?.name,
       scheduleVarianceDays: baselineScheduleVariance,
       costVariance: baselineCostVariance,
-      changedActivities,
+      changedActivities: trackedActivities,
+      maxFinishSlipDays,
+      maxStartSlipDays,
     },
     gantt,
     kpis,
@@ -729,6 +1082,150 @@ export function analyzeProject(input: ProjectInput): ProjectAnalysis {
   };
 }
 
+/** Collapses identical diagnostics (the same warning can be produced twice). */
+function dedupeDiagnostics(items: Diagnostic[]): Diagnostic[] {
+  const seen = new Set<string>();
+  const out: Diagnostic[] = [];
+  for (const item of items) {
+    const key = `${item.kind}|${item.severity}|${item.code}|${item.message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
 function currencyLabel(currency: "IRR" | "USD" | "EUR"): string {
   return currency === "IRR" ? "ریال" : currency === "USD" ? "دلار" : "یورو";
+}
+
+/**
+ * Minimal, honest analysis used when the engine throws. Every number is zero,
+ * the status is `internal-error`, and the reason is surfaced as a diagnostic so
+ * no consumer can mistake this for a valid schedule.
+ */
+function failedAnalysis(input: ProjectInput): ProjectAnalysis {
+  const today = new Date().toISOString().slice(0, 10);
+  const startDate = isIsoDate(input?.meta?.startDate ?? "") ? (input.meta.startDate as string) : today;
+  const emptyCosts: CostResult = {
+    currency: input?.meta?.currency ?? "IRR",
+    budget: 0,
+    plannedToDate: 0,
+    earned: 0,
+    actual: 0,
+    estimateAtCompletion: 0,
+    varianceAtCompletion: 0,
+    byPhase: [],
+  };
+  const emptyEvm: EvmResult = {
+    pv: 0,
+    ev: 0,
+    ac: null,
+    sv: 0,
+    cv: null,
+    spi: null,
+    cpi: null,
+    bac: 0,
+    eac: null,
+    etc: null,
+    vac: null,
+    eacMethod: "bac-cpi",
+    costDataCoverage: 0,
+    notes: ["محاسبه انجام نشده است"],
+  };
+  const diagnostic: Diagnostic = {
+    kind: "data",
+    severity: "error",
+    code: "internal-error",
+    message: "محاسبه تحلیل با خطای داخلی متوقف شد؛ اعداد این گزارش قابل استناد نیستند",
+  };
+
+  return {
+    generatedAt: new Date().toISOString(),
+    errors: [diagnostic.message],
+    warnings: [],
+    diagnostics: [diagnostic],
+    status: "internal-error",
+    unschedulable: (input?.activities ?? []).map((a) => ({
+      id: a.id,
+      code: a.code,
+      name: a.name,
+      reason: "خطای داخلی محاسبات",
+    })),
+    schedule: {
+      status: "invalid",
+      startDate,
+      finishDate: startDate,
+      workingDays: 0,
+      calendarDays: 0,
+      hoursPerDay: input?.calendar?.hoursPerDay ?? 8,
+      workDayCount: input?.calendar?.workDays?.length ?? 0,
+      holidayCount: input?.calendar?.holidays?.length ?? 0,
+      deadline: input?.meta?.deadline,
+      deadlineMet: null,
+      deadlineVarianceDays: null,
+      naturalWorkingDays: 0,
+      phases: [],
+    },
+    activities: [],
+    wbs: [],
+    criticalPath: [],
+    criticalPathRatio: 0,
+    milestones: [],
+    resources: [],
+    overallocatedResources: 0,
+    costs: emptyCosts,
+    evm: emptyEvm,
+    progress: {
+      overall: 0,
+      timeBased: 0,
+      physical: null,
+      physicalCoverage: 0,
+      planned: 0,
+      scheduleVariance: 0,
+      costVariance: 0,
+      schedulePerformanceIndex: 0,
+      costPerformanceIndex: 0,
+      started: 0,
+      completed: 0,
+      notStarted: 0,
+      late: 0,
+      remainingDays: 0,
+      elapsedDays: 0,
+    },
+    risks: [],
+    riskExposure: 0,
+    delays: [],
+    baseline: {
+      available: false,
+      scheduleVarianceDays: 0,
+      costVariance: 0,
+      changedActivities: [],
+      maxFinishSlipDays: 0,
+      maxStartSlipDays: 0,
+    },
+    gantt: { rows: [], totalOffsets: 1, dates: [startDate], criticalPath: [] },
+    kpis: [],
+    pricing: {
+      series: "official-1405",
+      seriesLabel: "—",
+      region: "tehran",
+      regionLabel: "—",
+      indexFactor: 100,
+      asOf: startDate,
+      asOfJalali: "—",
+      sources: [],
+      escalationEnabled: false,
+      escalationRatePerMonth: 0,
+      escalation: { months: [], total: 0, baseValue: 0, scenario: true, note: "محاسبه انجام نشده است" },
+      breakdown: { direct: 0, overhead: 0, profit: 0, contingency: 0, escalation: 0, total: 0 },
+      rates: [],
+    },
+    standards: [],
+    health: { score: 0, status: "critical", signals: [] },
+    summary: {
+      headline: `${input?.meta?.name ?? "پروژه"} — خطای داخلی محاسبات`,
+      bullets: [diagnostic.message],
+    },
+  };
 }

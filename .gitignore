@@ -48,3 +48,6 @@ scripts/.it-generator.ts
 *.sql
 *.dump
 !drizzle/*.sql
+
+# TypeScript incremental build info (generated)
+tsconfig.tsbuildinfo

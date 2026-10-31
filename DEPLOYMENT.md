@@ -50,7 +50,9 @@ All are server-side; none are exposed to the browser bundle.
 | `DATABASE_URL` | **yes (production)** | Requests that touch the database return a clear 500 error; the site still builds and renders public pages |
 | `DATABASE_SSL` | no | TLS auto-enabled when the URL contains `sslmode=require` or `ssl=true` |
 | `DATABASE_POOL_MAX` | no | `3` in production, `10` in development |
-| `SMS_PROVIDER_KEY` | only for phone login | Phone login is refused with HTTP 503 (`loginUnavailable`) |
+| `SMS_PROVIDER_KEY` | only for phone login | Phone login is refused with HTTP 503 and nothing is written to the database |
+| `SMS_PROVIDER` | no | `kavenegar` (default) or `http`; `kavenegar` also needs `SMS_OTP_TEMPLATE` |
+| `SMS_PROVIDER_URL` / `SMS_PROVIDER_SENDER` | only for `SMS_PROVIDER=http` | delivery endpoint and sender line |
 | `HERMIPLAN_ALLOW_DEMO_OTP` | **leave unset in production** | When unset together with `SMS_PROVIDER_KEY`, OTP codes are never returned in API responses |
 | `HERMIPLAN_MARKET_FEED` | no | The dated reference rate catalogue is used and the UI states this explicitly |
 | `HERMIPLAN_MARKET_FEED_KEY` | no | Bearer token for the rate feed |
@@ -66,25 +68,42 @@ scope variables to Builds only, requests will fail at runtime.
 
 ## 4. Production database and safe migrations
 
-The schema lives in `src/db/schema.ts` and is applied with `drizzle-kit`.
-Migrations are **never** run during the site build, so a deploy cannot alter
-data automatically.
-
-First-time setup (creates `projects`, `users`, `otp_codes`, `sessions`,
-`project_events`):
+The schema lives in `src/db/schema.ts`; the versioned SQL lives in `drizzle/`
+(`0001_baseline.sql`, `0002_security_hardening.sql`, each with a matching
+`*.rollback.sql`). They are applied by **`scripts/migrate.ts`**, never during
+the site build, so a deploy cannot alter data automatically.
 
 ```bash
-DATABASE_URL="postgres://…pooled…" npx drizzle-kit push
-```
+# 1. inspect what would run (no writes)
+DATABASE_URL="postgres://…" npm run db:migrate -- --dry-run
+DATABASE_URL="postgres://…" npm run db:status
 
-Subsequent schema changes: re-run the same command. `drizzle-kit push` compares
-the schema with the live database and emits the exact DDL it will run — review
-it before confirming. `--force` skips the prompt; use it only after reading the
-diff. For anything that could drop columns, prefer a backup first:
-
-```bash
+# 2. take a backup
 pg_dump "$DATABASE_URL" > backup-$(date +%F).sql
+
+# 3. apply (idempotent, in one transaction per migration)
+DATABASE_URL="postgres://…" npm run db:migrate
 ```
+
+How the runner protects you:
+
+* a ledger table `_hermiplan_migrations` records the name, SHA-256 checksum and
+  application time of every migration;
+* editing an already-applied migration is refused (drift detection) — add a new
+  file instead;
+* each file runs inside a transaction, so a failure leaves the database
+  unchanged;
+* `--dry-run` prints the statements that would be executed.
+
+**Rollback:** every migration ships with a paired `*.rollback.sql` that removes
+exactly what it added. Review it, apply it manually (`psql "$DATABASE_URL" -f
+drizzle/0002_security_hardening.rollback.sql`) and then delete the corresponding
+row from `_hermiplan_migrations`.
+
+The schema has no destructive statement: `0001` creates tables `IF NOT EXISTS`,
+`0002` only adds tables/columns/constraints/indexes. Nothing is dropped or
+renamed, so an existing database deployed with `drizzle-kit push` keeps working
+after `npm run db:migrate`.
 
 Connection guidance:
 
@@ -101,8 +120,11 @@ Connection guidance:
 
 * Codes are stored **hashed**, expire after **5 minutes**, allow **5 attempts**,
   and are invalidated afterwards.
-* Rate limits: **12 auth requests / minute / IP** and **45 s between codes for
-  the same phone number**.
+* Rate limits are per endpoint and stored in PostgreSQL (`rate_limits`), so they
+  are shared by every function instance: **12 auth requests / minute / IP**,
+  **5 code requests / 15 min / phone**, **10 verifications / 15 min / phone and
+  per IP**, **45 s between two codes for the same phone**. The full table lives
+  in `README.md → Rate limits`.
 * **Without `SMS_PROVIDER_KEY`:** login is refused with 503 and no code is
   returned — this is deliberate. To test login on a private preview you can set
   `HERMIPLAN_ALLOW_DEMO_OTP=1`, which returns the code in the response.
@@ -111,8 +133,12 @@ Connection guidance:
   tokens are also httpOnly cookies. `SameSite=Lax` blocks cross-site POSTs, which
   is the CSRF protection for all mutating endpoints.
 * Data isolation: raw project data (`GET/PATCH/DELETE /api/projects/:id`) is
-  owner-only. The report **page** is shareable by design, and an owner can make
-  it private with the 🔒 toggle in the report toolbar.
+  owner-only. Knowing the UUID is never authorisation: a non-owner always
+  receives **404** (not 403) so the existence of a project is not disclosed.
+* Reports are **private by default**. The owner publishes one explicitly from
+  the report toolbar (optional expiry) and can revoke it at any time; every
+  visibility change is written to `project_events` (`kind='visibility'`).
+  Publishing a report does **not** grant access to the raw project API.
 
 ---
 
@@ -154,8 +180,9 @@ curl -sI https://<site>/ | grep -iE 'x-frame-options|x-content-type-options'
 
 Then, in a browser: create a guest project → refresh the page (draft restores)
 → **تولید گزارش** → open the report → download each export format → print to
-PDF. Finally verify isolation: a different browser (no cookies) must get 403
-from `/api/projects/<id>` while still seeing the public report page.
+PDF. Finally verify isolation: a different browser (no cookies) must get **404**
+from `/api/projects/<id>`, and also 404 from `/report/<id>` unless the owner has
+explicitly published it.
 
 ---
 
@@ -169,12 +196,13 @@ from `/api/projects/<id>` while still seeing the public report page.
 | `no pg_hba.conf entry for host … SSL off` | provider requires TLS | set `DATABASE_SSL=require` or add `?sslmode=require` |
 | Login always returns 503 | no `SMS_PROVIDER_KEY` | configure a provider, or accept that login is unavailable (guest usage still works) |
 | Exports return 429 | per-IP export limit (30/min) reached | expected behaviour; retry after the `Retry-After` interval |
-| Report page 404 for a stranger | the owner set the report to private | intended behaviour |
+| Report page 404 for a stranger | reports are private until the owner publishes them (or the share link expired) | intended behaviour |
 | Deploy Preview cannot reach the database | preview scoped to a staging DB that does not exist | point it at a reachable database or remove the scope |
 
 **Rollback:** *Deploys → select the last known-good deploy → … → Publish deploy*.
-Database schema changes are not reverted by a code rollback — run the matching
-`drizzle-kit push` against a backup if a migration must be undone.
+Database schema changes are not reverted by a code rollback: apply the paired
+`drizzle/<name>.rollback.sql` (see §4) after reviewing it, or restore the backup
+taken before the migration.
 
 ---
 
@@ -202,8 +230,8 @@ export formats, Gantt, reports, private/public sharing — works with only
   above **3 MB** with 413, and a 200-activity export package is **~1.2 MB**.
 * All exports are generated in memory — no filesystem writes, which is required
   because function filesystems are read-only.
-* Rate limiting is per function instance, not global. For a single Netlify
-  function region this is adequate for abuse prevention; if you scale out or
-  need strict global limits, move the counters to a shared store (e.g. Upstash
-  Redis) — the call sites in `src/lib/server/rate-limit.ts` are isolated for
-  exactly that change.
+* Rate limiting is backed by PostgreSQL (`rate_limits`, atomic upsert), so the
+  quota is global across function instances and regions. If the database is
+  unreachable the limiter degrades to an in-process counter and marks the
+  decision `degraded` — it never fails open, and it never pretends to be
+  global.
