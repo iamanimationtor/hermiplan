@@ -1,14 +1,13 @@
-# bundle budget — 2026-10-31T15:14:07Z
+# production bundle budget — 2026-10-31T15:34:55Z
 ▶ بودجه‌ی جاوااسکریپت هر مسیر (gzip)
-  ✓ /builder             175.6 KB  (سقف 210 KB)
+  ✓ /builder             175.9 KB  (سقف 210 KB)
   ✓ /report/[id]           139 KB  (سقف 170 KB)
   ✓ /s/[token]             139 KB  (سقف 170 KB)
   ✓ /                     23.8 KB  (سقف 45 KB)
   ✓ /_not-found           20.6 KB  (سقف 40 KB)
   ✓ /_global-error        13.9 KB  (سقف 40 KB)
 
-  سنگین‌ترین مسیر: /builder با 175.6 KB gzip
+  سنگین‌ترین مسیر: /builder با 175.9 KB gzip
   ✓ خودآزمون: بودجه‌ی ۱KB روی سنگین‌ترین مسیر «نقض» تشخیص داده می‌شود
 
 ✔ 6 مسیر در بودجه‌ی تعیین‌شده هستند.
-EXIT=0

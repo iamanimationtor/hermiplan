@@ -1,5 +1,6 @@
-# revision history, restore, compare and optimistic concurrency — 2026-10-31T15:13:11Z
-sections §۴-ب (history), §۴-ج (diff) and §۴-د (input validation) of `npm run test:api`
+# revision history, restore, compare and parameter validation — 2026-10-31T15:36:01Z
+sections §۴-ب (history), §۴-ج (diff) and §۴-د (parameter validation) of `npm run test:api`
+against the production build on :3400 with real PostgreSQL.
 
 ▶ ۴-ب. تاریخچه نسخه‌ها، بازگردانی و ویرایش هم‌زمان
   ✓ پروژه آزمون تاریخچه ساخته شد
@@ -82,4 +83,5 @@ sections §۴-ب (history), §۴-ج (diff) and §۴-د (input validation) of `np
   ✓ نسخه بازسازی‌شده با علت «ایجاد» ثبت شد
   ✓ نسخه ۱ محتوای پیش از ویرایش را دارد (قابل واگردانی)
 
-▶ ۵. اعتبارسنجی ورودی
+
+── 75 بررسی موفق / ۰ ناموفق ──

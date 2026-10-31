@@ -743,6 +743,84 @@ async function main() {
     legacyOld.project?.meta?.name,
   );
 
+  /* ---- ۴-ه. فهرست پروژه‌ها: صفحه‌بندی، شمارش و خطای صریح ---- */
+  console.log("\n▶ ۴-ه. فهرست پروژه‌ها، صفحه‌بندی و شمارش");
+  {
+    const listJar = new Jar();
+    const listIp = `${CLIENT_IP}.81`;
+    for (const index of [1, 2, 3]) {
+      const project = JSON.parse(projectJson);
+      project.meta.name = `پروژه فهرست ${index}`;
+      const created = await call(listJar, "/api/projects", {
+        method: "POST",
+        body: JSON.stringify({ project, reportOptions: {} }),
+        ip: listIp,
+      });
+      ok(created.status === 201, `پروژه ${index} برای آزمون فهرست ساخته شد`, `status ${created.status}`);
+    }
+
+    const firstPage = await call(listJar, "/api/projects?limit=2", { ip: listIp });
+    const firstBody = JSON.parse(firstPage.body || "{}") as {
+      projects?: { id: string; name: string }[];
+      total?: number;
+      hasMore?: boolean;
+      nextOffset?: number | null;
+    };
+    ok(firstPage.status === 200, "فهرست با ۲۰۰ برگشت", firstPage.body.slice(0, 120));
+    ok(firstBody.projects?.length === 2, "limit=۲ دقیقاً دو پروژه می‌دهد", String(firstBody.projects?.length));
+    ok(firstBody.total === 3, "total تعداد کل پروژه‌ها را می‌گوید", String(firstBody.total));
+    ok(firstBody.hasMore === true && firstBody.nextOffset === 2, "hasMore و nextOffset درست است", JSON.stringify([firstBody.hasMore, firstBody.nextOffset]));
+
+    const secondPage = await call(listJar, "/api/projects?limit=2&offset=2", { ip: listIp });
+    const secondBody = JSON.parse(secondPage.body || "{}") as { projects?: unknown[]; hasMore?: boolean; nextOffset?: number | null };
+    ok(secondBody.projects?.length === 1, "صفحه دوم یک پروژه دارد", String(secondBody.projects?.length));
+    ok(secondBody.hasMore === false && secondBody.nextOffset === null, "در صفحه آخر hasMore=false است");
+
+    // A guest must only ever see its own projects, however they page through it.
+    const all = await call(listJar, "/api/projects?limit=50", { ip: listIp });
+    ok(
+      !(JSON.parse(all.body || "{}") as { projects?: { id: string }[] }).projects?.some((item) => item.id === id),
+      "فهرست پروژه‌های غریبه، پروژه دیگران را نشان نمی‌دهد",
+    );
+
+    for (const [label, path] of [
+      ["limit صفر", "/api/projects?limit=0"],
+      ["limit بیش از سقف", "/api/projects?limit=1000"],
+      ["offset غیرعددی", "/api/projects?offset=abc"],
+      ["offset منفی", "/api/projects?offset=-1"],
+    ] as const) {
+      const response = await call(listJar, path, { ip: listIp });
+      ok(response.status === 400, `${label} ⇒ ۴۰۰`, `got ${response.status}`);
+    }
+  }
+
+  /* ---- ۴-و. فهرست پروژه‌ها هم مثل بقیه خواندن‌ها سقف نرخ دارد ---- */
+  console.log("\n▶ ۴-و. محدودیت نرخ فهرست پروژه‌ها");
+  {
+    const burstJar = new Jar();
+    const burstIp = `${CLIENT_IP}.82`;
+    let limitedAt = 0;
+    let retryAfter = "";
+    for (let i = 1; i <= 130; i += 1) {
+      const response = await call(burstJar, "/api/projects?limit=1", { ip: burstIp });
+      if (response.status === 429) {
+        limitedAt = i;
+        retryAfter = String(response.response.headers.get("retry-after") ?? "");
+        break;
+      }
+    }
+    ok(limitedAt > 0, "درخواست‌های پشت‌سرهم فهرست، در نهایت ۴۲۹ می‌گیرند", "هرگز محدود نشد");
+    // The quota is configurable, so compare against the configured value rather
+    // than hard-coding 120 — a mismatch would otherwise be a silent pass.
+    const expectedQuota = Number(process.env.RATE_LIMIT_PROJECT_READ ?? 120);
+    ok(
+      limitedAt === expectedQuota + 1,
+      `اولین ۴۲۹ دقیقاً بعد از سهمیه (${expectedQuota}) رخ می‌دهد`,
+      `محدودسازی در درخواست ${limitedAt}`,
+    );
+    ok(retryAfter.length > 0, "پاسخ ۴۲۹ هدر Retry-After دارد", `retry-after="${retryAfter}"`);
+  }
+
   /* ---------------- 5. اعتبارسنجی و خطاها ---------------- */
   console.log("\n▶ ۵. اعتبارسنجی ورودی");
   // validation checks use their own client identity so a rate-limited bucket

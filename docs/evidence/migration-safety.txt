@@ -1,7 +1,4 @@
-# Migration runner safety + rollback rehearsal — 2026-10-31T15:14:43Z
-DATABASE_URL=…/hermiplan_ms8 MIGRATION_SAFETY_ROLLBACK=1 npm run db:migration-safety
-# scratch database created for this run only; steps ۵–۷ empty it by design
-
+# migration safety (incl. full rollback rehearsal) — 2026-10-31T15:34:38Z
 ▶ ۱. هر مهاجرت فایل بازگشت جفت‌شده دارد
   ✓ 0001_baseline.sql → 0001_baseline.rollback.sql
   ✓ 0002_security_hardening.sql → 0002_security_hardening.rollback.sql

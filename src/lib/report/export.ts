@@ -273,9 +273,20 @@ export function buildSheets(analysis: ProjectAnalysis, input: ProjectInput): She
   return sheets;
 }
 
-/** neutralises spreadsheet formula injection (=, +, -, @, tab, CR) in untrusted cells */
+/**
+ * Neutralises spreadsheet formula injection (CWE-1236) in untrusted cells.
+ *
+ * Excel and Google Sheets treat a cell that starts with `= + - @` or a control
+ * character as a formula, so a project titled `=HYPERLINK(...)` would become a
+ * live formula in the exported CSV. A leading apostrophe forces the cell to be
+ * text. Plain numbers keep their leading minus so `-5` stays a number.
+ */
+const NUMERIC_CELL = /^-?[\d\u0660-\u0669\u06F0-\u06F9][\d\u0660-\u0669\u06F0-\u06F9,.\s]*$/;
+
 function csvSafe(value: string): string {
-  return /^[=+@\t\r]/.test(value) ? `'${value}` : value;
+  if (/^[=+@\t\r]/.test(value)) return `'${value}`;
+  if (value.startsWith("-") && !NUMERIC_CELL.test(value)) return `'${value}`;
+  return value;
 }
 
 export function buildCsv(sheet: Sheet): string {

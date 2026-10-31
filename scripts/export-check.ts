@@ -207,8 +207,27 @@ async function main(): Promise<void> {
     }),
     "هیچ مبلغی بیش از دو رقم اعشار ندارد",
   );
-  const activitiesSource = readArtifact("export.ts");
-  check(/csvSafe|BOM|uFEFF/.test(activitiesSource), "CSV محافظ تزریق فرمول دارد");
+  // --- CSV formula injection (CWE-1236) ---
+  // A title is user input: if a cell starts with =, +, @ or -, Excel would run
+  // it as a formula. Real behaviour is asserted, not a grep over the source.
+  const hostile = {
+    ...input,
+    activities: input.activities.map((activity, index) =>
+      index === 0 ? { ...activity, name: "=HYPERLINK(\"http://evil.example\",\"click\")" } : activity,
+    ),
+    meta: { ...input.meta, name: "-2+3+cmd|' /C calc'!A0" },
+  };
+  const hostileSheets = buildSheets(analyzeProject(hostile as typeof input), hostile as typeof input);
+  const hostileCsv = buildCsv(hostileSheets.find((sheet) => sheet.name === "Activities")!);
+  check(/[,"]'=HYPERLINK/.test(hostileCsv), "عنوانی که با = شروع می‌شود با آپاستروف خنثی می‌شود", hostileCsv.slice(0, 90));
+  check(!/(^|,)"?=HYPERLINK/.test(hostileCsv), "هیچ سلولی با = به‌عنوان فرمول باقی نمی‌ماند");
+  const infoCsv = buildCsv(hostileSheets.find((sheet) => sheet.name === "Info")!);
+  check(/,'-2\+3/.test(infoCsv), "سلول با - غیرعددی هم خنثی می‌شود", infoCsv.split("\r\n").find((line) => line.includes("-2+3")) ?? "");
+  const numericCsv = buildCsv({ name: "T", headers: ["v"], rows: [[-5], ["-۱۲۳"], ["-5,200"]] });
+  check(
+    numericCsv.includes("-5") && numericCsv.includes("-۱۲۳") && numericCsv.includes("-5,200"),
+    "اعداد منفی واقعی (لاتین و فارسی) آپاستروف نمی‌گیرند",
+  );
 
   const base = process.env.BASE_URL;
   if (base) {

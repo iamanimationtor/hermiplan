@@ -1,10 +1,10 @@
-# health probe — 2026-10-31T15:01:20Z
-
-## A) migrated database (:3400)
-$ curl -s http://127.0.0.1:3400/api/health
+# health endpoint — 2026-10-31T15:34:13Z
+## migrated database (:3400)
+$ curl -s -i http://127.0.0.1:3400/api/health
+HTTP/1.1 200 OK
 {"ok":true,"schemaVersion":4,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false}
 
-## B) brand-new empty database (:3600, never migrated) — must be 503 and name the missing tables
-$ curl -s -w "HTTP %{http_code}\n" http://127.0.0.1:3600/api/health
+## empty database, migrations not applied (:3600 → hermiplan_empty11)
+$ curl -s -i http://127.0.0.1:3600/api/health
+HTTP/1.1 503 Service Unavailable
 {"ok":false,"schemaVersion":4,"database":"ok","missingTables":["projects","users","sessions","otp_codes","project_events","rate_limits","project_share_tokens","project_versions"],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
-HTTP 503

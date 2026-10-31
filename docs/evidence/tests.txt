@@ -1,4 +1,4 @@
-# unit/regression suites — 2026-10-31T15:15:08Z
+# unit/regression suites — 2026-10-31T15:37:22Z
 
 > test
 > tsx scripts/run-tests.ts
@@ -15,7 +15,7 @@
 ▶ ۸. تاریخ هدف پایان و شناوری منفی
 ▶ ۹. انحراف زمان‌بندی نسبت به Baseline (تعریف صحیح)
 ▶ ۱۰. کارایی روی پروژه بزرگ
-    زمان تحلیل: 59ms برای ۵۰۰ فعالیت
+    زمان تحلیل: 39ms برای ۵۰۰ فعالیت
 
 ✔ 81 بررسی مستقل موتور — همه با محاسبه دستی تأیید شد
 
@@ -59,20 +59,20 @@ ALL ENGINE CHECKS PASSED
 ══════ خروجی‌ها و موارد مرزی ══════
 
 ▶ ۱. پروژه خالی (بدون فعالیت، بدون منبع)
-  ✓ empty-project (0 acts, 0 wd, 19ms)
+  ✓ empty-project (0 acts, 0 wd, 18ms)
 
 ▶ ۲. فقط Milestone
   ✓ milestones-only (3 acts, 0 wd, 2ms)
 
 ▶ ۳. حلقه وابستگی و ارجاع نامعتبر
   ✓ cycle detection → 2 error(s), 1 warning(s)
-  ✓ cyclic-project (1 acts, 5 wd, 2ms)
+  ✓ cyclic-project (1 acts, 5 wd, 1ms)
 
 ▶ ۴. تقویم‌های خاص
   ✓ holidays-blocked-week (10 acts, 37 wd, 3ms)
   ✓ empty workDays falls back to the default working week
-  ✓ single-working-day (10 acts, 37 wd, 1ms)
-  ✓ very-long-project (10 acts, 216 wd, 6ms)
+  ✓ single-working-day (10 acts, 37 wd, 2ms)
+  ✓ very-long-project (10 acts, 216 wd, 4ms)
 
 ▶ ۵. انواع وابستگی، Lag منفی و محدودیت‌ها
   ✓ mixed-dependencies (8 acts, 12 wd, 2ms)
@@ -85,18 +85,18 @@ ALL ENGINE CHECKS PASSED
 
 ▶ ۸. همه قالب‌ها × همه مسیرهای خروجی
   ✓ template:construction (21 acts, 158 wd, 4ms)
-  ✓ template:civil (14 acts, 171 wd, 2ms)
-  ✓ template:architecture (13 acts, 98 wd, 19ms)
+  ✓ template:civil (14 acts, 171 wd, 9ms)
+  ✓ template:architecture (13 acts, 98 wd, 2ms)
   ✓ template:infrastructure (11 acts, 98 wd, 2ms)
-  ✓ template:software (15 acts, 92 wd, 1ms)
+  ✓ template:software (15 acts, 92 wd, 10ms)
   ✓ template:manufacturing (11 acts, 94 wd, 1ms)
   ✓ template:research (13 acts, 126 wd, 1ms)
   ✓ template:event (11 acts, 53 wd, 1ms)
   ✓ template:renovation (11 acts, 84 wd, 3ms)
-  ✓ template:general (10 acts, 37 wd, 2ms)
+  ✓ template:general (10 acts, 37 wd, 0ms)
 
 ▶ ۹. Baseline و پیشرفت کامل/صفر
-  ✓ baseline-100% (15 acts, 92 wd, 24ms)
+  ✓ baseline-100% (15 acts, 92 wd, 22ms)
 
 ══════════ EDGE-CASE AUDIT PASSED ══════════
 
@@ -253,11 +253,14 @@ ALL ENGINE CHECKS PASSED
   ✓ جمع پنج جزء برابر جمع نهایی است (بدون اختلاف گرد کردن)
   ✓ همه مبالغ از قبل گردشده‌اند (idempotent roundMoney)
   ✓ هیچ مبلغی بیش از دو رقم اعشار ندارد
-  ✓ CSV محافظ تزریق فرمول دارد
+  ✓ عنوانی که با = شروع می‌شود با آپاستروف خنثی می‌شود
+  ✓ هیچ سلولی با = به‌عنوان فرمول باقی نمی‌ماند
+  ✓ سلول با - غیرعددی هم خنثی می‌شود
+  ✓ اعداد منفی واقعی (لاتین و فارسی) آپاستروف نمی‌گیرند
 
 ▶ ۸. خروجی‌های HTTP — نادیده (BASE_URL تنظیم نشده)
 
-✔ 51 موفق / 0 ناموفق
+✔ 54 موفق / 0 ناموفق
 
 ══════ همه 9 مجموعه تست موفق بودند ══════
 EXIT=0

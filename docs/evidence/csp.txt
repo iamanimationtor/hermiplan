@@ -1,4 +1,4 @@
-# CSP — two public pages — 2026-10-31T15:14:07Z
+# CSP and security headers — 2026-10-31T15:34:25Z
 ▶ /
 ▶ /builder
 

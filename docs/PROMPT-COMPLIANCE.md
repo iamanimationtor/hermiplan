@@ -22,13 +22,13 @@
 | ۵ منابع | ۲ | ۰ | ۰ |
 | ۶ EVM و پیشرفت | ۵ | ۰ | ۰ |
 | ۷ قیمت‌گذاری | ۵ | ۲ | ۱ |
-| ۸ امنیت | ۱۱ | ۱ | ۰ |
+| ۸ امنیت | ۱۳ | ۱ | ۰ |
 | ۹ پایگاه داده | ۴ | ۱ | ۰ |
 | ۱۰ کیفیت کد | ۴ | ۰ | ۰ |
 | ۱۱ آزمون | ۶ | ۰ | ۱ |
 | ۱۲ تجربه کاربری | ۶ | ۱ | ۰ |
 | ۱۳–۱۶ ترتیب/آینده/پذیرش/خروجی | ۶ | ۰ | ۰ |
-| **جمع** | **۵۹** | **۶** | **۲** |
+| **جمع** | **۶۱** | **۶** | **۲** |
 
 ---
 
@@ -95,17 +95,19 @@
 | اصلاح `normalizePhone` | **انجام‌شده** | `src/lib/server/phone.ts`، `security-checks.ts` §۱ | — |
 | محدودیت نرخ مشترک (PostgreSQL) + مستندسازی هر endpoint | **انجام‌شده** | `src/lib/server/rate-limit.ts` (جدول `rate_limits`)، `README.md` جدول سهمیه‌ها، `db-integrity-check.ts` §۱ | — |
 | بازبینی نشست/کوکی (HttpOnly/Secure/SameSite/انقضا/ابطال/CSRF) | **انجام‌شده** | `src/lib/server/auth.ts`، `src/lib/server/http.ts` (`isSameOriginRequest`) | — |
-| سخت‌سازی و آزمون‌های منفی مجوز | **انجام‌شده** | `api-integration` (۱۵۲ بررسی)، `security-checks` (۲۹۱ بررسی) | — |
+| سخت‌سازی و آزمون‌های منفی مجوز | **انجام‌شده** | `api-integration` (۱۸۷ بررسی)، `security-checks` (۲۹۱ بررسی)، `export-check` (۶۴ بررسی) | — |
 | CSP و هدرهای امنیتی | **انجام‌شده** | `src/middleware.ts` (nonce، بدون `unsafe-inline` در script)، `test:csp` ۲۴ بررسی روی دو صفحه + ۹۲ بررسی روی هفت مسیر واقعی | — |
 | ارسال واقعی پیامک با ارائه‌دهنده بیرونی | **ناقص** | کل زنجیره با ارائه‌دهنده محلی آزموده شد (`docs/evidence/otp-sms.txt`) | کلید `SMS_PROVIDER_KEY` + `SMS_OTP_TEMPLATE` شما |
 | محافظت از داده (بدون مهاجرت مخرب، برگشت‌پذیر) | **انجام‌شده** | `drizzle/0002..0004` + فایل rollback، `migration-safety.ts` (۳۳ بررسی، شامل بازگشت کامل و بازسازی هم‌ساختار) | — |
+| تزریق فرمول در خروجی صفحه‌گسترده (CWE-1236) | **انجام‌شده (افزوده این دور)** | `src/lib/report/export.ts` (`csvSafe`، شامل `-` غیرعددی و اعداد منفی فارسی)، `export-check.ts` ۶۴ بررسی با عنوان مخرب واقعی | — |
+| سهمیه فهرست پروژه‌ها + صفحه‌بندی محدود | **انجام‌شده (افزوده این دور)** | `GET /api/projects?limit&offset` با `parsePositiveInt`، سقف ۵۰، ۴۲۹ با `Retry-After`، `total`/`hasMore`؛ `api-integration` §۴-ه و §۴-و | — |
 
 ## ۹. پایگاه داده
 
 | معیار | وضعیت | شاهد | باقی‌مانده |
 | --- | --- | --- | --- |
 | کلید خارجی، ایندکس، قید یکتا، تراکنش، داده یتیم، تاریخچه رخداد | **انجام‌شده** | `0001`–`0004`، `db-integrity-check.ts` (۲۰ بررسی روی PostgreSQL واقعی: هم‌زمانی، CASCADE، «یتیم‌سنجی» FK) | — |
-| تاریخچه نسخه‌ها و ویرایش هم‌زمان (افزوده این دور) | **انجام‌شده** | `0004_project_versions.sql`، `src/lib/server/project-versions*.ts`، `api-integration` §۴-ب (۵۲ بررسی)، `db-integrity-check.ts` §۵ | — |
+| تاریخچه نسخه‌ها و ویرایش هم‌زمان (افزوده این دور) | **انجام‌شده** | `0004_project_versions.sql`، `src/lib/server/project-versions*.ts`، `api-integration` §۴-ب (۴۲ بررسی)، `db-integrity-check.ts` §۵ | — |
 | مقایسه دو نسخه پیش از بازگردانی (افزوده این دور) | **انجام‌شده** | `src/lib/report/version-diff.ts` (خالص، بدون I/O)، مسیر `GET …/versions/:n/diff?against=current\|<n>`، `npm run test:versions` (۴۱ بررسی) و `api-integration` §۴-ج | — |
 | آماده‌سازی (نه ساخت بی‌دلیل) جداول Company/CompanyMember/ProjectMember/Role/Permission، Activity، Dependency، Calendar، Baseline، Milestone، Resource، Assignment، DailyReport، WorkItem، Quantity، QA، RFI، Document، Issue، Approval | **ناقص** | مدل دامنه در `src/lib/engine/types.ts` و `docs/ENGINE.md` کامل است؛ الگوی مالکیت/رخداد/نسخه در پایگاه موجود است | جداول ساخته نشدند: بدون ماژول مصرف‌کننده یعنی ساختار بی‌مصرف. پیشنهاد: ساخت هر جدول همراه با ماژولش (بخش ۴ سند AUDIT-REPORT) |
 | قواعد چندمستأجری (multitenancy) | **انجام‌شده** | مالکیت توسط `owner_user`/`guest_token` + `isProjectOwner`؛ آزمون جداسازی در §۲ `api-integration` | گروه/تیم تا زمانی که مدل عضویت ساخته نشود وجود ندارد (در بخش ۱۴ جهت‌گیری آمده) |
@@ -124,7 +126,7 @@
 | معیار | وضعیت | شاهد | باقی‌مانده |
 | --- | --- | --- | --- |
 | آزمون واحد برای هر دو گذر، شناوری، چهار رابطه، Lag، تقویم، نقطه عطف، محدودیت، چرخه، Baseline، پیشرفت، EVM، منابع، نرخ، تعدیل، نگاشت تاریخ | **انجام‌شده** | `npm test` = ۹ مجموعه؛ موتور ۸۱ + رگرسیون ۱۹۱ + امنیت ۲۹۱ + خروجی ۶۱ + تفاوت نسخه‌ها ۴۱؛ و در `test:api` تاریخچه/مقایسه/اعتبارسنجی ۷۵ بررسی | — |
-| ۲۲ سناریوی یکپارچگی | **انجام‌شده (بیش از خواسته)** | `npm run test:api`: ۱۵۲ بررسی روی build تولیدی و ۱۴۴ روی `next dev` (شامل ۶ سناریوی OTP که فقط با دمو باز است) | — |
+| ۲۲ سناریوی یکپارچگی | **انجام‌شده (بیش از خواسته)** | `npm run test:api`: ۱۸۷ بررسی روی build تولیدی و ۱۹۲ روی `next dev` (شامل ۶ سناریوی OTP که فقط با دمو باز است) | — |
 | آزمون مرجع محاسبه دستی | **انجام‌شده** | `scripts/engine-verification.ts` (اعداد دستی در §۱، §۵، §۶) | — |
 | اجرای واقعی فرمان‌های package.json (`npm ci`, typecheck, lint, test, integration, api, build) | **انجام‌شده** | `docs/evidence/npm-ci.txt`, `typecheck.txt`, `lint.txt`, `tests.txt`, `api-integration*.txt`, `build.txt` | `test:load` فقط محلی اجرا شد (ظرفیت Netlify سنجیده نشد) |
 | آزمون تفاوت نسخه‌ها (خالص) | **انجام‌شده** | `scripts/version-diff-check.ts` **۴۱ بررسی**: نسخه یکسان، ترتیب مستقل از JSON، افزوده/حذف‌شده، نام/مدت/وابستگی/منبع/کارکرد، خط مبنا، تنظیمات گزارش، فیلد ناشناخته، ترتیب پایدار | — |

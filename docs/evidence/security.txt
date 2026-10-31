@@ -1,6 +1,4 @@
-# security checks (static + live) — 2026-10-31T15:14:36Z
-DATABASE_URL=… npm run test:security
-
+# security checks — 2026-10-31T15:34:18Z
 ▶ ۱. نرمال‌سازی شماره موبایل
 ▶ ۲. تولید و هش OTP
 ▶ ۳. پیکربندی پیامک و حالت نمایشی

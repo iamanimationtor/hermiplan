@@ -47,6 +47,10 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedList, setSavedList] = useState<SavedProject[] | null>(null);
+  /** the server says whether older projects exist; the UI must never guess */
+  const [savedMore, setSavedMore] = useState<{ total: number; nextOffset: number | null } | null>(null);
+  const [savedError, setSavedError] = useState<string | null>(null);
+  const [savedBusy, setSavedBusy] = useState(false);
   /**
    * The server copy this builder session is working on. "Generate report" used
    * to create a *new* project every time, which meant a second run silently
@@ -203,14 +207,49 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
     }
   }
 
+  async function fetchSavedPage(offset: number) {
+    const response = await fetch(`/api/projects?limit=20&offset=${offset}`, { cache: "no-store" });
+    const data = (await response.json().catch(() => ({}))) as {
+      projects?: SavedProject[];
+      total?: number;
+      nextOffset?: number | null;
+      error?: string;
+    };
+    if (!response.ok) {
+      // A failed listing is *not* "you have no projects": say what happened.
+      setSavedError(data.error ?? "خواندن فهرست پروژه‌ها ناموفق بود");
+      return null;
+    }
+    setSavedMore({ total: data.total ?? 0, nextOffset: data.nextOffset ?? null });
+    return data.projects ?? [];
+  }
+
   async function openSaved() {
     setSavedList([]);
+    setSavedError(null);
+    setSavedMore(null);
+    setSavedBusy(true);
     try {
-      const response = await fetch("/api/projects");
-      const data = (await response.json()) as { projects: SavedProject[] };
-      setSavedList(data.projects ?? []);
+      const page = await fetchSavedPage(0);
+      setSavedList(page ?? []);
     } catch {
+      setSavedError("خواندن فهرست پروژه‌ها ناموفق بود");
       setSavedList([]);
+    } finally {
+      setSavedBusy(false);
+    }
+  }
+
+  async function loadMoreSaved() {
+    if (!savedMore?.nextOffset) return;
+    setSavedBusy(true);
+    try {
+      const page = await fetchSavedPage(savedMore.nextOffset);
+      if (page) setSavedList((current) => [...(current ?? []), ...page]);
+    } catch {
+      setSavedError("بارگذاری پروژه‌های بیشتر ناموفق بود");
+    } finally {
+      setSavedBusy(false);
     }
   }
 
@@ -646,7 +685,10 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
         </div>
       </Modal>
 
-      <Modal open={savedList !== null} onClose={() => setSavedList(null)} title="پروژه‌های ذخیره‌شده">
+      <Modal open={savedList !== null || savedError !== null} onClose={() => { setSavedList(null); setSavedError(null); }} title="پروژه‌های ذخیره‌شده">
+        {savedError ? (
+          <p className="rounded-xl bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">{savedError}</p>
+        ) : null}
         {savedList && savedList.length ? (
           <div className="space-y-2">
             {savedList.map((item) => (
@@ -663,9 +705,21 @@ export function BuilderApp({ initial }: { initial: ProjectInput }) {
           </div>
         ) : (
           <p className="py-6 text-center text-[13px] text-slate-500">
-            {savedList === null ? "در حال بارگذاری…" : "پروژه ذخیره‌شده‌ای یافت نشد."}
+            {savedList === null ? "در حال بارگذاری…" : savedError ? "" : "پروژه ذخیره‌شده‌ای یافت نشد."}
           </p>
         )}
+        {savedMore?.nextOffset ? (
+          <button
+            type="button"
+            onClick={() => void loadMoreSaved()}
+            disabled={savedBusy}
+            className="mt-3 w-full rounded-xl border border-slate-200 px-4 py-2 text-[12px] font-semibold text-brand-700 transition hover:border-brand-400 hover:bg-brand-50/40 disabled:opacity-50"
+          >
+            {savedBusy
+              ? "در حال بارگذاری…"
+              : `نمایش پروژه‌های بیشتر (${toPersianDigits(String(savedMore.total))} پروژه در کل)`}
+          </button>
+        ) : null}
         <p className="mt-4 text-[11.5px] leading-6 text-slate-500">
           پروژه‌های شما روی همین مرورگر ذخیره می‌شوند. برای دسترسی از دستگاه‌های دیگر می‌توانید لینک گزارش را نگه دارید.
         </p>
