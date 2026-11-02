@@ -1,0 +1,75 @@
+# HERMIPLAN — Netlify configuration
+# Docs: https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/
+#
+# Next.js support on Netlify is provided by the Next.js Runtime
+# (@netlify/plugin-nextjs — the OpenNext-based adapter). It is declared
+# EXPLICITLY below and pinned in package.json/package-lock.json so it runs
+# on every deploy: production, branch deploys and Deploy Previews alike.
+#
+# Why explicit: relying on Netlify's automatic framework detection is what
+# previously produced deploys where the build succeeded but every route —
+# including / — answered with Netlify's "Page not found". Without the
+# runtime, the raw `.next` build output is published as plain static files:
+# it has no index.html at its root and no server function to render routes,
+# so the CDN has nothing to serve. With the runtime, the plugin swaps in the
+# static assets at onPostBuild and registers a server function
+# (___netlify-server-handler, config.path = "/*", preferStatic) that renders
+# every page and API route, with prerendered pages served from the blob
+# store through its cache handler.
+#
+# Required environment variables are documented in DEPLOYMENT.md and
+# .env.example. Never place secrets in this file: values in netlify.toml
+# cannot reference environment variables, so they would be committed in
+# plain text. Configure them in the Netlify UI instead.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # package-lock.json is committed, so `npm install` is reproducible and
+  # installs the pinned Next.js Runtime version from devDependencies.
+  NPM_FLAGS = "--no-audit --no-fund"
+
+# ---------------------------------------------------------------------------
+# Next.js Runtime (OpenNext adapter)
+# ---------------------------------------------------------------------------
+# Declaring the plugin here guarantees it is installed and executed during
+# every build, independent of framework auto-detection on the site. The
+# version is pinned via package.json (devDependencies) + package-lock.json.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# ---------------------------------------------------------------------------
+# Migrations
+# ---------------------------------------------------------------------------
+# Schema changes are run explicitly and manually — never as part of the site
+# build, so a deploy can never alter production data automatically:
+#   DATABASE_URL="postgres://…" npx drizzle-kit migrate     (if using SQL files)
+#   DATABASE_URL="postgres://…" npx drizzle-kit push        (current workflow)
+# See DEPLOYMENT.md → "Production database and safe migrations".
+
+# ---------------------------------------------------------------------------
+# Deploy Previews
+# ---------------------------------------------------------------------------
+# Previews build the same way as production. Point them at a staging database
+# (or the same one) through the Netlify UI; the app itself needs no change.
+[context.deploy-preview]
+  command = "npm run build"
+
+# ---------------------------------------------------------------------------
+# Functions runtime
+# ---------------------------------------------------------------------------
+# The Next.js Runtime provisions all server functions (___netlify-server-handler
+# in .netlify/functions-internal, registered with config.path = "/*" and
+# preferStatic). No [functions] configuration is needed; the [[plugins]] entry
+# above is what makes the runtime run on every build.
+
+# ---------------------------------------------------------------------------
+# Security headers / caching
+# ---------------------------------------------------------------------------
+# Headers are set in next.config.ts so they apply to every deployment target
+# (including local `next start`), and are inherited by the Netlify runtime.
+# Dynamic routes are all `force-dynamic`, so no public caching is configured
+# for user-specific responses.
