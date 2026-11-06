@@ -55,6 +55,12 @@ function instance opens its own connection pool.
 6. Verify the deployment instead of trusting the build log:
    `npm run deploy:check -- --url https://<site>.netlify.app` (exit 0 = healthy;
    it also detects the "raw `.next` published" fingerprint).
+7. Optional but recommended: enable `.github/workflows/deploy.yml` by adding the
+   `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` repository secrets. It deploys with
+   `netlify deploy --build --prod` (build **and** pinned adapter) and verifies the
+   live site afterwards, so a deployment no longer depends on dashboard framework
+   detection. Without the secrets it skips with a notice. More: §7 of
+   `docs/NETLIFY-DEPLOY.md`.
 
 > `netlify.toml` values override dashboard settings for the same property, so
 > leave Build command / Publish directory / Node version alone in the UI.

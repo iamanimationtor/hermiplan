@@ -1,0 +1,88 @@
+name: Deploy to Netlify
+
+# Why this workflow exists
+# ------------------------
+# The site answered Netlify's own "Page not found" on every URL because the
+# deployment contained the raw `next build` output and Netlify's Next.js
+# runtime (@netlify/plugin-nextjs) never ran (see docs/NETLIFY-DEPLOY.md).
+# Relying on the dashboard's framework detection silently produced that state.
+#
+# This workflow deploys through the documented CLI path — `netlify deploy
+# --build --prod` — which runs the build AND the adapter pinned in
+# netlify.toml, so routing and functions exist regardless of how the site's
+# framework preset is configured. It then verifies the live site with
+# `npm run deploy:check`.
+#
+# It is opt-in: without the two repository secrets it skips with a notice
+# instead of failing. To enable it:
+#   Settings → Secrets and variables → Actions
+#     NETLIFY_AUTH_TOKEN  (Netlify → User settings → Applications → Personal access tokens)
+#     NETLIFY_SITE_ID     (Netlify → Site configuration → Site information → Site ID)
+#   Optional repository variable SITE_URL (defaults to https://hermiplan.netlify.app).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: netlify-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies (including dev — next build needs them)
+        run: npm ci --no-audit --no-fund
+
+      - name: Static gates
+        run: |
+          npx tsc --noEmit
+          npx eslint .
+          npm test
+
+      - name: Are Netlify credentials configured?
+        id: creds
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Netlify deploy skipped — set NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID (docs/NETLIFY-DEPLOY.md §9)."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy (build + adapter + publish)
+        if: steps.creds.outputs.skip == 'false'
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        # --build runs the Netlify build pipeline locally in the runner, which
+        # executes the pinned @netlify/plugin-nextjs adapter. Publishing the
+        # bare .next folder (--dir) is what produced the global 404.
+        run: npx --yes netlify-cli deploy --build --prod
+
+      - name: Verify the live deployment
+        if: steps.creds.outputs.skip == 'false'
+        env:
+          SITE_URL: ${{ vars.SITE_URL || 'https://hermiplan.netlify.app' }}
+        # A healthy deploy answers /api/health with JSON, serves the Persian
+        # landing page, and returns 404 for /BUILD_ID (200 there means the raw
+        # build output is being served and no route can match).
+        run: npm run deploy:check -- --skip-build --url "$SITE_URL"

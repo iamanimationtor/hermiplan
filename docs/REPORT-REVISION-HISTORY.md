@@ -403,6 +403,11 @@ Netlify روی `https://hermiplan.netlify.app/`.
 این محیط به `*.netlify.app` دسترسی خروجی ندارد و به حساب Netlify شما هم وصل نیست، پس
 **دیپلوی را نمی‌تواند از اینجا اجرا یا تأیید کند.** برای بسته شدن کامل:
 
+0. مسیر مستقل از پنل هم اضافه شد: `.github/workflows/deploy.yml` با
+   `netlify deploy --build --prod` (بیلد **و** آداپتر pin‌شده) و سپس
+   `npm run deploy:check`؛ با دو secret (`NETLIFY_AUTH_TOKEN`، `NETLIFY_SITE_ID`)
+   فعال می‌شود و بدون آن‌ها با notice رد می‌شود. مزیتش این است که به تشخیص
+   فریم‌ورک پنل وابسته نیست.
 1. اگر سایت به گیت وصل است: شاخهٔ تولید باید همان شاخه‌ای باشد که کد اپ روی آن است
    (`main` پیش از این PR فقط یک ZIP داشت) — وگرنه بیلدی برای دیپلوی وجود ندارد.
 2. **Deploys → Clear cache and deploy site** و بعد `npm run deploy:check -- --url …`
