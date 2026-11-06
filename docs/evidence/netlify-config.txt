@@ -1,4 +1,4 @@
-# npm run deploy:check  (2026-11-06T10:47:19Z)
+# npm run deploy:check  (2026-11-06T10:59:49Z)
 HERMIPLAN — بررسی دیپلوی Netlify
 
 ✓ دستور بیلد
@@ -16,7 +16,7 @@ HERMIPLAN — بررسی دیپلوی Netlify
 ✓ بخش [dev]
    netlify dev روی پورت ۳۰۰۰ به اپ وصل می‌شود.
 ✓ خروجی بیلد
-   BUILD_ID = b3y-lDNzNntVEYenftgOV
+   BUILD_ID = MeyCpScKKSSMhVYw5nikM
 ✓ مسیرهای بیلد
    20 مسیر در مانیفست، شامل / و APIها.
 

@@ -163,7 +163,7 @@
 
 | ایراد | شدت | فایل یا ماژول | اقدام انجام‌شده | تست تأییدکننده | وضعیت |
 | --- | --- | --- | --- | --- | --- |
-| **همهٔ آدرس‌های سایت مستقر، ۴۰۴ خودِ Netlify را می‌دادند** («Page not found») در حالی که لاگ بیلد موفق بود | بحرانی (استقرار) | `netlify.toml`, `package.json`, `scripts/netlify-check.ts` (جدید), `docs/NETLIFY-DEPLOY.md` (جدید) | علت با شاهد مشخص شد: `/BUILD_ID` و `/app-path-routes-manifest.json` روی دامنه ۲۰۰ می‌دادند، یعنی **خروجی خام `next build`** به‌صورت استاتیک منتشر شده بود و Netlify Next.js runtime (آداپتر OpenNext) اجرا نشده بود؛ پس هیچ تابع و هیچ جدول مسیری وجود نداشت. آداپتر به‌صورت صریح pin شد (بلوک `[[plugins]]` + `@netlify/plugin-nextjs@5.16.6` در devDependencies)، `[dev]` اضافه شد، و `npm run deploy:check` ساخته شد که همین اثر انگشت را در ۱۴ بررسی زنده تشخیص می‌دهد | `docs/evidence/netlify-config.txt` (۹ بررسی، خروجی ۰) و `docs/evidence/netlify-live.txt` (سنجش زندهٔ دامنه + کنترل «Site not found») | ✅ |
+| **همهٔ آدرس‌های سایت مستقر، ۴۰۴ خودِ Netlify را می‌دادند** («Page not found») در حالی که لاگ بیلد موفق بود | بحرانی (استقرار) | `netlify.toml`, `package.json`, `scripts/netlify-check.ts` (جدید), `docs/NETLIFY-DEPLOY.md` (جدید) | علت با شاهد مشخص شد: صفحهٔ اصلی، `/builder` و `/api/health` همه ۴۰۴ نتلیفای می‌دادند در حالی که `/BUILD_ID` و مانیفست مسیرها از ریشهٔ دامنه خوانده می‌شدند ⇒ **خروجی خام `next build`** استاتیک منتشر شده بود و آداپتر OpenNext اجرا نشده بود؛ پس هیچ تابعی وجود نداشت. آداپتر صریحاً pin شد (`[[plugins]]` + `@netlify/plugin-nextjs@5.16.6`)، `[dev]` اضافه شد، و `npm run deploy:check` ساخته شد (۹ بررسی آفلاین + ۱۴ بررسی زنده). **تأیید پس از دیپلوی:** `/` و `/builder` ۲۰۰ با متن فارسی، `/api/health` JSON، و مسیر ناموجود ۴۰۴ خودِ اپ ⇒ آداپتر اجرا شده است | `docs/evidence/netlify-config.txt` (۹ بررسی، خروجی ۰) و `docs/evidence/netlify-live.txt` (قبل و بعد از دیپلوی + کنترل «Site not found») | ✅ |
 | انتشار کاملاً به تشخیص فریم‌ورک در پنل وابسته بود (بدون مسیر جایگزین در مخزن) | متوسط (استقرار) | `.github/workflows/deploy.yml` (جدید) | نشر با `netlify deploy --build --prod` (بیلد + آداپتر) روی push به `main`، پیش از آن `tsc`/`eslint`/`npm test`، و پس از آن `deploy:check` روی دامنهٔ زنده؛ بدون secretها با notice رد می‌شود | `npx yaml-lint` + اجرای دستی همان دستورها در این دور | ✅ |
 | راهنمای استقرار، pin کردن آداپتر را **ممنوع** می‌کرد؛ همان توصیه در این سایت شکست خورد | متوسط (مستندات) | `DEPLOYMENT.md` §۲، §۸، §۹ | مرحله‌ها بازنویسی شد: base directory خالی، آداپتر pin‌شده و دلیلش، ممنوعیت `netlify deploy --dir=.next`، الزام نصب devDependencies، و ردیف تازهٔ «۴۰۴ سراسری» در جدول خطاها | `npm run deploy:check` + بازبینی متن | ✅ |
 
@@ -328,9 +328,10 @@
 3. مهاجرت را **دستی و یک‌بار** اجرا کنید: `npm run db:status` سپس `npm run db:migrate`
    (پیش از آن `pg_dump`). این کار در بیلد انجام نمی‌شود.
 4. پس از استقرار: `npm run deploy:check -- --url https://<site>` (باید ۰ برگردد) و
-   `curl /api/health` باید `ok:true` و `schemaVersion` جاری را برگرداند
+   `curl /api/health` باید JSON بدهد: `ok:true` و `schemaVersion` جاری
    (در نبود مهاجرت ۵۰۳ + `missingTables`، در نبود `DATABASE_URL` ۵۰۳ + `database_unconfigured`).
-   `/BUILD_ID` باید **۴۰۴** باشد؛ ۲۰۰ یعنی خروجی خام بیلد منتشر شده و آداپتر اجرا نشده.
+   ملاک مسیریابی، ۴۰۴ **خودِ اپ** روی یک مسیر ناموجود است، نه `/BUILD_ID` (که با
+   `publish = ".next"` حتی در دیپلوی سالم ۲۰۰ می‌دهد).
 5. پیش از اطلاع‌رسانی انتشار: `npm run db:share-audit` را اجرا و پروژه‌های «لینک قدیمی»
    (منتشرشده پیش از `0003`) را فهرست کنید؛ لینک UUID قدیمی آن‌ها دیگر کار نمی‌کند و باید
    لینک تازه صادر شود.
