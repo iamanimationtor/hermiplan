@@ -52,3 +52,21 @@ visit Netlify’s “page not found” support guide …
 # ─────────────────────────────────────────────────────────────────────────────
 # نتیجه: علت ریشه‌ای = انتشار خروجی خام next build بدون Netlify Next.js runtime
 # (آداپتر @netlify/plugin-nextjs اجرا نشده). اصلاح و تأیید: docs/NETLIFY-DEPLOY.md
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ۵) پیوست — وضعیت ورک‌فلوی انتشار روی GitHub (همین دور)
+#    اجرای 42206344888  (main، «Merge pull request #4»)  → success، ۵۰s
+#      ✓ tsc / eslint / npm test روی ران‌ر تمیز گیت‌هاب
+#      - Deploy (build + adapter + publish)  → skip: secretها ست نشده‌اند
+#      - Verify the live deployment          → skip
+#    اجرای 42206501364  (main، «Merge pull request #5»)  → success، ۳۷s
+#      همان نتیجه؛ فقط notice «NETLIFY_AUTH_TOKEN و NETLIFY_SITE_ID را ست کنید».
+#    ⇒ گیت‌های ایستا روی ران‌ر گیت‌هاب هم سبز است؛ انتشار خودکار برای فعال شدن
+#      به دو secret نیاز دارد (docs/NETLIFY-DEPLOY.md §۷).
+#
+# ۶) وضعیت دامنه پس از دو push و یک merge به main
+#    GET https://hermiplan.netlify.app/BUILD_ID → همان مقدار 07MAeMBJT2t_HEmwi5F17
+#    ⇒ هیچ دیپلوی تازه‌ای منتشر نشده است: سایت به این مخزن/این شاخه وصل نیست،
+#      یا انتشار خودکار خاموش است، یا بیلدهایش شکست می‌خورند و آخرین دیپلوی
+#      سالمِ قدیمی (همان خروجی خام) سر جایش مانده است.
+#      رفع نهایی نیاز به یک اقدام در پنل Netlify دارد (docs/NETLIFY-DEPLOY.md §۸).
