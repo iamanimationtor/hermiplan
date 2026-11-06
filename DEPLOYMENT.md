@@ -1,8 +1,13 @@
 # HERMIPLAN — Netlify Deployment
 
 This guide matches the actual implementation. It assumes Next.js 16 (App Router,
-Turbopack), PostgreSQL via Drizzle ORM, and Netlify's automatically installed
-OpenNext Next.js adapter.
+Turbopack), PostgreSQL via Drizzle ORM, and Netlify's OpenNext Next.js adapter —
+which this repository pins explicitly (see §2, step 3).
+
+> **"Page not found" on every URL?** That is the signature of a deploy that
+> published the raw `.next` output without the adapter. Diagnose it in one
+> command (`npm run deploy:check -- --url https://<site>.netlify.app`) and follow
+> `docs/NETLIFY-DEPLOY.md`.
 
 ---
 
@@ -27,13 +32,29 @@ function instance opens its own connection pool.
 1. Push the repository to GitHub/GitLab. `.gitignore` excludes `.env`,
    `node_modules`, `.next` and `.netlify`, so no credentials are committed.
 2. In Netlify: **Add new site → Import an existing project**, pick the repo.
-3. Netlify auto-detects Next.js and installs its maintained OpenNext adapter.
-   **Do not** add `@netlify/plugin-nextjs` to `package.json` or `[[plugins]]` —
-   that pins the adapter and disables automatic updates.
+   Leave **Base directory** empty — the app lives at the repository root, and
+   detection silently stops working when it is set.
+3. Netlify normally installs its maintained OpenNext adapter automatically.
+   This repository **pins it anyway** (`[[plugins]]` in `netlify.toml` plus
+   `@netlify/plugin-nextjs` in `devDependencies`), because on 2026-11-06 the
+   deployment published the raw `next build` output with no adapter, and every
+   URL answered Netlify's own "Page not found". Pinning is the documented way
+   to make that step explicit and reproducible. Trade-off: the adapter no
+   longer updates on its own — bump the version deliberately (see
+   `docs/NETLIFY-DEPLOY.md` §3, which also explains how to opt back in).
 4. Build settings come from `netlify.toml` (already committed):
    `command = "npm run build"`, `publish = ".next"`, `NODE_VERSION = "22"`
    (also pinned in `.nvmrc`). Netlify runs `npm install` because only
-   `package-lock.json` is committed.
+   `package-lock.json` is committed. Dev dependencies must be installed —
+   `typescript`, `@types/*` and the Tailwind PostCSS plugin are needed by
+   `next build`; if a dashboard-level `NODE_ENV=production` skips them the
+   build fails.
+5. Never deploy build output directly (`netlify deploy --dir=.next`): it
+   bypasses the adapter and reproduces the 404. Deploy from Git, or
+   `netlify deploy --build --prod`.
+6. Verify the deployment instead of trusting the build log:
+   `npm run deploy:check -- --url https://<site>.netlify.app` (exit 0 = healthy;
+   it also detects the "raw `.next` published" fingerprint).
 
 > `netlify.toml` values override dashboard settings for the same property, so
 > leave Build command / Publish directory / Node version alone in the UI.
@@ -260,11 +281,24 @@ command). Recommended:
 
 Run these against the production URL:
 
+The fastest check is the script — it verifies config, the local build artifact
+and the live deployment in one pass, and names the cause when something is off:
+
+```bash
+npm run deploy:check -- --url https://<site>.netlify.app     # exit 0 = healthy
+```
+
+The same checks by hand:
+
 ```bash
 curl -s https://<site>/api/health
 # {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres",
 #  "shareLinks":"postgres","smsConfigured":false}
 # 503 with "missingTables" means the migrations were not applied yet.
+# 503 "database_unconfigured" means DATABASE_URL is missing for Functions scope.
+curl -s -o /dev/null -w '%{http_code}\n' https://<site>/BUILD_ID   # must be 404
+# 200 here means the raw build output is being served statically: the adapter
+# never ran, and every route will 404. See docs/NETLIFY-DEPLOY.md.
 curl -s -o /dev/null -w '%{http_code}\n' https://<site>/            # 200
 curl -s -o /dev/null -w '%{http_code}\n' https://<site>/builder     # 200
 curl -s -o /dev/null -w '%{http_code}\n' https://<site>/report/xxx  # 404
@@ -291,6 +325,8 @@ explicitly published it.
 | Exports return 429 | per-IP export limit (30/min) reached | expected behaviour; retry after the `Retry-After` interval |
 | Report page 404 for a stranger | reports are private until the owner publishes them (or the share link expired) | intended behaviour |
 | Deploy Preview cannot reach the database | preview scoped to a staging DB that does not exist | point it at a reachable database or remove the scope |
+| Every URL shows Netlify's **"Page not found"**, while the build log says success | the deploy published the raw `.next` output and Netlify's Next.js runtime never ran (no function, no routing) — usually a `--dir` deploy or an adapter that was not attached | confirm with `npm run deploy:check -- --url https://…` (`raw_next_publish`); then redeploy from Git or `netlify deploy --build --prod`, and confirm `/BUILD_ID` returns **404** afterwards. Full checklist: `docs/NETLIFY-DEPLOY.md` |
+| App answers 503 `database_unconfigured` | `DATABASE_URL` is not set for **Functions** scope | add it in the UI and redeploy; this is a deliberate, explicit failure (see §3) |
 
 **Rollback:** *Deploys → select the last known-good deploy → … → Publish deploy*.
 Database schema changes are not reverted by a code rollback: apply the paired

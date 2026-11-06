@@ -77,6 +77,19 @@ npm run dev                     # یا: npm run build && npm start
 `npm run db:status` مهاجرت‌های اعمال‌شده/باقی‌مانده را نشان می‌دهد و `npm run db:migrate -- --dry-run`
 بدون تغییر پایگاه داده برنامه را چاپ می‌کند.
 
+## استقرار روی Netlify
+
+```bash
+npm run deploy:check                                       # تنظیمات مخزن + خروجی بیلد
+npm run deploy:check -- --url https://<site>.netlify.app   # + سنجش زندهٔ دیپلوی
+```
+
+خروجی `0` یعنی سالم، `1` یعنی مانع (با نام علت و راه‌حل)، `2` یعنی سنجش زنده ممکن نشد.
+این بررسی همان خطای «Page not found» سراسری را هم تشخیص می‌دهد: اگر
+`https://<site>/BUILD_ID` با ۲۰۰ جواب بدهد، یعنی خروجی خام `next build` منتشر شده و
+آداپتر Next اجرا نشده است. تنظیمات درست، مراحل بازیابی و چک‌لیست کامل:
+[`docs/NETLIFY-DEPLOY.md`](docs/NETLIFY-DEPLOY.md) · راهنمای استقرار: [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
 ## آزمون‌ها
 
 | فرمان | چه چیزی را می‌سنجد |
@@ -109,6 +122,7 @@ npm run dev                     # یا: npm run build && npm start
 | `npm run test:bundle` | بودجه‌ی gzip جاوااسکریپت هر مسیر (رچت ضد رگرسیون وزن صفحه) |
 | `npm run db:preflight` | پیش‌بررسی **فقط‌خواندنی** پایگاه پیش از مهاجرت: در انتظار، drift، یتیم مالکیت، لینک قدیمی |
 | `npm run db:share-audit` | بازبینی فقط‌خواندنی لینک‌های اشتراک و فهرست پروژه‌های «لینک قدیمی» (`--json` برای ماشین) |
+| `npm run deploy:check` | بررسی دیپلوی Netlify: تنظیمات مخزن + خروجی بیلد + (با `--url`) پاسخ زندهٔ سایت؛ اثر انگشت «خروجی خام `.next` منتشر شده» را هم تشخیص می‌دهد (۹ بررسی آفلاین، ۱۴ بررسی با سنجش زنده) |
 | `npm run build` | ساخت production |
 
 برای مجموعه یکپارچگی:

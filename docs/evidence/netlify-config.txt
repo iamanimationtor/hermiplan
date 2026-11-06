@@ -1,0 +1,25 @@
+# npm run deploy:check  (2026-11-06T10:47:19Z)
+HERMIPLAN — بررسی دیپلوی Netlify
+
+✓ دستور بیلد
+   npm run build → next build (خروجی کامل Next، نه next export)
+✓ پوشهٔ انتشار
+   publish = ".next" (مقدار مستندشده برای سایت Next.js)
+✓ آداپتر Next
+   «@netlify/plugin-nextjs» هم در netlify.toml و هم در package.json است.
+✓ نسخهٔ Node
+   NODE_VERSION = "22" و .nvmrc = "22"
+✓ وابستگی‌های بیلد
+   4 وابستگی لازم (typescript و …) در package.json هستند.
+✓ خروجی بیلد در گیت نیست
+   .next/ و .netlify/ در .gitignore هستند.
+✓ بخش [dev]
+   netlify dev روی پورت ۳۰۰۰ به اپ وصل می‌شود.
+✓ خروجی بیلد
+   BUILD_ID = b3y-lDNzNntVEYenftgOV
+✓ مسیرهای بیلد
+   20 مسیر در مانیفست، شامل / و APIها.
+
+همه‌چیز درست است · 0 هشدار · 9 بررسی
+
+EXIT=0

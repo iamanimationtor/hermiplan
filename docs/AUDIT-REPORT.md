@@ -159,6 +159,13 @@
 | ذخیره در پروژه، نسخه قبلی را **بی‌بازگشت** بازنویسی می‌کرد (خطای کاربر یا دو تب باز = از دست رفتن کار) | متوسط | `drizzle/0004_project_versions.sql`, `src/lib/server/project-versions*.ts`, `src/app/api/projects/[id]/versions/**` | تاریخچه نسخه‌های تغییرناپذیر + بازگردانی که خودش هم قابل بازگشت است؛ محدودیت تعداد/حجم | `api` §۴-ب (۴۷ بررسی) و §۴-د (۱۹ بررسی اعتبارسنجی)، `security` (۳۰ بررسی قاعده‌های خالص)، `db-integrity` §۵ | ✅ |
 | «تولید گزارش» در هر بار فشردن، پروژه‌ی تازه می‌ساخت (تکرار پروژه، بدون تاریخچه) | کم | `src/components/builder/BuilderApp.tsx` (`saveAndOpenReport`) | همان پروژه بازبینی می‌شود؛ در تعارض ۴۰۹ پیام روشن و بازگشت ایمن | `tsc` + `api` §۴-ب (۴۰۹) | ✅ |
 
+### ۱-۹. استقرار (Netlify)
+
+| ایراد | شدت | فایل یا ماژول | اقدام انجام‌شده | تست تأییدکننده | وضعیت |
+| --- | --- | --- | --- | --- | --- |
+| **همهٔ آدرس‌های سایت مستقر، ۴۰۴ خودِ Netlify را می‌دادند** («Page not found») در حالی که لاگ بیلد موفق بود | بحرانی (استقرار) | `netlify.toml`, `package.json`, `scripts/netlify-check.ts` (جدید), `docs/NETLIFY-DEPLOY.md` (جدید) | علت با شاهد مشخص شد: `/BUILD_ID` و `/app-path-routes-manifest.json` روی دامنه ۲۰۰ می‌دادند، یعنی **خروجی خام `next build`** به‌صورت استاتیک منتشر شده بود و Netlify Next.js runtime (آداپتر OpenNext) اجرا نشده بود؛ پس هیچ تابع و هیچ جدول مسیری وجود نداشت. آداپتر به‌صورت صریح pin شد (بلوک `[[plugins]]` + `@netlify/plugin-nextjs@5.16.6` در devDependencies)، `[dev]` اضافه شد، و `npm run deploy:check` ساخته شد که همین اثر انگشت را در ۱۴ بررسی زنده تشخیص می‌دهد | `docs/evidence/netlify-config.txt` (۹ بررسی، خروجی ۰) و `docs/evidence/netlify-live.txt` (سنجش زندهٔ دامنه + کنترل «Site not found») | ✅ |
+| راهنمای استقرار، pin کردن آداپتر را **ممنوع** می‌کرد؛ همان توصیه در این سایت شکست خورد | متوسط (مستندات) | `DEPLOYMENT.md` §۲، §۸، §۹ | مرحله‌ها بازنویسی شد: base directory خالی، آداپتر pin‌شده و دلیلش، ممنوعیت `netlify deploy --dir=.next`، الزام نصب devDependencies، و ردیف تازهٔ «۴۰۴ سراسری» در جدول خطاها | `npm run deploy:check` + بازبینی متن | ✅ |
+
 ---
 
 ## ۲. تغییرات معماری
@@ -304,7 +311,7 @@
 
 | کلید | الزامی | رفتار در نبود مقدار |
 | --- | --- | --- |
-| `DATABASE_URL` | ✅ در production | مسیرهای دادابیس ۵۰۰ روشن می‌دهند؛ سایت بیلد و صفحات ایستا کار می‌کنند |
+| `DATABASE_URL` | ✅ در production | `/api/health` و مسیرهای پایگاه‌داده **۵۰۳ `database_unconfigured`** با پیام فارسی که نام متغیر را می‌گوید؛ بیلد و صفحات بدون پایگاه کار می‌کنند |
 | `DATABASE_SSL` / `DATABASE_POOL_MAX` | ✖ | TLS خودکار برای `sslmode=require`؛ pool = ۳ در production |
 | `SMS_PROVIDER_KEY` / `SMS_PROVIDER` / `SMS_OTP_TEMPLATE` | ✖ (برای ورود) | ورود با موبایل ۵۰۳؛ بقیه امکانات بدون ورود کار می‌کند |
 | `HERMIPLAN_ALLOW_DEMO_OTP` | ✖ | فقط خارج از production و با مقدار `1` |
@@ -315,12 +322,14 @@
 
 ### مراحل استقرار (Netlify + PostgreSQL)
 
-1. مخزن را به Netlify وصل کنید؛ `netlify.toml` (build = `npm run build`) و `.nvmrc` (22) موجود است.
+1. مخزن را به Netlify وصل کنید؛ `netlify.toml` (build = `npm run build`، publish = `.next`، آداپتر `@netlify/plugin-nextjs` صریحاً تعریف‌شده) و `.nvmrc` (22) موجود است. Base directory را خالی بگذارید و هرگز با `netlify deploy --dir=.next` منتشر نکنید (جزئیات: `docs/NETLIFY-DEPLOY.md`).
 2. `DATABASE_URL` را با scope **Functions** تنظیم کنید (endpoint تجمیعی توصیه می‌شود).
 3. مهاجرت را **دستی و یک‌بار** اجرا کنید: `npm run db:status` سپس `npm run db:migrate`
    (پیش از آن `pg_dump`). این کار در بیلد انجام نمی‌شود.
-4. پس از استقرار: `curl /api/health` باید `ok:true` و `schemaVersion` جاری را برگرداند
-   (در نبود مهاجرت ۵۰۳ + `missingTables` می‌دهد).
+4. پس از استقرار: `npm run deploy:check -- --url https://<site>` (باید ۰ برگردد) و
+   `curl /api/health` باید `ok:true` و `schemaVersion` جاری را برگرداند
+   (در نبود مهاجرت ۵۰۳ + `missingTables`، در نبود `DATABASE_URL` ۵۰۳ + `database_unconfigured`).
+   `/BUILD_ID` باید **۴۰۴** باشد؛ ۲۰۰ یعنی خروجی خام بیلد منتشر شده و آداپتر اجرا نشده.
 5. پیش از اطلاع‌رسانی انتشار: `npm run db:share-audit` را اجرا و پروژه‌های «لینک قدیمی»
    (منتشرشده پیش از `0003`) را فهرست کنید؛ لینک UUID قدیمی آن‌ها دیگر کار نمی‌کند و باید
    لینک تازه صادر شود.
