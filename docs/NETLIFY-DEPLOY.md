@@ -96,6 +96,10 @@ SMS_PROVIDER_KEY=…                     # اختیاری؛ بدون آن ورو
 **راه درست (توصیه‌شده):** مخزن را در پنل وصل کنید؛ هر push به شاخهٔ تولید
 خودش بیلد و دیپلوی می‌شود و آداپتر با همان `netlify.toml` اجرا می‌شود.
 
+**راه قطعی‌تر (مستقل از تشخیص پنل):** ورک‌فلوی GitHub Actions این مخزن
+(`.github/workflows/deploy.yml`) که با `netlify deploy --build --prod` منتشر
+می‌کند — بند ۷.
+
 **با Netlify CLI:**
 
 ```bash
@@ -173,7 +177,45 @@ curl -s -o /dev/null -w "%{http_code}\n" https://hermiplan.netlify.app/BUILD_ID 
 
 ---
 
-## ۷. اگر باز هم ۴۰۴ دیدید
+## ۷. دیپلوی خودکار از GitHub Actions (بدون تکیه بر تشخیص پنل)
+
+اگر بخواهید انتشار مستقل از تنظیمات پنل باشد، ورک‌فلوی
+`.github/workflows/deploy.yml` در همین مخزن هست:
+
+- روی هر push به `main` (و اجرای دستی) اجرا می‌شود؛
+- ابتدا گیت‌های ایستا را می‌زند (`tsc`، `eslint`، `npm test`)؛
+- بعد با مسیر رسمی CLI منتشر می‌کند: `netlify deploy --build --prod`
+  — همین مسیر، بیلد **و** آداپتر pin‌شده را اجرا می‌کند، پس مسیر‌دهی درست
+  ساخته می‌شود (برخلاف `--dir=.next` که همان ۴۰۴ را می‌سازد)؛
+- در پایان `npm run deploy:check -- --url …` را اجرا می‌کند تا اگر سایت
+  جواب درست نداد، همان‌جا با شکست مواجه شود.
+
+فعال‌سازی (یک‌بار):
+
+```
+Settings → Secrets and variables → Actions
+  NETLIFY_AUTH_TOKEN = <Netlify → User settings → Applications → Personal access tokens>
+  NETLIFY_SITE_ID    = <Netlify → Site configuration → Site information → Site ID>
+  (اختیاری) Variables → SITE_URL = https://<site>.netlify.app
+```
+
+تا وقتی این دو secret ست نشده‌اند، ورک‌فلو **شکست نمی‌خورد**؛ با یک notice
+رد می‌شود، تا pushها قرمز نشوند.
+
+> صداقت: خود این محیط به `*.netlify.app` و به حساب Netlify شما دسترسی ندارد،
+> پس اجرای واقعی این ورک‌فلو از اینجا آزموده نشده است. YAML آن lint شده و
+> دستورهایش همان‌هایی هستند که در همین سند توصیه شده‌اند؛ اولین اجرای واقعی
+> را در تب Actions ببینید.
+
+معادل دستی روی ماشین خودتان (بدون Actions):
+
+```bash
+npm ci
+npx netlify-cli link          # یک‌بار، انتخاب سایت
+npx netlify-cli deploy --build --prod
+```
+
+## ۸. اگر باز هم ۴۰۴ دیدید
 
 1. `npm run deploy:check -- --url https://hermiplan.netlify.app` را اجرا کنید؛
    پیام‌ها دقیقاً می‌گویند کدام حلقهٔ زنجیره شکسته است.
@@ -192,8 +234,9 @@ curl -s -o /dev/null -w "%{http_code}\n" https://hermiplan.netlify.app/BUILD_ID 
 
 ---
 
-## ۸. شواهد این پروژه
+## ۹. شواهد این پروژه
 
 - `docs/evidence/netlify-config.txt` — خروجی `npm run deploy:check` (تنظیمات و خروجی بیلد)
 - `docs/evidence/netlify-live.txt` — سنجش زندهٔ دامنه، با ثبت همان اثر انگشت
   `raw_next_publish` که علت را نشان داد
+- `.github/workflows/deploy.yml` — مسیر انتشارِ مستقل از پنل (بند ۷)
