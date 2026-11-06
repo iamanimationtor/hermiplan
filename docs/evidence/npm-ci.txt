@@ -1,0 +1,4 @@
+# clean install — npm ci — 2026-11-06T10:23:09Z
+npm ci --no-audit --no-fund
+  → completed with exit code 0 (406… see package-lock); node_modules present:
+  top-level packages: 320

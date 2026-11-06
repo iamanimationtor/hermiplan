@@ -1,0 +1,208 @@
+/**
+ * HERMIPLAN — Content-Security-Policy verification.
+ *
+ * This is not a browser test (no browser is available in this environment), and
+ * it is not claimed to be one. What it *does* prove, against a running server:
+ *
+ *  1. every document response carries a CSP header;
+ *  2. the policy has no `'unsafe-inline'` / `'unsafe-eval'` in `script-src`;
+ *  3. every inline `<script>` in the served HTML carries the nonce from the
+ *     same response's header (so the policy does not block the app's own
+ *     bootstrap);
+ *  4. every external origin referenced by the markup (fonts, styles, images,
+ *     connect targets) is allowed by the policy — i.e. the policy does not
+ *     silently break resources the page loads;
+ *  5. `frame-ancestors`, `object-src`, `base-uri` and `form-action` are locked
+ *     down.
+ *
+ * Usage: BASE_URL=http://127.0.0.1:3200 npx tsx scripts/csp-check.ts
+ */
+import { request } from "node:http";
+
+const BASE = process.env.BASE_URL ?? "http://127.0.0.1:3200";
+const PATHS = (process.env.CSP_PATHS ?? "/,/builder").split(",").filter(Boolean);
+/** Optional cookie header, so owner-only and token-only routes can be checked. */
+const COOKIE = process.env.CSP_COOKIE ?? "";
+
+let checks = 0;
+let failures = 0;
+
+function check(condition: boolean, message: string, detail?: string) {
+  checks += 1;
+  if (!condition) {
+    failures += 1;
+    console.error(`  ✗ ${message}${detail ? ` — ${detail}` : ""}`);
+  }
+}
+
+interface Fetched {
+  status: number;
+  headers: Record<string, string | string[] | undefined>;
+  body: string;
+}
+
+function fetchPath(path: string): Promise<Fetched> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(path, BASE);
+    const req = request(
+      {
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname + url.search,
+        method: "GET",
+        headers: { accept: "text/html", ...(COOKIE ? { cookie: COOKIE } : {}) },
+      },
+      (res) => {
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => (body += chunk));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body }));
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+/** Splits a CSP header into directive → sources. */
+function parseCsp(header: string): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const part of header.split(";")) {
+    const tokens = part.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) continue;
+    map.set(tokens[0].toLowerCase(), tokens.slice(1));
+  }
+  return map;
+}
+
+function originOf(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+async function main() {
+  if (PATHS.length === 0) {
+    // An empty CSP_PATHS must never look like a pass: only the two nonce checks
+    // would run, so a broken route list would go unnoticed.
+    console.error("CSP_PATHS is empty — refusing to report a passing run.");
+    process.exit(2);
+  }
+  for (const path of PATHS) {
+    console.log(`▶ ${path}`);
+    const page = await fetchPath(path);
+    // A route may legitimately answer 404 (unknown token / foreign project):
+    // what matters is that *every* response carries the policy, so 404 is only
+    // accepted when the path is explicitly marked as expected to be missing.
+    const expected = Number(process.env.CSP_EXPECT_404?.split(",").includes(path) ? 404 : 200);
+    check(page.status === expected, `${path} با کد ${expected} پاسخ می‌دهد`, `status=${page.status}`);
+
+    const rawCsp = page.headers["content-security-policy"];
+    const csp = Array.isArray(rawCsp) ? rawCsp[0] : rawCsp;
+    check(Boolean(csp), `${path} هدر Content-Security-Policy دارد`);
+    if (!csp) continue;
+
+    const directives = parseCsp(csp);
+    const scriptSrc = directives.get("script-src") ?? [];
+    check(!scriptSrc.includes("'unsafe-inline'"), "script-src بدون 'unsafe-inline' است", scriptSrc.join(" "));
+    check(!scriptSrc.includes("'unsafe-eval'"), "script-src بدون 'unsafe-eval' است", scriptSrc.join(" "));
+    check(directives.get("object-src")?.[0] === "'none'", "object-src مسدود است");
+    check(directives.get("base-uri")?.[0] === "'self'", "base-uri محدود به self است");
+    check(directives.get("form-action")?.[0] === "'self'", "form-action محدود به self است");
+    check(directives.get("frame-ancestors")?.[0] === "'none'", "frame-ancestors مسدود است");
+
+    const nonceToken = scriptSrc.find((token) => token.startsWith("'nonce-"));
+    check(Boolean(nonceToken), "script-src دارای nonce است");
+    const nonce = nonceToken?.replace(/^'nonce-/, "").replace(/'$/, "") ?? "";
+
+    // 3. every inline script carries this response's nonce
+    const scriptTags = page.body.match(/<script\b[^>]*>/gi) ?? [];
+    const inlineScripts = scriptTags.filter((tag) => !/\bsrc=/i.test(tag));
+    const unnonced = inlineScripts.filter((tag) => !tag.includes(`nonce="${nonce}"`));
+    check(
+      unnonced.length === 0,
+      "همه اسکریپت‌های inline همان nonce پاسخ را دارند (سیاست، خود اپ را نمی‌شکند)",
+      unnonced.length ? `${unnonced.length} از ${inlineScripts.length} بدون nonce` : `${inlineScripts.length} اسکریپت inline`,
+    );
+
+    // 4. external origins referenced by the markup must be allowed
+    const origins = new Set<string>();
+    for (const match of page.body.matchAll(/(?:href|src)="(https?:\/\/[^"]+)"/g)) {
+      const origin = originOf(match[1]);
+      if (origin && origin !== new URL(BASE).origin) origins.add(origin);
+    }
+    const styleSrc = directives.get("style-src") ?? [];
+    const fontSrc = directives.get("font-src") ?? [];
+    const imgSrc = directives.get("img-src") ?? [];
+    for (const origin of origins) {
+      const allowed = [...styleSrc, ...fontSrc, ...imgSrc].includes(origin);
+      check(allowed, `منبع بیرونی ${origin} در سیاست مجاز است`);
+    }
+    if (origins.size === 0) check(true, "هیچ منبع بیرونی در HTML صفحه فراخوانی نمی‌شود");
+
+    // A stylesheet-level @import is a second way to pull in a third-party
+    // origin; it must also be covered by the policy. (The webfont is
+    // self-hosted now, so this is normally empty — the check stays as a guard.)
+    const cssOrigin = (page.body.match(/@import\s+url\("?(https?:\/\/[^")]+)/) ?? [])[1];
+    if (cssOrigin) {
+      const origin = originOf(cssOrigin);
+      check(
+        Boolean(origin && (styleSrc.includes(origin) || fontSrc.includes(origin))),
+        "CDN فونت در style-src/font-src مجاز شمرده شده است",
+        cssOrigin,
+      );
+    }
+
+    /*
+     * Report and share routes carry contract/cost data behind a secret URL, so
+     * the policy is half of the contract: the response must also refuse
+     * indexing, caching and referrer leakage — and a 404 on these paths must
+     * carry the same headers as a 200, otherwise an unknown token becomes a
+     * distinguishable response.
+     */
+    if (path.startsWith("/report") || path.startsWith("/s/")) {
+      const robots = String(page.headers["x-robots-tag"] ?? "");
+      const cache = String(page.headers["cache-control"] ?? "");
+      const referrer = String(page.headers["referrer-policy"] ?? "");
+      check(/noindex/i.test(robots), `${path} هدر noindex دارد`, robots);
+      check(/no-store/i.test(cache), `${path} کش نمی‌شود`, cache);
+      if (path.startsWith("/s/")) {
+        check(referrer === "no-referrer", `${path} referrer را لو نمی‌دهد`, referrer);
+      }
+    }
+  }
+
+  /*
+   * The nonce is the whole point of the policy: it must differ on every
+   * response. Two identical nonces would mean the header was computed once at
+   * build time, and the inline scripts would become forgeable.
+   */
+  const first = await fetchPath(PATHS[0] ?? "/");
+  const second = await fetchPath(PATHS[0] ?? "/");
+  const nonceOf = (page: Fetched): string => {
+    const header = Array.isArray(page.headers["content-security-policy"])
+      ? page.headers["content-security-policy"][0]
+      : page.headers["content-security-policy"];
+    return (String(header ?? "").match(/'nonce-([^']+)'/) ?? [])[1] ?? "";
+  };
+  const firstNonce = nonceOf(first);
+  const secondNonce = nonceOf(second);
+  check(Boolean(firstNonce) && Boolean(secondNonce), "دو پاسخ متوالی هر دو nonce دارند");
+  check(
+    firstNonce !== secondNonce,
+    "nonce در هر درخواست یکتاست",
+    `${firstNonce.slice(0, 8)}… / ${secondNonce.slice(0, 8)}…`,
+  );
+
+  console.log(
+    failures === 0
+      ? `\n✔ ${checks} بررسی CSP — همه موفق\n  سیاست بررسی‌شده، نه آزمون مرورگری: اجرای واقعی مرورگر همچنان کار باز است.`
+      : `\n✘ ${failures} خطا از ${checks} بررسی CSP`,
+  );
+  process.exit(failures === 0 ? 0 : 1);
+}
+
+void main();

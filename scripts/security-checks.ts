@@ -1,0 +1,315 @@
+/**
+ * Unit checks for the security helpers that do not need a browser or a database.
+ *
+ * Run: npm run test:security
+ */
+import { parsePhone, normalizePhone, toAsciiDigits } from "../src/lib/server/phone";
+import { demoOtpAllowed, readSmsConfig } from "../src/lib/server/sms";
+import { generateOtp, hashOtp, MAX_OTP_ATTEMPTS, OTP_LENGTH } from "../src/lib/server/otp";
+import { checkRateLimit, clientIp } from "../src/lib/server/rate-limit";
+import { isSameOriginRequest, isUuid } from "../src/lib/server/http";
+import { describeShareState } from "../src/lib/share-status";
+import {
+  canonicalJson,
+  checksumOf,
+  byteSizeOf,
+  HISTORY_LIMIT,
+  HISTORY_BYTES_LIMIT,
+  KEEP_AT_LEAST,
+  planPrune,
+  versionReasonLabel,
+} from "../src/lib/server/project-versions-core";
+import {
+  generateShareToken,
+  hashShareToken,
+  SHARE_TOKEN_BYTES,
+  SHARE_TOKEN_RE,
+} from "../src/lib/server/share-token-core";
+
+let failures = 0;
+let checks = 0;
+const check = (condition: boolean, message: string, detail?: string) => {
+  checks += 1;
+  if (!condition) {
+    failures += 1;
+    console.error(`  ✗ ${message}${detail ? ` — ${detail}` : ""}`);
+  }
+};
+const eq = (actual: unknown, expected: unknown, message: string) =>
+  check(actual === expected, message, `got ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`);
+
+/* ================================================================== */
+console.log("▶ ۱. نرمال‌سازی شماره موبایل");
+{
+  const canonical = "09123456789";
+  const accepted = [
+    "09123456789",
+    "0912 345 6789",
+    "0912-345-6789",
+    "۰۹۱۲۳۴۵۶۷۸۹", // Persian digits
+    "٠٩١٢٣٤٥٦٧٨٩", // Arabic-Indic digits
+    "+989123456789",
+    "+98 912 345 6789",
+    "00989123456789",
+    "0098-912-345-6789",
+    "989123456789",
+    "9123456789",
+    " 09123456789 ",
+    "(0912) 345-6789",
+  ];
+  for (const input of accepted) {
+    eq(normalizePhone(input), canonical, `پذیرش قالب «${input}»`);
+  }
+
+  const rejected = [
+    "",
+    "۰۹۱۲۳", // too short
+    "0912345678", // 10 digits
+    "091234567890", // 12 digits
+    "+1 202 555 0143", // foreign
+    "0912abc6789",
+    "++989123456789",
+    "0091234567891",
+  ];
+  for (const input of rejected) {
+    eq(normalizePhone(input), null, `رد قالب نامعتبر «${input}»`);
+  }
+
+  eq(toAsciiDigits("۱۲۳۴۵۶۷۸۹۰"), "1234567890", "تبدیل ارقام فارسی");
+  eq(toAsciiDigits("١٢٣٤٥٦٧٨٩٠"), "1234567890", "تبدیل ارقام عربی");
+  const parsed = parsePhone("+98 912 000 0000");
+  check(parsed.ok, "parsePhone نتیجه ساختاری برمی‌گرداند");
+}
+
+/* ================================================================== */
+console.log("▶ ۲. تولید و هش OTP");
+{
+  const codes = new Set<string>();
+  for (let i = 0; i < 200; i += 1) {
+    const code = generateOtp();
+    check(new RegExp(`^\\d{${OTP_LENGTH}}$`).test(code), `کد ${OTP_LENGTH} رقمی است`, code);
+    codes.add(code);
+  }
+  check(codes.size > 150, "کدها تصادفی‌اند (بدون تکرار انبوه)", `unique=${codes.size}/200`);
+  eq(hashOtp("12345"), hashOtp("12345"), "هش OTP قطعی است");
+  check(hashOtp("12345") !== hashOtp("12346"), "هش کدهای متفاوت، متفاوت است");
+  check(!hashOtp("12345").includes("12345"), "کد خام در هش قابل مشاهده نیست");
+  eq(MAX_OTP_ATTEMPTS, 5, "حداکثر تلاش مجاز = ۵");
+}
+
+/* ================================================================== */
+console.log("▶ ۳. پیکربندی پیامک و حالت نمایشی");
+{
+  const noConfig = readSmsConfig({} as NodeJS.ProcessEnv);
+  eq(noConfig.configured, false, "بدون SMS_PROVIDER_KEY: پیکربندی ناقص است");
+
+  const kavenegar = readSmsConfig({
+    SMS_PROVIDER_KEY: "k",
+    SMS_PROVIDER: "kavenegar",
+    SMS_OTP_TEMPLATE: "hermiplan",
+  } as unknown as NodeJS.ProcessEnv);
+  eq(kavenegar.configured, true, "کاوه‌نگار با کلید و قالب، پیکربندی‌شده است");
+
+  const missingTemplate = readSmsConfig({
+    SMS_PROVIDER_KEY: "k",
+    SMS_PROVIDER: "kavenegar",
+  } as unknown as NodeJS.ProcessEnv);
+  eq(missingTemplate.configured, false, "قالب پیامک اجباری است (ارسال verify بدون قالب ممکن نیست)");
+
+  eq(
+    demoOtpAllowed({ NODE_ENV: "production", HERMIPLAN_ALLOW_DEMO_OTP: "1" } as unknown as NodeJS.ProcessEnv),
+    false,
+    "حالت نمایشی در محیط production هرگز فعال نمی‌شود",
+  );
+  eq(
+    demoOtpAllowed({ NODE_ENV: "development", HERMIPLAN_ALLOW_DEMO_OTP: "1" } as unknown as NodeJS.ProcessEnv),
+    true,
+    "حالت نمایشی در توسعه با فعال‌سازی صریح مجاز است",
+  );
+  eq(
+    demoOtpAllowed({ NODE_ENV: "development" } as unknown as NodeJS.ProcessEnv),
+    false,
+    "حالت نمایشی بدون فعال‌سازی صریح غیرفعال است",
+  );
+}
+
+/* ================================================================== */
+console.log("▶ ۴. محافظت CSRF (هم‌مبدأ بودن درخواست)");
+{
+  const makeRequest = (headers: Record<string, string>) =>
+    new Request("https://hermiplan.example/api/projects", { method: "POST", headers });
+
+  check(isSameOriginRequest(makeRequest({ host: "hermiplan.example" })), "درخواست بدون Origin مجاز است");
+  check(
+    isSameOriginRequest(makeRequest({ host: "hermiplan.example", origin: "https://hermiplan.example" })),
+    "Origin هم‌مبدأ مجاز است",
+  );
+  check(
+    !isSameOriginRequest(makeRequest({ host: "hermiplan.example", origin: "https://evil.example" })),
+    "Origin متفاوت رد می‌شود",
+  );
+  check(
+    !isSameOriginRequest(makeRequest({ host: "hermiplan.example", "sec-fetch-site": "cross-site" })),
+    "Sec-Fetch-Site=cross-site رد می‌شود",
+  );
+  check(
+    isSameOriginRequest(makeRequest({ host: "hermiplan.example", "sec-fetch-site": "same-origin" })),
+    "Sec-Fetch-Site=same-origin مجاز است",
+  );
+  check(!isSameOriginRequest(makeRequest({ host: "a.example", origin: "not-a-url" })), "Origin نامعتبر رد می‌شود");
+}
+
+/* ================================================================== */
+console.log("▶ ۵. اعتبارسنجی شناسه و استخراج IP");
+{
+  check(isUuid("3f0c1a9e-6b1c-4a43-9f0e-0f0d3a1b2c3d"), "UUID معتبر پذیرفته می‌شود");
+  check(!isUuid("../etc/passwd"), "ورودی غیر UUID رد می‌شود");
+  check(!isUuid("3f0c1a9e6b1c4a439f0e0f0d3a1b2c3d"), "UUID بدون خط تیره رد می‌شود");
+
+  const request = new Request("https://x.example/api", {
+    headers: { "x-forwarded-for": "203.0.113.9, 10.0.0.1" },
+  });
+  eq(clientIp(request), "203.0.113.9", "اولین IP زنجیره X-Forwarded-For استفاده می‌شود");
+}
+
+/* ================================================================== */
+async function main() {
+  console.log("▶ ۶. محدودکننده نرخ (حالت جایگزین حافظه‌ای)");
+  {
+    /**
+     * The documented in-memory fallback is only reachable when no database is
+     * configured. `npm test` must behave identically whether or not the caller
+     * happens to have DATABASE_URL exported — earlier this block failed only
+     * when a developer ran the suite with that variable set. The environment is
+     * therefore made explicit for the duration of the check and restored after.
+     */
+    const savedUrl = process.env.DATABASE_URL;
+    delete process.env.DATABASE_URL;
+    try {
+      const key = `test:${Date.now()}`;
+      const rule = { limit: 3, windowMs: 60_000 };
+      const results = [];
+      for (let i = 0; i < 4; i += 1) results.push(await checkRateLimit(key, rule));
+      check(results[0].allowed && results[1].allowed && results[2].allowed, "سه درخواست اول مجاز است");
+      check(!results[3].allowed, "درخواست چهارم رد می‌شود");
+      check(results[3].retryAfterSeconds > 0, "زمان تلاش مجدد گزارش می‌شود");
+      check(results[3].degraded === true, "نبود دیتابیس به‌صورت degraded اعلام می‌شود");
+    } finally {
+      if (savedUrl === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = savedUrl;
+    }
+  }
+
+  /* ---------------- share tokens (256-bit, hashed at rest) ---------------- */
+  console.log("\n▶ توکن اشتراک گزارش");
+  {
+    const token = generateShareToken();
+    check(SHARE_TOKEN_RE.test(token), "توکن با ۴۳ نویسه base64url ساخته می‌شود", token);
+    check(SHARE_TOKEN_BYTES === 32, "آنتروپی توکن ۲۵۶ بیت است");
+    check(!/[/+=]/.test(token), "توکن نویسه‌های ناسازگار با URL ندارد (بدون نیاز به escape)");
+
+    // 1000 draws must all be distinct (a CSPRNG collision here would mean a
+    // predictable generator, which is the actual failure mode we care about).
+    const drawn = new Set(Array.from({ length: 1000 }, () => generateShareToken()));
+    check(drawn.size === 1000, "۱۰۰۰ توکن پیاپی همه یکتا هستند");
+
+    const hash = hashShareToken(token);
+    check(/^[0-9a-f]{64}$/.test(hash), "هش SHA-256 در قالب ۶۴ نویسه هگز است");
+    check(hash === hashShareToken(token), "هش قطعی است (جست‌وجو با تساوی روی هش)");
+    check(hash !== token, "هش با توکن یکسان نیست (توکن خام ذخیره نمی‌شود)");
+    check(hashShareToken(token + "x") !== hash, "تغییر یک نویسه، هش را کاملاً عوض می‌کند");
+
+    // The database stores only the digest, so these are the only accepted shapes.
+    check(!SHARE_TOKEN_RE.test("x".repeat(42)), "توکن کوتاه‌تر رد می‌شود");
+    check(!SHARE_TOKEN_RE.test("x".repeat(44)), "توکن بلندتر رد می‌شود");
+    check(!SHARE_TOKEN_RE.test("../../etc/passwd"), "ورودی مسیرگونه رد می‌شود");
+    check(!SHARE_TOKEN_RE.test("00000000-0000-4000-8000-000000000000"), "UUID به‌جای توکن پذیرفته نمی‌شود");
+  }
+
+  console.log("\n▶ وضعیت اشتراک در رابط کاربری (قاعده‌ی خالص)");
+  {
+    const active = describeShareState(true, [{ active: true }]);
+    check(active.kind === "shared" && active.activeCount === 1, "لینک فعال ⇒ وضعیت «اشتراک»");
+    check(active.notice === null, "در وضعیت سالم هیچ هشداری نشان داده نمی‌شود");
+
+    const legacy = describeShareState(true, [{ active: false }, { active: false }]);
+    check(legacy.kind === "legacy-inactive", "پرچم عمومی بدون لینک فعال ⇒ «لینک قدیمی غیرفعال»");
+    check(legacy.activeCount === 0, "لینک باطل‌شده فعال شمرده نمی‌شود");
+    check(legacy.notice !== null && legacy.notice.includes("لینک تازه"), "هشدار، راه‌حل (ساخت لینک تازه) را می‌گوید");
+    check(legacy.badge.includes("غیرفعال"), "نشان وضعیت، غیرفعال‌بودن را صریح می‌گوید");
+
+    const privateState = describeShareState(false, []);
+    check(privateState.kind === "private", "بدون انتشار ⇒ «خصوصی»");
+    check(privateState.notice === null, "پروژه خصوصی هشدار لینک قدیمی نمی‌گیرد");
+
+    // A legacy project that gets a fresh link must lose the warning immediately.
+    const recovered = describeShareState(true, [{ active: false }, { active: true }]);
+    check(recovered.kind === "shared" && recovered.notice === null, "صدور لینک تازه هشدار را برمی‌دارد");
+  }
+
+  /* ---------------- revision history: pure rules ---------------- */
+  console.log("\n▶ تاریخچه نسخه‌ها: قاعده‌های خالص");
+
+  const sampleInput = {
+    meta: { name: "الف", startDate: "2026-01-01" },
+    activities: [{ id: "a1", predecessors: [{ predecessorId: "a0", type: "FS", lag: 0 }] }],
+  } as unknown as Parameters<typeof checksumOf>[0];
+
+  // Key order must not create a new revision.
+  const reordered = {
+    activities: sampleInput.activities,
+    meta: { startDate: "2026-01-01", name: "الف" },
+  } as unknown as Parameters<typeof checksumOf>[0];
+  eq(checksumOf(sampleInput, null), checksumOf(reordered, null), "ترتیب کلیدها checksum را تغییر نمی‌دهد");
+  check(checksumOf(sampleInput, null) !== checksumOf(sampleInput, { sections: [] } as never), "گزینه‌های گزارش در checksum اثر دارند");
+  check(/^[0-9a-f]{64}$/.test(checksumOf(sampleInput, null)), "checksum یک هش SHA-256 است");
+  check(canonicalJson({ b: 1, a: [2, { d: 4, c: 3 }] }) === '{"a":[2,{"c":3,"d":4}],"b":1}', "سریال‌سازی متعارف، کلیدها را در هر عمق مرتب می‌کند");
+  check(canonicalJson({ a: undefined, b: 1 }) === '{"b":1}', "کلید undefined حذف می‌شود");
+  check(byteSizeOf(sampleInput, null) > 0, "اندازه بایت محاسبه می‌شود");
+  check(
+    byteSizeOf(sampleInput, null) ===
+      Buffer.byteLength(canonicalJson({ input: sampleInput, reportOptions: null }), "utf8"),
+    "اندازه بایت با فرم متعارف هم‌خوان است",
+  );
+
+  eq(versionReasonLabel("create"), "ایجاد پروژه", "برچسب «ایجاد»");
+  eq(versionReasonLabel("restore"), "بازگردانی‌شده", "برچسب «بازگردانی»");
+  eq(versionReasonLabel("pre-restore"), "وضعیت پیش از بازگردانی", "برچسب «پیش از بازگردانی»");
+  eq(versionReasonLabel("autosave"), "ذخیره ویرایش", "برچسب «ذخیره ویرایش»");
+  eq(versionReasonLabel("unknown-thing"), "تغییر", "علت ناشناس، برچسب عمومی می‌گیرد");
+
+  check(HISTORY_LIMIT >= 3 && HISTORY_LIMIT <= 100, "سقف تعداد نسخه در بازه مجاز است", String(HISTORY_LIMIT));
+  check(HISTORY_BYTES_LIMIT >= 512 * 1024, "سقف بایتی حداقل ۵۱۲ کیلوبایت است", String(HISTORY_BYTES_LIMIT));
+  eq(KEEP_AT_LEAST, 3, "حداقل سه نسخه هرگز حذف نمی‌شوند");
+
+  const revisions = Array.from({ length: 5 }, (_, index) => ({ version: 5 - index, sizeBytes: 100 }));
+  eq(planPrune(revisions, 3, 10_000).length, 2, "هرس بر اساس تعداد: دو نسخه قدیمی حذف می‌شود");
+  eq(planPrune(revisions, 10, 10_000).length, 0, "داخل بودجه: هیچ حذفی");
+  check(
+    planPrune(revisions, 10, 250).every((version) => version <= 2),
+    "هرس بر اساس حجم، از قدیمی‌ترین نسخه‌های اضافی شروع می‌شود",
+  );
+  const heavy = [
+    { version: 3, sizeBytes: 10_000_000 },
+    { version: 2, sizeBytes: 10_000_000 },
+    { version: 1, sizeBytes: 10_000_000 },
+  ];
+  eq(planPrune(heavy, 10, 100).length, 0, "حتی با حجم بیش از سقف، سه نسخه آخر می‌مانند");
+  const fourHeavy = [{ version: 4, sizeBytes: 9_000_000 }, ...heavy];
+  eq(JSON.stringify(planPrune(fourHeavy, 10, 100)), "[1]", "با چهار نسخه سنگین، فقط قدیمی‌ترین حذف می‌شود");
+  eq(planPrune([], 10, 10_000).length, 0, "تاریخچه خالی، حذفی ندارد");
+}
+
+main()
+  .then(() => {
+    console.log(
+      failures === 0
+        ? `\n✔ ${checks} بررسی امنیتی — همه موفق`
+        : `\n✘ ${failures} خطا از ${checks} بررسی امنیتی`,
+    );
+    process.exit(failures === 0 ? 0 : 1);
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

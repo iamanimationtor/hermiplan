@@ -1,0 +1,83 @@
+# HERMIPLAN — Netlify configuration
+#
+# Docs: https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/
+# Checklist + failure modes: docs/NETLIFY-DEPLOY.md
+# Verify this file and a live deploy: npm run deploy:check -- --url https://<site>.netlify.app
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# Why the adapter is pinned
+# ─────────────────────────────────────────────────────────────────────────────
+# A plain `next build` only produces build output. It does NOT produce the
+# serverless function and the routing table that make `/`, `/builder` and
+# `/api/*` answer at all. That job belongs to Netlify's Next.js runtime
+# (`@netlify/plugin-nextjs`, the OpenNext adapter).
+#
+# Without the adapter the deploy still "succeeds" and then every URL on the
+# site returns Netlify's own "Page not found" page, because the published
+# `.next` folder contains BUILD_ID and manifests but no index.html and no
+# function that could handle a request. That exact failure happened to this
+# site on 2026-11-06.
+#
+# Netlify normally attaches the adapter automatically through framework
+# detection. Listing it here (and in package.json) makes it explicit and
+# reproducible instead of implicit: it runs for `netlify build`, for
+# `netlify deploy --build`, and for a git-connected site, whatever the
+# dashboard's framework preset says. This is the pinning procedure from the
+# docs above; to go back to automatic updates, delete the `[[plugins]]` block
+# and remove `@netlify/plugin-nextjs` from package.json.
+#
+# Never deploy build output directly (`netlify deploy --dir=.next`): that
+# bypasses the adapter completely and is the other way to get this 404.
+#
+# Required environment variables are documented in DEPLOYMENT.md and
+# .env.example. Never place secrets in this file: values in netlify.toml
+# cannot reference environment variables, so they would be committed in plain
+# text. Configure them in the Netlify UI instead.
+
+[build]
+  command = "npm run build"   # → next build
+  publish = ".next"           # documented value for a Next.js site; the adapter provisions routing
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+  # Netlify runs `npm install` because only package-lock.json is committed.
+  # Dev dependencies must be installed: typescript, @types/* and the Tailwind
+  # PostCSS plugin are all needed by `next build`.
+  NPM_FLAGS = "--no-audit --no-fund"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# ---------------------------------------------------------------------------
+# Migrations
+# ---------------------------------------------------------------------------
+# Schema changes are run explicitly and manually — never as part of the site
+# build, so a deploy can never alter production data automatically:
+#   DATABASE_URL="postgres://…" npm run db:migrate
+# See DEPLOYMENT.md → "Production database and safe migrations".
+
+# ---------------------------------------------------------------------------
+# Deploy Previews
+# ---------------------------------------------------------------------------
+# Previews build the same way as production. Point them at a staging database
+# (or the same one) through the Netlify UI; the app itself needs no change.
+[context.deploy-preview]
+  command = "npm run build"
+
+# ---------------------------------------------------------------------------
+# Local development through the Netlify CLI (`netlify dev`)
+# ---------------------------------------------------------------------------
+[dev]
+  command = "npm run dev"
+  framework = "next"
+  port = 3000
+  targetPort = 3000
+
+# ---------------------------------------------------------------------------
+# Security headers / caching
+# ---------------------------------------------------------------------------
+# Headers are set in next.config.ts so they apply to every deployment target
+# (including local `next start`) and are inherited by the Netlify runtime.
+# Dynamic routes are all `force-dynamic`, so no public caching is configured
+# for user-specific responses.

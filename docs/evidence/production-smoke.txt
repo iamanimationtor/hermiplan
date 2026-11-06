@@ -1,0 +1,53 @@
+# production smoke — next start + real PostgreSQL — 2026-11-06T10:23:41Z
+
+## 1) the account door
+$ curl -s :3000/ | grep -o "ورود / ثبت‌نام"
+ورود / ثبت‌نام
+$ curl -s :3000/ | grep -o "builder?account=1"
+builder?account=1
+$ curl -s :3000/builder | grep -o "ورود / ثبت‌نام"
+ورود / ثبت‌نام
+
+## 2) account flow (username + password; no SMS provider on this host)
+POST /api/auth register                        201
+POST /api/auth login, UPPERCASE username       200   (username is case-insensitive)
+GET  /api/auth with the session cookie         200
+POST /api/auth login, wrong password           401
+POST /api/auth register, duplicate (any case)  409
+POST /api/auth from a foreign Origin           403
+POST /api/auth OTP request (no SMS key)        503
+
+## 3) project -> report with no cookie at all
+POST /api/projects                             201   id=03f3f2a7…  viewKey=issued
+GET  /report/<id>?k=<viewKey>   (no cookies)   200
+GET  /report/<id>               (no cookies)   404   existence is not confirmed
+GET  /report/<id>?k=<tampered>                 404
+
+## 4) security headers on /
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+content-security-policy: default-src 'self'; script-src 'self' 'nonce-ZmMwZmEwYTgtNzgxOS00MzRkLWE1MGEtMDhjMzIwZDU4ZGY2' 
+
+## 5) preview host (Host + X-Forwarded-Proto) is accepted
+GET /builder with preview headers: 200
+
+## 6) robots.txt and sitemap
+User-Agent: *
+Allow: /
+Allow: /builder
+Disallow: /api/
+Disallow: /report/
+Disallow: /s/
+
+Host: https://hermiplan.netlify.app
+Sitemap: https://hermiplan.netlify.app/sitemap.xml
+
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url>
+<loc>https://hermiplan.netlify.app/</loc>
+<lastmod>2026-11-06T10:04:37.876Z</lastmod>
+<changefreq>monthly</changefreq>

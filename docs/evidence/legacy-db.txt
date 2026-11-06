@@ -1,0 +1,74 @@
+# legacy database cycle (previous release schema → 0005 → rollback) — 2026-11-06T10:28:37Z
+
+## prepare
+▶ ساخت پایگاه داده نسخه قبلی (legacy) و درج داده‌های موجود
+  ✓ پایگاه داده برای سناریوی مهاجرت خالی است
+  وضعیت اولیه: {"projects":2,"users":1,"otps":1}
+  ✓ نسخه قبل: پیش‌فرض is_public برابر true است
+
+✔ مرحله «prepare» با 2 بررسی موفق
+
+## migrate
+  ✓ applied
+
+All migrations applied.
+
+## verify
+▶ تأیید مهاجرت روی پایگاه داده نسخه قبل (بدون از دست رفتن داده)
+  ✓ همه پروژه‌های قبلی باقی مانده‌اند
+  ✓ کاربران باقی مانده‌اند
+  ✓ کدهای OTP باقی مانده‌اند
+  ✓ نشست‌های فعال باقی مانده‌اند
+  ✓ انتشار تصادفی گذشته بسته شد (is_public = false)
+  ✓ انتشار ثبت‌شده در رخداد حفظ شد (is_public = true)
+  ✓ داده JSON پروژه بدون تغییر باقی مانده است
+  ✓ ستون attempts از text به integer تبدیل شد
+  ✓ مقدار شمارنده تلاش‌ها حفظ شد (۳)
+  ✓ ستون share_expires_at اضافه شد
+  ✓ جدول rate_limits ساخته شد
+  ✓ کلید خارجی مالکیت اضافه شد
+  ✓ کلید خارجی به‌صورت NOT VALID اضافه شد (داده معیوب قدیمی مهاجرت را نمی‌شکند)
+  ✓ ایندکس projects_owner_idx ساخته شد
+  ✓ ایندکس projects_updated_idx ساخته شد
+  ✓ ایندکس sessions_user_idx ساخته شد
+  ✓ ایندکس sessions_expires_idx ساخته شد
+  ✓ ایندکس otp_phone_created_idx ساخته شد
+  ✓ ایندکس project_events_project_kind_idx ساخته شد
+  ✓ ایندکس rate_limits_window_idx ساخته شد
+  ✓ دفتر مهاجرت همه فایل‌ها را ثبت کرد
+  ✓ جدول project_share_tokens ساخته شد
+  ✓ حذف پروژه، لینک‌های اشتراک آن را پاک می‌کند (CASCADE)
+  ✓ ایندکس یکتای هش توکن ساخته شد
+  ✓ مهاجرت ۰۰۰۳ هیچ پروژه‌ای را حذف نکرد
+  ✓ جدول project_versions ساخته شد
+  ✓ ستون projects.version با پیش‌فرض ۱ اضافه شد
+  ✓ ستون version اجباری است
+  ✓ پروژه‌های قدیمی از نسخه ۱ شروع می‌کنند
+  ✓ تاریخچه برای پروژه‌های قدیمی از پیش پر نمی‌شود (بی‌دلیل حجم داده دو برابر نمی‌شود)
+  ✓ حذف پروژه، تاریخچه آن را هم پاک می‌کند (CASCADE)
+
+✔ مرحله «verify» با 31 بررسی موفق
+
+## rollback
+▶ اجرای rollback رسمی 0004_project_versions.rollback.sql
+  ✓ rollback اجرا شد
+▶ اجرای rollback رسمی 0003_share_tokens.rollback.sql
+  ✓ rollback اجرا شد
+▶ اجرای rollback رسمی 0002_security_hardening.rollback.sql
+  ✓ rollback اجرا شد
+
+✔ مرحله «rollback» بدون خطا اجرا شد
+
+## verify-rollback
+▶ تأیید rollback: اسکیمای قبلی بازگشت و داده‌ها سالم ماندند
+  ✓ attempts به text بازگشت
+  ✓ جدول rate_limits حذف شد
+  ✓ پیش‌فرض is_public به مقدار قبلی بازگشت
+  ✓ پروژه‌ها در rollback حذف نشدند
+  ✓ rollback عمداً پروژه را دوباره عمومی نکرد (حفاظت از داده)
+  ✓ جدول لینک‌های اشتراک در rollback حذف شد
+  ✓ جدول تاریخچه در rollback حذف شد
+  ✓ ستون version حذف شد (کد نسخه قبلی بدون آن کار می‌کند)
+  ✓ بازگشت ۰۰۰۴ هیچ پروژه‌ای را حذف نکرد
+
+✔ مرحله «verify-rollback» با 9 بررسی موفق

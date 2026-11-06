@@ -1,0 +1,3 @@
+# eslint — 2026-11-06T10:46:42Z
+$ npx eslint . -f json
+files 120 · errors 0 · warnings 0

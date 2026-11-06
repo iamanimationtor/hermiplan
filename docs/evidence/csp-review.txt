@@ -1,0 +1,15 @@
+# CSP over real routes — 2026-10-31T16:17:02Z
+# CSP_PATHS=/,/builder,/report/3b1a6f84-140f-4e46-927d-ddd80caba0df,/s/17VZoUTiwyawS1iJGoFGRzJmd2Q9F6KxQnjRdQvFZXw,/s/Vxf-nAof7E-8UpXH1rXoXTPAdVHcyDZrJEjCEFs8w6Q,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
+# CSP_EXPECT_404=/s/Vxf-nAof7E-8UpXH1rXoXTPAdVHcyDZrJEjCEFs8w6Q,/s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,/report/00000000-0000-4000-8000-000000000000
+
+▶ /
+▶ /builder
+▶ /report/3b1a6f84-140f-4e46-927d-ddd80caba0df
+▶ /s/17VZoUTiwyawS1iJGoFGRzJmd2Q9F6KxQnjRdQvFZXw
+▶ /s/Vxf-nAof7E-8UpXH1rXoXTPAdVHcyDZrJEjCEFs8w6Q
+▶ /s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+▶ /report/00000000-0000-4000-8000-000000000000
+
+✔ 92 بررسی CSP — همه موفق
+  سیاست بررسی‌شده، نه آزمون مرورگری: اجرای واقعی مرورگر همچنان کار باز است.
+EXIT=0

@@ -1,0 +1,11 @@
+# BASE_URL=:3400 bash scripts/csp-real-routes.sh — 2026-10-31T16:35:57Z
+▶ /
+▶ /builder
+▶ /report/e8313f36-0a73-4ee2-bc56-fcd032288427
+▶ /s/JBdURlhgQTqcCVJyZqpbyHy-qdjwBuFA5lQk4te53JM
+▶ /s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+▶ /report/00000000-0000-4000-8000-000000000000
+
+✔ 78 بررسی CSP — همه موفق
+  سیاست بررسی‌شده، نه آزمون مرورگری: اجرای واقعی مرورگر همچنان کار باز است.
+share token under test: /s/JBdURlhgQTqcCVJyZqpbyHy-qdjwBuFA5lQk4te53JM

@@ -1,0 +1,54 @@
+# سنجش زندهٔ دامنه — https://hermiplan.netlify.app
+# تاریخ: ۲۰۲۶-۱۱-۰۶ (UTC 10:35–10:50)
+#
+# روش: این محیط اجرا (sandbox) خروجی مستقیم به *.netlify.app ندارد
+# (ECONNRESET؛ فقط چند دامنهٔ مجاز باز است). بنابراین همان درخواست‌ها با
+# ابزار HTTP خودِ محیط گرفته شد و پاسخ خام در ادامه آمده است.
+# روی ماشین/CI خودتان معادل دستوری‌اش این است:
+#
+#   npm run deploy:check -- --url https://hermiplan.netlify.app
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# ۱) GET https://hermiplan.netlify.app/
+#    وضعیت: 404 · نوع: text/html · عنوان: "Page not found"
+#    بدنه (خلاصه):
+Page not found
+Looks like you’ve followed a broken link or entered a URL that doesn’t exist
+on this site.
+If this is your site, and you weren’t expecting a 404 for this path, please
+visit Netlify’s “page not found” support guide …
+#    ⇒ صفحهٔ ۴۰۴ خودِ Netlify؛ هیچ مسیری پاسخ نمی‌دهد.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# ۲) GET https://hermiplan.netlify.app/BUILD_ID
+#    وضعیت: 200 · بدنه:
+07MAeMBJT2t_HEmwi5F17
+#    ⇒ خروجی خام next build در ریشهٔ دامنه منتشر شده است.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# ۳) GET https://hermiplan.netlify.app/app-path-routes-manifest.json
+#    وضعیت: 200 · بدنه (خلاصه):
+{
+  "/page": "/",
+  "/builder/page": "/builder",
+  "/report/[id]/page": "/report/[id]",
+  "/s/[token]/page": "/s/[token]",
+  "/api/health/route": "/api/health",
+  "/api/auth/route": "/api/auth",
+  "/api/projects/route": "/api/projects",
+  "/api/export/route": "/api/export",
+  "/robots.txt/route": "/robots.txt",
+  "/sitemap.xml/route": "/sitemap.xml"
+}
+#    ⇒ همان اپ است، ولی مانیفست‌های سرور به‌صورت استاتیک عمومی شده‌اند؛
+#      هیچ تابعی وجود ندارد که این مسیرها را اجرا کند.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# ۴) کنترل (تفکیک «سایت هست» از «سایت نیست»)
+#    GET https://zzq-nonexistent-site-98765.netlify.app/
+#    وضعیت: 404 · عنوان: "Site not found"  (نه "Page not found")
+#    ⇒ دامنهٔ ما وجود دارد؛ مشکل «دیپلوی ناقص/بدون مسیر‌دهی» است، نه نبود سایت.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# نتیجه: علت ریشه‌ای = انتشار خروجی خام next build بدون Netlify Next.js runtime
+# (آداپتر @netlify/plugin-nextjs اجرا نشده). اصلاح و تأیید: docs/NETLIFY-DEPLOY.md

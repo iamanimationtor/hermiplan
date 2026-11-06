@@ -1,0 +1,32 @@
+# access mode — 2026-11-06T10:28:37Z
+$ cat config/access.json
+{
+  "mode": "locked",
+  "updatedAt": "2026-10-31",
+  "note": "تحویل واقعی: محدودیت‌های مستندشده فعال است (سهمیهٔ هر endpoint و سقف ۱۰ لینک اشتراک)."
+}
+
+$ npm run access:status
+حالت فعال: locked  (منبع: config/access.json)
+سقف لینک فعال هر پروژه: ۱۰
+تاریخچهٔ هر پروژه: 20 نسخه / 8 مگابایت
+
+همهٔ سهمیه‌های مستندشده (README → محدودیت نرخ) فعال هستند.
+
+آخرین تغییر فایل: 2026-10-31
+یادداشت: تحویل واقعی: محدودیت‌های مستندشده فعال است (سهمیهٔ هر endpoint و سقف ۱۰ لینک اشتراک).
+
+$ npm run test:access
+  ✓ مقدار نامعتبر "unlimited" ⇒ locked
+
+✔ 52 بررسی حالت دسترسی — همه موفق
+
+$ curl -s :3000/api/health (config → locked)
+{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
+$ curl -s :3410/api/health (HERMIPLAN_ACCESS_MODE=open, same build)
+{"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"env","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
+
+$ curl -s :3000/builder | grep -c "بدون سهمیه"
+0
+$ curl -s :3410/builder | grep -c "بدون سهمیه"
+1

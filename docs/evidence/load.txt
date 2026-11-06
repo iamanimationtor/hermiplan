@@ -1,0 +1,24 @@
+# load — local container, NOT Netlify capacity — 2026-10-31T14:02:13Z
+# this server was started ONLY for the measurement with raised quotas:
+#   RATE_LIMIT_ANALYZE=100000 RATE_LIMIT_PROJECT_READ=100000 RATE_LIMIT_SHARE_CREATE=10000
+# defaults are 60 / 120 / 10 per window; without the override the run is throttled (429),
+# which is the limiter working, not a capacity result.
+
+$ BASE_URL=http://127.0.0.1:3400 CONCURRENCY=12 DURATION_MS=8000 npm run test:load
+
+▶ آزمون بار محلی — http://127.0.0.1:3400
+   حجم بدنه: 10.4 KB · هم‌زمانی: 12 · مدت هر سنجش: 8000 ms
+   node v22.22.3 · linux/x64
+
+▶ POST /api/analyze (موتور CPM + EVM)
+   درخواست: 1477 · موفق: 1477 · ناموفق: 0
+   تأخیر (ms): p50=60.8 p95=89.9 p99=115.2 max=225.2
+   توان عبور: 184.6 درخواست/ثانیه با هم‌زمانی 12
+▶ GET /builder (SSR + CSP nonce)
+   درخواست: 898 · موفق: 898 · ناموفق: 0
+   تأخیر (ms): p50=100.4 p95=140.2 p99=306.7 max=313.9
+   توان عبور: 112.3 درخواست/ثانیه با هم‌زمانی 12
+
+✔ آزمون بار پایان یافت — 2375 درخواست، بدون خطا
+  این عدد ظرفیت یک پروسه روی این ماشین است، نه تضمین ظرفیت Netlify.
+EXIT=0

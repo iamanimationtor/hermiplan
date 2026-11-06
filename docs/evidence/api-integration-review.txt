@@ -1,0 +1,5 @@
+| پیکربندی | نتیجه |
+| --- | --- |
+| locked (:3000, delivery config) | نتیجه: 237 موفق / 0 ناموفق / 6 نادیده |
+| open (:3410, same build, HERMIPLAN_ACCESS_MODE=open) | نتیجه: 235 موفق / 0 ناموفق / 7 نادیده |
+| next dev (:3500, HERMIPLAN_ALLOW_DEMO_OTP=1) | نتیجه: 242 موفق / 0 ناموفق / 0 نادیده |
