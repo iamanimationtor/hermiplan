@@ -75,7 +75,9 @@ const REMEDIES: Record<string, string> = {
   static_404:
     "دامنهٔ مستقر «Page not found» خودِ Netlify را برمی‌گرداند: یعنی هنوز هیچ دیپلوی سالمی منتشر نشده یا مسیرها به تابع وصل نیستند. در پنل Netlify → Deploys: آخرین دیپلوی را باز کنید؛ اگر Build failed است لاگ را بخوانید، «Clear cache and deploy site» بزنید و از مخزن (git) دیپلوی کنید.",
   raw_next_publish:
-    "خروجی خام next build به‌عنوان فایل استاتیک منتشر شده است (BUILD_ID و app-path-routes-manifest.json از ریشهٔ دامنه در دسترس‌اند). این دقیقاً همان حالتی است که همهٔ مسیرها ۴۰۴ می‌شوند. آداپتر را فعال کنید (netlify.toml این مخزن) و هرگز با `netlify deploy --dir=.next` دیپلوی نکنید؛ از دیپلوی متصل به گیت یا `netlify deploy --build --prod` استفاده کنید.",
+    "خروجی خام next build به‌عنوان فایل استاتیک منتشر شده است (BUILD_ID و app-path-routes-manifest.json از ریشهٔ دامنه در دسترس‌اند) و صفحهٔ اصلی هم پاسخ نمی‌دهد — این همان حالتی است که همهٔ مسیرها ۴۰۴ می‌شوند. آداپتر را فعال کنید (netlify.toml این مخزن) و هرگز با `netlify deploy --dir=.next` دیپلوی نکنید؛ از دیپلوی متصل به گیت یا `netlify deploy --build --prod` استفاده کنید.",
+  build_metadata_exposed:
+    "این مورد مسیریابی را خراب نمی‌کند و محتوایش راز نیست؛ ولی نام فایل‌های داخلی بیلد از بیرون خوانده می‌شود. اگر می‌خواهید بسته شود، publish را از .next به پوشهٔ استاتیکِ آداپتر تغییر دهید (مستند Netlify: مقدار پیشنهادی .next است) و بعد با همین اسکریپت دوباره بسنجید.",
   health_not_json:
     "پاسخ /api/health JSON نیست، پس درخواست به تابع Next نمی‌رسد؛ همان مشکل مسیر‌دهی است.",
   route_broken:
@@ -264,7 +266,8 @@ async function liveChecks(base: string): Promise<void> {
     add("warn", "network_unreachable", "بررسی زنده انجام نشد", `اتصال به ${base} برقرار نشد (${home.body}). این وضعیت دربارهٔ تنظیمات سایت هیچ نمی‌گوید؛ از شبکه‌ای اجرا کنید که به دامنه دسترسی دارد.`);
     return;
   }
-  if (home.status === 200 && /HERMIPLAN/i.test(home.body) && /lang="fa"/i.test(home.body)) {
+  const homeHealthy = home.status === 200 && /HERMIPLAN/i.test(home.body);
+  if (homeHealthy && /lang="fa"/i.test(home.body)) {
     add("ok", "live_home", "صفحهٔ اصلی", `۲۰۰ در ${home.ms}ms — صفحهٔ فارسی HERMIPLAN`);
   } else if (isNetlify404(home)) {
     add("blocker", "static_404", "صفحهٔ اصلی ۴۰۴ خودِ Netlify است", `وضعیت ${home.status} — HTML «Page not found» نتلیفای`);
@@ -272,17 +275,42 @@ async function liveChecks(base: string): Promise<void> {
     add("blocker", "route_broken", "صفحهٔ اصلی پاسخ درست نمی‌دهد", `وضعیت ${home.status} · ${home.contentType} · ${home.body.slice(0, 160).replace(/\s+/g, " ")}`);
   }
 
+  // A route that exists nowhere: if the app answers with its own Persian 404,
+  // requests really do reach the Next function. Netlify's own "Page not found"
+  // here means no function matched — the failure this script exists for.
+  const unknownRoute = await probe(base, "/__deploy-check-no-such-route");
+  const appOwns404 = unknownRoute.status === 404 && /HERMIPLAN/i.test(unknownRoute.body);
+  if (appOwns404) {
+    add("ok", "unknown_route", "مسیر ناموجود", "۴۰۴ از خودِ اپ (نه از Netlify) — یعنی درخواست‌ها به تابع Next می‌رسند");
+  } else if (isNetlify404(unknownRoute)) {
+    add("blocker", "static_404", "۴۰۴ از Netlify است، نه از اپ", "هیچ تابعی درخواست‌ها را تحویل نمی‌گیرد");
+  } else {
+    add("warn", "unknown_route", "مسیر ناموجود", `وضعیت ${unknownRoute.status} — انتظار: ۴۰۴ با متن خودِ اپ`);
+  }
+
+  // `publish = ".next"` leaves build metadata (BUILD_ID, route manifests)
+  // readable at the site root even on a perfectly healthy deployment — the
+  // server bundles themselves are NOT reachable. So this is only a blocker
+  // when the app is not answering at all; otherwise it is a note.
   const buildId = await probe(base, "/BUILD_ID");
   const manifest = await probe(base, "/app-path-routes-manifest.json");
-  if (buildId.status === 200 || manifest.status === 200) {
+  const metadataReadable = buildId.status === 200 || manifest.status === 200;
+  if (metadataReadable && !homeHealthy) {
     add(
       "blocker",
       "raw_next_publish",
       "خروجی خام next build منتشر شده است",
-      `/BUILD_ID → ${buildId.status} · /app-path-routes-manifest.json → ${manifest.status} — یعنی پوشهٔ .next به‌عنوان فایل استاتیک سرو می‌شود، نه از طریق آداپتر`,
+      `/BUILD_ID → ${buildId.status} · /app-path-routes-manifest.json → ${manifest.status} — و صفحهٔ اصلی هم پاسخ نمی‌دهد؛ یعنی پوشهٔ .next عیناً استاتیک سرو می‌شود`,
+    );
+  } else if (metadataReadable) {
+    add(
+      "warn",
+      "build_metadata_exposed",
+      "فراداده بیلد از ریشهٔ دامنه خوانده می‌شود",
+      `/BUILD_ID → ${buildId.status} · مانیفست مسیرها → ${manifest.status} — با publish = ".next" طبیعی است و مسیریابی را خراب نمی‌کند؛ بسته‌های سرور در دسترس نیستند (مسیر /server/… همان ۴۰۴ اپ را می‌دهد). محتوایش راز نیست، فقط بهتر است نام فایل‌های داخلی بیرون نباشد`,
     );
   } else {
-    add("ok", "raw_next_publish", "خروجی بیلد خام منتشر نشده", `/BUILD_ID → ${buildId.status} · مانیفست مسیرها → ${manifest.status}`);
+    add("ok", "build_metadata_exposed", "فراداده بیلد عمومی نیست", `/BUILD_ID → ${buildId.status} · مانیفست مسیرها → ${manifest.status}`);
   }
 
   const health = await probe(base, "/api/health");

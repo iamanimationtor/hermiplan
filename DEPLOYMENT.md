@@ -302,9 +302,12 @@ curl -s https://<site>/api/health
 #  "shareLinks":"postgres","smsConfigured":false}
 # 503 with "missingTables" means the migrations were not applied yet.
 # 503 "database_unconfigured" means DATABASE_URL is missing for Functions scope.
-curl -s -o /dev/null -w '%{http_code}\n' https://<site>/BUILD_ID   # must be 404
-# 200 here means the raw build output is being served statically: the adapter
-# never ran, and every route will 404. See docs/NETLIFY-DEPLOY.md.
+curl -s https://<site>/__no-such-route | grep -c HERMIPLAN          # >0 = the app owns its 404
+# Netlify's own "Page not found" here means no function matched the request.
+# Note: /BUILD_ID answering 200 is NOT a reliable signal — with publish=".next"
+# that build metadata is served even on a healthy deploy. Check that / renders
+# the Persian landing page and /api/health returns JSON instead.
+# Details: docs/NETLIFY-DEPLOY.md.
 curl -s -o /dev/null -w '%{http_code}\n' https://<site>/            # 200
 curl -s -o /dev/null -w '%{http_code}\n' https://<site>/builder     # 200
 curl -s -o /dev/null -w '%{http_code}\n' https://<site>/report/xxx  # 404
