@@ -1,10 +1,11 @@
-# real PostgreSQL — 2026-10-31T15:02:03Z
+# real PostgreSQL — 2026-11-06T10:23:09Z
 $ npm run db:status
 Database: 127.0.0.1:5544/postgres
   ✓ 0001_baseline (applied)
   ✓ 0002_security_hardening (applied)
   ✓ 0003_share_tokens (applied)
   ✓ 0004_project_versions (applied)
+  ✓ 0005_user_credentials (applied)
 
 Schema is up to date.
 

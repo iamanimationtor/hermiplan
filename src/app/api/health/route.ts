@@ -2,7 +2,12 @@ import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { SCHEMA_VERSION } from "@/db/schema";
 import { describeAccessMode } from "@/lib/server/access-mode";
-import { MIGRATION_MESSAGE } from "@/lib/server/schema";
+import {
+  DATABASE_MISSING_MESSAGE,
+  MIGRATION_MESSAGE,
+  isDatabaseUnconfigured,
+} from "@/lib/server/schema";
+import { isDatabaseConfigured } from "@/db";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +107,32 @@ export async function GET() {
       },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch {
-    return Response.json({ ok: false, schemaVersion: SCHEMA_VERSION }, { status: 500 });
+  } catch (error) {
+    // A probe is read by whoever deploys. "ok:false" with no word of
+    // explanation is not an answer, so every failure names its state and the
+    // fix: no DATABASE_URL at all, or a database that cannot be reached.
+    if (isDatabaseUnconfigured(error) || !isDatabaseConfigured()) {
+      return Response.json(
+        {
+          ok: false,
+          schemaVersion: SCHEMA_VERSION,
+          database: "unconfigured",
+          code: "database_unconfigured",
+          message: DATABASE_MISSING_MESSAGE,
+        },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    console.error("[health] database probe failed:", error);
+    return Response.json(
+      {
+        ok: false,
+        schemaVersion: SCHEMA_VERSION,
+        database: "unreachable",
+        code: "database_unreachable",
+        message: "اتصال به پایگاه داده برقرار نشد؛ DATABASE_URL و دسترس‌پذیری سرور را بررسی کنید",
+      },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

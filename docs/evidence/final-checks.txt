@@ -1,13 +1,10 @@
-# a11y / layout / bundle / access / versions / project-file — 2026-10-31T17:39:29Z
-## a11y
+# a11y / layout / bundle — 2026-11-06T10:28:51Z
+
+## npm run test:a11y
 ✔ 32 بررسی دسترس‌پذیری/موبایل — همه موفق
-## layout
+
+## npm run test:layout
 ✔ 24 بررسی چیدمان/رندر — همه موفق
-## bundle
+
+## npm run test:bundle
 ✔ 6 مسیر در بودجه‌ی تعیین‌شده هستند.
-## access
-✔ 52 بررسی حالت دسترسی — همه موفق
-## versions
-✔ 41 بررسی تفاوت نسخه‌ها — همه موفق
-## project file
-✔ 31 بررسی فایل پروژه — همه موفق

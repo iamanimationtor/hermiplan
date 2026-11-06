@@ -1,6 +1,6 @@
-# export quality — 2026-10-31T17:39:29Z
+# export quality — 2026-11-06T10:28:48Z
 
-## with a live server
+## with a live server (:3000)
 ▶ ۱. XLSX — بسته واقعی Office
   ✓ بخش [Content_Types].xml حاضر است
   ✓ xl/workbook.xml حاضر است
@@ -77,7 +77,7 @@
   ✓ سلول با - غیرعددی هم خنثی می‌شود
   ✓ اعداد منفی واقعی (لاتین و فارسی) آپاستروف نمی‌گیرند
 
-▶ ۸. خروجی‌های HTTP (http://127.0.0.1:3400)
+▶ ۸. خروجی‌های HTTP (http://127.0.0.1:3000)
   ✓ گزارش چاپی با کد ۲۰۰ برگشت
   ✓ نوع محتوا صادقانه text/html است (نه ادعای PDF)
   ✓ نام فایل با .html تمام می‌شود
@@ -112,7 +112,7 @@
 
 ✔ 91 موفق / 0 ناموفق
 
-## without a server
+## without a server (pure builders)
 ▶ ۱. XLSX — بسته واقعی Office
   ✓ بخش [Content_Types].xml حاضر است
   ✓ xl/workbook.xml حاضر است

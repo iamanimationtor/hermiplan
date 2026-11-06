@@ -1,4 +1,4 @@
-# Version history / diff / validation slice of the same run — production build :3400, locked — 2026-10-31T17:39:29Z
+# Version history / diff / validation slice of the same run — production build :3000, access mode locked — 2026-11-06T10:28:48Z
 
 ## §۴-ب + §۴-ج + §۴-د — 92 موفق / 0 ناموفق
 

@@ -1,6 +1,6 @@
 # شواهد اجرا (raw evidence)
 
-این پوشه خروجی **خام** فرمان‌هایی است که در تاریخ ۲۰۲۶-۱۰-۳۱ (UTC) در همین مخزن اجرا شده‌اند.
+این پوشه خروجی **خام** فرمان‌هایی است که در همین مخزن اجرا شده‌اند؛ آخرین بازتولید کامل: **۲۰۲۶-۱۱-۰۶ (UTC)**.
 هیچ فایلی دست‌کاری نشده و عددی دستی وارد نشده است؛ هر فایل، متن stdout/stderr همان فرمان است.
 
 | فایل | فرمان | انتظار |
@@ -33,7 +33,7 @@
 | `health-probe.txt` | `curl /api/health` + کد صفحه‌ها + وجود دکمهٔ ورود + صفت‌های کوکی در سه وضعیت (locked، open با env، پایگاه بدون مهاجرت / فقط تا ۰۰۰۴) + کد وضعیت مسیرها | ۲۰۰ + `schemaVersion:5` + `access`؛ پایگاه خالی ⇒ ۵۰۳ + `missingTables`؛ پایگاه تا ۰۰۰۴ ⇒ ۵۰۳ + `missingColumns`؛ مسیرهای ۴۰۴ متن راهنما دارند |
 | `migration-review.txt` | اجرای دوباره `db:migrate` و دست‌کاری checksum | بیکار بودن اجرای دوباره و رد شدن drift |
 | `share-audit.txt` | `npm run db:share-audit` | فهرست لینک‌های فعال و علامت‌خوردن پروژه «منتشرشده پیش از مهاجرت» |
-| `migration-safety.txt` | `npm run db:migration-safety` (با `MIGRATION_SAFETY_ROLLBACK=1`) | **۴۵ بررسی**: جفت بازگشت هر مهاجرت، no-op بودن اجرای دوم، رد شدن drift، قفل بازگشت پایه، بازگشت کامل و بازسازی هم‌ساختار، و §۸ = تشخیص پایگاه مهاجرت‌نشده (`isSchemaError`) |
+| `migration-safety.txt` | `npm run db:migration-safety` (با `MIGRATION_SAFETY_ROLLBACK=1`) | **۵۰ بررسی**: جفت بازگشت هر مهاجرت، no-op بودن اجرای دوم، رد شدن drift، قفل بازگشت پایه، بازگشت کامل و بازسازی هم‌ساختار، و §۸ = تشخیص پایگاه مهاجرت‌نشده (`isSchemaError`) |
 | `preflight.txt` | `npm run db:preflight` (+ `--json`) | پیش‌بررسی فقط‌خواندنی: مهاجرت‌های در انتظار، drift، یتیم مالکیت، لینک قدیمی، حجم |
 | `export.txt` | `npm run test:export` (با `BASE_URL`) | **۹۱ با سرور / ۷۳ بدون سرور**: XLSX/CSV/HTML/بسته/MSProject، امضای بایتی هر ۷ فرمت، **اعتبار ساختار Workbook**، و **well-formed بودن هر جزء XML + ساختار MSPDI** (مدت ISO، UID یکتا) |
 | `a11y.txt` | `npm run test:a11y` | **۳۲ بررسی** روی HTML سرو‌شده (زبان، جهت، landmark،‏ h1، برچسب ورودی‌ها، alt) |

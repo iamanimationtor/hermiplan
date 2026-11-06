@@ -28,7 +28,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client } from "pg";
 import { SCHEMA_VERSION } from "../src/db/schema";
-import { MIGRATION_MESSAGE, isSchemaError } from "../src/lib/server/schema";
+import { DATABASE_MISSING_MESSAGE, MIGRATION_MESSAGE, isDatabaseUnconfigured, isSchemaError } from "../src/lib/server/schema";
+import { DatabaseNotConfiguredError } from "../src/db";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -92,6 +93,28 @@ async function main(): Promise<void> {
     MIGRATION_MESSAGE.includes("db:migrate") && MIGRATION_MESSAGE.length > 20,
     "پیام راهنما شامل فرمان اجراست و خالی نیست",
     MIGRATION_MESSAGE,
+  );
+
+  // The other deployment state: no database at all. It must be recognised as
+  // such (503 + instruction), never confused with a code bug or with a schema
+  // problem — a wrong classification here sends the operator to the wrong fix.
+  check(isDatabaseUnconfigured(new DatabaseNotConfiguredError()), "نبودِ DATABASE_URL شناسایی می‌شود");
+  check(
+    isDatabaseUnconfigured({ name: "DatabaseNotConfiguredError" }),
+    "خطای نبودِ پایگاه حتی پس از عبور از مرز ماژول شناسایی می‌شود",
+  );
+  check(
+    isDatabaseUnconfigured({ cause: { code: "database_unconfigured" } }),
+    "کد database_unconfigured در cause هم شناسایی می‌شود",
+  );
+  check(
+    !isDatabaseUnconfigured({ code: "42703" }) && !isDatabaseUnconfigured(new Error("boom")),
+    "خطای اسکیما یا خطای معمولی، «نبودِ پایگاه» شمرده نمی‌شود",
+  );
+  check(
+    DATABASE_MISSING_MESSAGE.includes("DATABASE_URL") && DATABASE_MISSING_MESSAGE.length > 20,
+    "پیام نبودِ پایگاه، نام متغیر محیطی را می‌گوید",
+    DATABASE_MISSING_MESSAGE,
   );
 
   const client = new Client({ connectionString: url });

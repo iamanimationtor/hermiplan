@@ -1,4 +1,4 @@
-# legacy database cycle (previous release schema → 0005 → rollback) — 2026-10-31T17:39:58Z
+# legacy database cycle (previous release schema → 0005 → rollback) — 2026-11-06T10:28:37Z
 
 ## prepare
 ▶ ساخت پایگاه داده نسخه قبلی (legacy) و درج داده‌های موجود

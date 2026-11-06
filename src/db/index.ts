@@ -20,13 +20,28 @@ const globalForDb = globalThis as typeof globalThis & {
   __hermiplanPool?: Pool;
 };
 
-function requireDatabaseUrl(): string {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
+/**
+ * Raised when the process has no database to talk to.
+ *
+ * A distinct class (rather than a plain `Error` with a message) so the HTTP
+ * layer can recognise it: "you forgot the environment variable" must answer
+ * 503 with the exact instruction, exactly like an unmigrated database does —
+ * not a bare 500 with an empty body, which tells the operator nothing.
+ */
+export class DatabaseNotConfiguredError extends Error {
+  readonly code = "database_unconfigured";
+
+  constructor() {
+    super(
       "DATABASE_URL is not configured. Set it in the Netlify UI (Site configuration → Environment variables) and redeploy.",
     );
+    this.name = "DatabaseNotConfiguredError";
   }
+}
+
+function requireDatabaseUrl(): string {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new DatabaseNotConfiguredError();
   return url;
 }
 

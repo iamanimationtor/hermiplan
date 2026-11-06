@@ -125,13 +125,13 @@
 | ۵ منابع | ۲ | ۰ | ۰ |
 | ۶ EVM و پیشرفت | ۵ | ۰ | ۰ |
 | ۷ قیمت‌گذاری | ۵ | ۲ | ۱ |
-| ۸ امنیت | ۱۹ | ۱ | ۰ |
+| ۸ امنیت | ۲۰ | ۱ | ۰ |
 | ۹ پایگاه داده | ۵ | ۱ | ۰ |
 | ۱۰ کیفیت کد | ۴ | ۰ | ۰ |
 | ۱۱ آزمون | ۷ | ۰ | ۱ |
 | ۱۲ تجربهٔ کاربری | ۹ | ۱ | ۰ |
 | ۱۳–۱۶ ترتیب کار/آینده/پذیرش/خروجی | ۶ | ۰ | ۰ |
-| **جمع** | **۷۲** | **۶** | **۲** |
+| **جمع** | **۷۳** | **۶** | **۲** |
 
 دقیقاً همین ۸ ردیف باز است (و هیچ ردیف دیگری):
 
@@ -259,7 +259,7 @@
 **اعداد تازه بعد از این تغییرات:** API روی build تولیدی **۲۳۷/۰/۶** (`locked`) و **۲۳۵/۰/۷** (`open`)،
 روی `next dev` **۲۴۲/۰/۰**، `npm test` **۱۲/۱۲**، a11y ۳۲، export ۸۰، layout ۲۴، versions ۴۱،
 project-file ۳۱، access ۵۲، bundle ۶/۶، CSP ۲۴/۹۲/۷۸، امنیت ۲۹۱، db-integrity ۲۰،
-migration-safety ۳۹، legacy ۲/۳۱/۹، journey ۷۹، password ۴۵.
+migration-safety ۵۰، legacy ۲/۳۱/۹، journey ۷۹، password ۴۵.
 
 ---
 
@@ -270,7 +270,7 @@ migration-safety ۳۹، legacy ۲/۳۱/۹، journey ۷۹، password ۴۵.
 | ۱. پروژه‌های «منتشرشده» با پرچم قدیمی | **پوشش کامل** | `api` §۳-ج: `is_public=true` بدون توکن ⇒ `/report/<uuid>` برای غریبه ۴۰۴، داده خام ۴۰۴، در فهرست غریبه دیده نمی‌شود | رفتار درست؛ لینک مبتنی بر UUID باز نمی‌شود |
 | ۲. کنترل دسترسی و ابطال لینک | **پوشش کامل** | `api` §۳-ب: انقضا (تغییر `expires_at` در پایگاه) ⇒ ۴۰۴، ابطال یک لینک لینک دیگر را نمی‌بندد، `?all=1` همه را می‌بندد، توکن باطل با صدور لینک تازه زنده نمی‌شود، سقف ۱۰ لینک ⇒ ۴۰۹، ابطال از دامنهٔ دیگر ⇒ ۴۰۳ | هیچ شکافی پیدا نشد |
 | ۳. CSP روی مسیرهای واقعی | **شکاف بود؛ بسته شد** | پیش‌تر فقط `/` و `/builder` آزموده می‌شد. اکنون `scripts/csp-real-routes.sh` + `scripts/share-fixture.ts`: **۷۸ بررسی روی ۶ مسیر** — جملهٔ `/report/<uuid>` با کوکی مالک و لینک زندهٔ اشتراک | nonce یکتا در هر پاسخ، بدون `unsafe-inline`، `frame-ancestors none`، و مسیرهای ۴۰۴ هم سیاست دارند |
-| ۴. سازگاری مهاجرت | **پوشش کامل** | `migration-safety` **۴۵ بررسی**: idempotency، رد drift با checksum، بازگشت کامل و بازسازی؛ `legacy-db` **۲/۳۱/۹** روی پایگاه نسخهٔ قبل | بدون تغییر |
+| ۴. سازگاری مهاجرت | **پوشش کامل** | `migration-safety` **۵۰ بررسی**: idempotency، رد drift با checksum، بازگشت کامل و بازسازی؛ `legacy-db` **۲/۳۱/۹** روی پایگاه نسخهٔ قبل | بدون تغییر |
 
 **افزودهٔ این بازبینی:** پوشش امضای بایتی هر ۷ فرمت خروجی از سرویس (xlsx/xls/csv/json/msproject/package/pdf-print)
 با بررسی `magic bytes` + `content-type` + حجم — `export-check` از ۶۴ به **۷۲** بررسی رسید، و
@@ -307,7 +307,7 @@ migration-safety ۳۹، legacy ۲/۳۱/۹، journey ۷۹، password ۴۵.
 
 | کار | جزئیات | آزمون |
 | --- | --- | --- |
-| مهاجرت ۰۰۰۵ | `users.username` (یکتای جزئی روی `lower(username)`)، `users.password_hash`، `phone` اکنون nullable، قید «دست‌کم یک راه ورود»؛ فایل بازگشت با قید امن (اگر حساب بدون شماره باشد، بازگشت متوقف می‌شود) | `migration-safety` (**۴۵ بررسی**) |
+| مهاجرت ۰۰۰۵ | `users.username` (یکتای جزئی روی `lower(username)`)، `users.password_hash`، `phone` اکنون nullable، قید «دست‌کم یک راه ورود»؛ فایل بازگشت با قید امن (اگر حساب بدون شماره باشد، بازگشت متوقف می‌شود) | `migration-safety` (**۵۰ بررسی**) |
 | هش رمز | scrypt با نمک تصادفی و پارامترهای همراه هش؛ مقایسه با `timingSafeEqual`؛ هش خراب ⇒ رد (نه خطا) | `password-check` (۴۵) |
 | یکتایی نام کاربری | تصمیم با ایندکس یکتا (`23505` ⇒ ۴۰۹)، نه `SELECT` سپس `INSERT` | `api` §۶-ب |
 | ورود | پیام یکسان برای «رمز غلط» و «کاربر ناشناس» + scrypt ساختگی برای نام ناموجود (بدون نشت زمانی)؛ سقف ۱۰/۱۵دقیقه برای هر نام کاربری | `api` §۶-ب (۴۰۱/۴۲۹) |
@@ -323,7 +323,7 @@ migration-safety ۳۹، legacy ۲/۳۱/۹، journey ۷۹، password ۴۵.
 **اعداد این دور (از اجرای واقعی):** `npm test` **۱۲/۱۲** · `api` **۲۳۷/۰/۶** (locked)،
 **۲۳۵/۰/۷** (open)، **۲۴۲/۰/۰** (dev با دمو) · `journey` **۷۹** · `export` **۷۳** بدون سرور /
 **۹۱** با سرور · `password` **۴۵** · `access` **۵۲** · `security` **۲۹۱** ·
-`migration-safety` **۴۵** · `db-integrity` **۲۰** · `legacy` **۲/۳۱/۹** · `otp` **۳۹** ·
+`migration-safety` **۵۰** · `db-integrity` **۲۰** · `legacy` **۲/۳۱/۹** · `otp` **۳۹** ·
 `a11y` ۳۲ · `layout` ۲۴ · `bundle` ۶/۶ · CSP ۲۴/۹۲/۷۸ · `tsc` ۰ · `eslint` ۰.
 
 ---
@@ -349,7 +349,7 @@ migration-safety ۳۹، legacy ۲/۳۱/۹، journey ۷۹، password ۴۵.
 **اعداد این دور (اجرای واقعی):** `tsc` ۰ · `eslint` ۰ (۱۱۹ فایل) · `npm test` **۱۲/۱۲** ·
 `api` **۲۳۷/۰/۶** (locked) · **۲۳۵/۰/۷** (open) · **۲۴۲/۰/۰** (dev + OTP دمو) ·
 `journey` **۷۹** · `export` **۹۱/۷۳** · `security` **۲۹۱** · `password` **۴۵** · `access` **۵۲** ·
-`db-integrity` **۲۰** · `migration-safety` **۴۵** · `legacy` **۲/۳۱/۹** · `otp` **۳۹** ·
+`db-integrity` **۲۰** · `migration-safety` **۵۰** · `legacy` **۲/۳۱/۹** · `otp` **۳۹** ·
 `a11y` ۳۲ · `layout` ۲۴ · `bundle` ۶/۶ · CSP ۲۴/۷۸ · `versions` ۴۱ · `project-file` ۳۱.
 
 ## ۸. پذیرش

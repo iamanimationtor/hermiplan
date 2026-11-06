@@ -1,9 +1,20 @@
-# /api/health probe — 2026-10-31T17:41:14Z (UTC)
+# /api/health probe — 2026-11-06T10:28:29Z (UTC)
 
-All servers run the same build (`next start`); only DATABASE_URL / HERMIPLAN_ACCESS_MODE differ.
+Every case runs the same build (`next start`); only DATABASE_URL / HERMIPLAN_ACCESS_MODE differ.
 
-## 1) migrated database, delivery mode "locked" (:3400)
-$ curl -s :3400/api/health
+## 0) no DATABASE_URL at all (:3610) — the operator forgot the environment variable
+$ curl -s :3610/api/health
+{"ok":false,"schemaVersion":5,"database":"unconfigured","code":"database_unconfigured","message":"پایگاه داده پیکربندی نشده است؛ متغیر DATABASE_URL را در محیط اجرا تنظیم کنید"}
+HTTP 503
+$ curl -s -X POST :3610/api/auth (register)
+HTTP 503  {"error":"پایگاه داده پیکربندی نشده است؛ متغیر DATABASE_URL را در محیط اجرا تنظیم کنید","code":"database_unconfigured"}
+$ curl -s :3610/api/projects (with a guest cookie, so the database would be used)
+HTTP 503  (an empty list would have been a lie)
+$ curl -s -X POST :3610/api/export (compute-only, no database needed)
+HTTP 200
+
+## 1) migrated database, delivery mode "locked" (:3000)
+$ curl -s :3000/api/health
 {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
 
 ## 2) migrated database, pre-release mode "open" (:3410)
@@ -16,9 +27,9 @@ $ curl -s :3600/api/health
 HTTP 503
 
 $ curl -s :3600/builder
-HTTP 200   (the page itself renders; the failure is reported when data is needed)
+HTTP 200   (the page renders; the failure is reported when data is needed)
 
-## 4) migrated database, 0005 columns dropped (:3600 restarted)
+## 4) migrated database with the 0005 columns dropped (:3600 restarted)
 $ curl -s :3600/api/health
 {"ok":false,"schemaVersion":5,"database":"ok","missingTables":[],"missingColumns":["users.username","users.password_hash"],"message":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید"}
 HTTP 503
@@ -26,7 +37,7 @@ HTTP 503
 $ curl -s -X POST :3600/api/auth (register)
 HTTP 503  {"error":"مهاجرت‌ها اعمال نشده‌اند؛ npm run db:migrate را اجرا کنید","code":"schema_incomplete"}
 
-## 5) page status codes (:3400)
+## 5) page status codes (:3000)
 /                                                        200
 /builder                                                 200
 /robots.txt                                              200
@@ -34,16 +45,17 @@ HTTP 503  {"error":"مهاجرت‌ها اعمال نشده‌اند؛ npm run d
 /report/00000000-0000-4000-8000-000000000000             404
 /s/not-a-real-token                                      404
 
-## 6) the 404 page states the rule, without confirming which case it was
+## 6) the 404 page states the rule without confirming which case it was
 report 404 sentence: 1
 share  404 sentence: 1
 
 ## 7) cookie attributes: cross-site frame (https) vs plain http
 $ POST /api/auth (register) with `x-forwarded-proto: https`
-hermiplan_session=828a5c65150ad1fd499708f75780f602582df06dc23f2de1c91e858c3d11b9a1; Path=/; Expires=Wed, 30 Dec 2026 17:41:20 GMT; Secure; HttpOnly; SameSite=none
-$ same, over plain http
-hermiplan_session=cfae6398e0336737a319929ce0d676fb5806efa415496388b022ca792080efc1; Path=/; Expires=Wed, 30 Dec 2026 17:41:20 GMT; HttpOnly; SameSite=lax
+hermiplan_session=<64 hex>; Path=/; Expires=Tue, 05 Jan 2027 10:28:30 GMT; Secure; HttpOnly; SameSite=none
+$ same request over plain http
+hermiplan_session=<64 hex>; Path=/; Expires=Tue, 05 Jan 2027 10:28:30 GMT; HttpOnly; SameSite=lax
 
-Reason: SameSite=Lax is not sent by browsers inside a cross-site frame; that is what made
-an owner's own report 404. Over https we send SameSite=None; Secure, the only combination
-browsers accept there. Over plain http we keep Lax, because None without Secure is rejected.
+Reason: SameSite=Lax is not sent by browsers inside a cross-site frame, and that made
+an owner's own report answer 404. Over https we send SameSite=None; Secure - the only
+combination browsers accept there. Over plain http we keep Lax, because None without
+Secure is rejected outright.

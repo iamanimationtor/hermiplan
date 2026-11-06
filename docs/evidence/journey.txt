@@ -1,5 +1,5 @@
-# journey — 2026-10-31T17:39:29Z
-▶ سرور: http://127.0.0.1:3400 · کاربر: journey385707
+# journey — account → project → real files in seven formats — 2026-11-06T10:28:48Z
+▶ سرور: http://127.0.0.1:3000 · کاربر: journey859664
 
 ▶ ۱. ساخت حساب با نام کاربری و رمز عبور
   ✓ ثبت‌نام ⇒ ۲۰۱

@@ -1,4 +1,4 @@
-# OTP / SMS end-to-end with a local fake provider — 2026-10-31T17:40:30Z
+# OTP / SMS end-to-end with a local fake provider — 2026-11-06T10:28:51Z
   ✓ در قطع ارائه‌دهنده، کد بی‌مصرف در پایگاه نمی‌ماند
   ✓ خروج ⇒ ۲۰۰
   ✓ پس از خروج، نشست باطل است

@@ -8,7 +8,7 @@
  */
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { MIGRATION_MESSAGE, isSchemaError } from "./schema";
+import { DATABASE_MISSING_MESSAGE, MIGRATION_MESSAGE, isDatabaseUnconfigured, isSchemaError } from "./schema";
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -73,22 +73,32 @@ export function validationErrorResponse(error: unknown, scope: string): NextResp
 }
 
 /**
- * A database that is missing tables or columns is a *deployment* state, not a
- * bug: answer 503 with the same wording `/api/health` uses, instead of a 500
- * that hides the real instruction. Returns `null` when the error is something
- * else, so the caller keeps its own handling.
+ * Deployment states are not request bugs.
+ *
+ * "No database configured" and "database not migrated" both answer **503** with
+ * the wording `/api/health` uses, instead of a 500 whose empty body hides the
+ * instruction. Returns `null` for anything else, so the caller keeps its own
+ * handling.
  */
-export function schemaRejection(error: unknown): NextResponse<ApiErrorBody> | null {
-  if (!isSchemaError(error)) return null;
-  console.error("[schema] the database is missing objects — migrations have not been applied:", error);
-  return jsonError(503, MIGRATION_MESSAGE, { code: "schema_incomplete" });
-}
-
-export function internalErrorResponse(error: unknown, scope: string, message: string): NextResponse<ApiErrorBody> {
+export function deploymentRejection(error: unknown, scope = "http"): NextResponse<ApiErrorBody> | null {
+  if (isDatabaseUnconfigured(error)) {
+    console.error(`[${scope}] DATABASE_URL is not set — the app cannot reach a database`);
+    return jsonError(503, DATABASE_MISSING_MESSAGE, { code: "database_unconfigured" });
+  }
   if (isSchemaError(error)) {
-    console.error(`[${scope}] is running against an unmigrated database:`, error);
+    console.error(`[${scope}] the database is missing objects — migrations have not been applied:`, error);
     return jsonError(503, MIGRATION_MESSAGE, { code: "schema_incomplete" });
   }
+  return null;
+}
+
+/** Backwards-compatible alias used by the auth route. */
+export const schemaRejection = (error: unknown): NextResponse<ApiErrorBody> | null =>
+  deploymentRejection(error, "auth");
+
+export function internalErrorResponse(error: unknown, scope: string, message: string): NextResponse<ApiErrorBody> {
+  const deployment = deploymentRejection(error, scope);
+  if (deployment) return deployment;
   console.error(`[${scope}]`, error);
   return jsonError(500, message);
 }

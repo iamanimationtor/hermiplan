@@ -103,7 +103,7 @@ npm run dev                     # یا: npm run build && npm start
 | `npm run test:csp` | هدر CSP، nonce روی همه اسکریپت‌های inline و مجاز بودن منابع بیرونی |
 | `npm run test:layout` | رندر واقعی نمودار (پیکسل)، قواعد چاپ A4 و پیش‌شرط‌های چیدمان موبایل |
 | `npm run test:db:integrity` | هم‌زمانی محدودیت نرخ، یکتایی/آبشاری‌شدن قیدها، `VALIDATE CONSTRAINT` |
-| `npm run db:migration-safety` | ۴۵ بررسی ایمنی اجراکنندهٔ مهاجرت: جفت بازگشت، idempotency، drift؛ با `MIGRATION_SAFETY_ROLLBACK=1` بازگشت واقعی ۰۰۰۲–۰۰۰۴، بازگشت کامل و بازسازی هم‌ساختار |
+| `npm run db:migration-safety` | ۵۰ بررسی ایمنی اجراکنندهٔ مهاجرت: جفت بازگشت، idempotency، drift؛ با `MIGRATION_SAFETY_ROLLBACK=1` بازگشت واقعی ۰۰۰۲–۰۰۰۵، بازگشت کامل و بازسازی هم‌ساختار؛ و §۸ = تشخیص دو وضعیت استقرار (پایگاه مهاجرت‌نشده و پایگاه پیکربندی‌نشده) |
 | `npm run test:load` | آزمون بار محلی با p50/p95/p99 و نرخ خطا |
 | `npm run test:a11y` | دسترس‌پذیری HTML سرو‌شده: زبان/جهت، `main`، یک `h1`، برچسب ورودی‌ها، `alt`، بزرگ‌نمایی موبایل |
 | `npm run test:bundle` | بودجه‌ی gzip جاوااسکریپت هر مسیر (رچت ضد رگرسیون وزن صفحه) |

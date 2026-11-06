@@ -1,4 +1,24 @@
-# npm run build — 2026-10-31T17:31:12Z
+# npm run build — 2026-11-06T10:29:05Z
+  Generating static pages using 1 worker (2/4) 
+  Generating static pages using 1 worker (3/4) 
+✓ Generating static pages using 1 worker (4/4) in 129ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /api/analyze
+├ ƒ /api/auth
+├ ƒ /api/export
+├ ƒ /api/health
+├ ƒ /api/market
+├ ƒ /api/projects
+├ ƒ /api/projects/[id]
+├ ƒ /api/projects/[id]/share
+├ ƒ /api/projects/[id]/versions
+├ ƒ /api/projects/[id]/versions/[version]
+├ ƒ /api/projects/[id]/versions/[version]/diff
+├ ƒ /api/projects/[id]/versions/[version]/restore
 ├ ƒ /builder
 ├ ƒ /report/[id]
 ├ ○ /robots.txt

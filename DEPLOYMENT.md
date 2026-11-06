@@ -47,7 +47,7 @@ All are server-side; none are exposed to the browser bundle.
 
 | Variable | Required | Default behaviour when absent |
 | --- | --- | --- |
-| `DATABASE_URL` | **yes (production)** | Requests that touch the database return a clear 500 error; the site still builds and renders public pages |
+| `DATABASE_URL` | **yes (production)** | `/api/health` returns **503 `database_unconfigured`** and every database-backed endpoint returns the same 503 with a message naming `DATABASE_URL`; pages that need no database (landing, `/builder`, exports of a supplied file) keep working. Nothing is written and no 500 with an empty body is produced |
 | `DATABASE_SSL` | no | TLS auto-enabled when the URL contains `sslmode=require` or `ssl=true` |
 | `DATABASE_POOL_MAX` | no | `3` in production, `10` in development |
 | `SMS_PROVIDER_KEY` | only for phone login | Phone login is refused with HTTP 503 and nothing is written to the database |

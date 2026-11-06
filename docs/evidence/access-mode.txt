@@ -1,4 +1,4 @@
-# access mode — 2026-10-31T17:40:30Z
+# access mode — 2026-11-06T10:28:37Z
 $ cat config/access.json
 {
   "mode": "locked",
@@ -21,12 +21,12 @@ $ npm run test:access
 
 ✔ 52 بررسی حالت دسترسی — همه موفق
 
-$ curl -s :3400/api/health (config → locked)
+$ curl -s :3000/api/health (config → locked)
 {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"locked","source":"config","shareLinkCap":10,"history":{"count":20,"bytes":8388608}}}
-$ curl -s :3410/api/health (HERMIPLAN_ACCESS_MODE=open)
+$ curl -s :3410/api/health (HERMIPLAN_ACCESS_MODE=open, same build)
 {"ok":true,"schemaVersion":5,"database":"ok","rateLimitStore":"postgres","shareLinks":"postgres","revisionHistory":"postgres","smsConfigured":false,"access":{"mode":"open","source":"env","shareLinkCap":100000,"history":{"count":100,"bytes":33554432}}}
 
-$ curl -s :3400/builder | grep -c "بدون سهمیه"
+$ curl -s :3000/builder | grep -c "بدون سهمیه"
 0
 $ curl -s :3410/builder | grep -c "بدون سهمیه"
 1
