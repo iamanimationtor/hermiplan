@@ -42,7 +42,7 @@
 | `final-checks.txt` | a11y + export + layout + versions + project-file + bundle + csp-real + access در یک اجرا | ۳۲ · ۸۰ · ۲۴ · ۴۱ · ۳۱ · ۶/۶ · ۷۸ · ۵۲ — همه سبز |
 | `security.txt` | `npm run test:security` | **۲۹۱ بررسی** (شماره، OTP، CSRF، محدودیت نرخ، توکن اشتراک، قاعده‌های خالص تاریخچه) |
 | `netlify-config.txt` | `npm run deploy:check` (تنظیمات مخزن + خروجی بیلد) | **۹ بررسی، خروجی ۰**: دستور بیلد، `publish = ".next"`، آداپتر `@netlify/plugin-nextjs` (در `netlify.toml` و `package.json`)، `NODE_VERSION`/`.nvmrc`، وابستگی‌های بیلد، `.gitignore`، `[dev]`، و مانیفست مسیرهای خروجی بیلد |
-| `netlify-live.txt` | سنجش زندهٔ `https://hermiplan.netlify.app` (پاسخ خام قیدشده) | **علت ۴۰۴ سراسری**: `/` = ۴۰۴ نتلیفای، ولی `/BUILD_ID` و `/app-path-routes-manifest.json` = ۲۰۰ ⇒ خروجی خام `next build` منتشر شده و آداپتر اجرا نشده؛ دامنهٔ ناموجود برای کنترل، «Site not found» می‌دهد |
+| `netlify-live.txt` | سنجش زندهٔ `https://hermiplan.netlify.app` (پاسخ خام قیدشده) | **علت ۴۰۴ سراسری**: `/` = ۴۰۴ نتلیفای، ولی `/BUILD_ID` و `/app-path-routes-manifest.json` = ۲۰۰ ⇒ خروجی خام `next build` منتشر شده و آداپتر اجرا نشده؛ دامنهٔ ناموجود برای کنترل، «Site not found» می‌دهد | (به‌علاوه: دو اجرای ورک‌فلوی `Deploy to Netlify` روی ران‌ر گیت‌هاب با نتیجهٔ success، و اینکه `BUILD_ID` دامنه پس از دو push به `main` تغییر نکرد ⇒ دیپلوی تازه‌ای منتشر نشده) |
 
 ## بازتولید
 
