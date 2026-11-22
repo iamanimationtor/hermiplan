@@ -195,13 +195,98 @@ function mobilePreconditions() {
     .filter((source) => source.includes("overflow-x-auto")).length;
   check(scrollable >= 2, "جدول‌های پهن در ظرف اسکرول افقی قرار دارند", `${scrollable} فایل`);
 
-  const builder = readFileSync(join(process.cwd(), "src/components/builder/BuilderApp.tsx"), "utf8");
-  const responsiveTokens = (builder.match(/\b(sm|md|lg):/g) ?? []).length;
+  const builderSource = readFileSync(join(process.cwd(), "src/components/builder/BuilderApp.tsx"), "utf8");
+  const responsiveTokens = (builderSource.match(/\b(sm|md|lg):/g) ?? []).length;
   check(responsiveTokens >= 10, "رابط بیلدر از نقاط شکست واکنش‌گرا استفاده می‌کند", `${responsiveTokens} مورد`);
 
   const reportView = readFileSync(join(process.cwd(), "src/components/report/ReportView.tsx"), "utf8");
   const reportTokens = (reportView.match(/\b(sm|md|lg):/g) ?? []).length;
   check(reportTokens >= 10, "گزارش هم چیدمان موبایل دارد", `${reportTokens} مورد`);
+
+  // Regression guard for the phone bug fixed in this revision: the shared
+  // `Button` used to hard-code `inline-flex`, which beat every `hidden` the
+  // caller passed (Tailwind emits `.hidden` first), so "hidden on phones"
+  // buttons stayed visible and widened the page. Display is now opt-out.
+  const ui = readFileSync(join(process.cwd(), "src/components/ui.tsx"), "utf8");
+  const buttonBody = ui.slice(ui.indexOf("export function Button"), ui.indexOf("/* -------------------------------- Card"));
+  check(
+    !/className={`inline-flex/.test(buttonBody),
+    "دکمهٔ مشترک، display را بی‌قید به className اضافه نمی‌کند (hidden قابل بازنویسی است)",
+  );
+  check(/DISPLAY_UTILITY/.test(buttonBody), "دکمه فقط وقتی inline-flex پیش‌فرض می‌گیرد که فراخوان display نفرستاده باشد");
+
+  // Horizontal overflow is clipped at the root, so a stray wide child can never
+  // pan the document and slide `position: fixed` bars out of the viewport.
+  check(/html,\s*\n?body\s*\{[^}]*overflow-x:\s*clip/.test(globals), "ریشهٔ سند سرریز افقی را clip می‌کند");
+
+  // The builder reserves space for its bottom bar with one shared token instead
+  // of an ad-hoc `pb-32`, and the offset must follow the same breakpoint as the
+  // bar itself (lg), including the safe-area inset.
+  check(/--hp-actionbar-h:/.test(globals), "ارتفاع نوار اقدام موبایل به‌صورت توکن تعریف شده است");
+  check(/\.hp-actionbar-offset\s*\{[^}]*env\(safe-area-inset-bottom\)/.test(globals), "فاصلهٔ محتوا از نوار، safe-area را لحاظ می‌کند");
+  check(builderSource.includes("hp-actionbar-offset"), "صفحهٔ سازنده از فاصلهٔ استاندارد نوار پایین استفاده می‌کند");
+  check(
+    !/pb-32/.test(builderSource),
+    "صفحهٔ سازنده دیگر از padding عددی ثابت (pb-32) برای نوار پایین استفاده نمی‌کند",
+  );
+
+  // Regression guard for the "dialog inside a hidden wrapper" bug: the sign-in
+  // modal used to be rendered *inside* the header's `hidden sm:inline-flex`
+  // account slot. A `display:none` ancestor does not unmount a `<dialog>` — it
+  // paints it at 0×0 on phones, which is invisible to DOM-only assertions.
+  // Overlays must be rendered at page level.
+  const authSource = readFileSync(join(process.cwd(), "src/components/builder/AuthMenu.tsx"), "utf8");
+  const authBody = authSource.slice(authSource.indexOf("export function AuthMenu"));
+  check(
+    !/hidden[^\n]*sm:inline-flex/.test(authBody),
+    "دیالوگ ورود، تریگر خودش را داخل ظرف مخفی موبایل رندر نمی‌کند",
+  );
+  /**
+   * Find every JSX element whose `className` hides it on some breakpoints and
+   * look at what it wraps. Walking `<span …>` / `</span>` nesting is enough for
+   * this file (spans never nest across component boundaries here) and catches
+   * the exact regression: `<span className="hidden sm:inline-flex"><AuthMenu/>`.
+   */
+  const hiddenWrappers: string[] = [];
+  const spanOpen = /<span\b[^>]*className="([^"]*\bhidden\b[^"]*)"/g;
+  for (let match = spanOpen.exec(builderSource); match; match = spanOpen.exec(builderSource)) {
+    const start = match.index;
+    let depth = 0;
+    let cursor = start;
+    for (;;) {
+      const nextOpen = builderSource.indexOf("<span", cursor + 1);
+      const nextClose = builderSource.indexOf("</span>", cursor + 1);
+      if (nextClose === -1) break;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth += 1;
+        cursor = nextOpen;
+      } else {
+        if (depth === 0) {
+          hiddenWrappers.push(builderSource.slice(start, nextClose));
+          break;
+        }
+        depth -= 1;
+        cursor = nextClose;
+      }
+    }
+  }
+  check(
+    hiddenWrappers.every((wrapper) => !wrapper.includes("<AuthMenu")),
+    "دیالوگ ورود داخل هیچ ظرف hidden (مخفی در موبایل) mount نشده است",
+    `${hiddenWrappers.filter((w) => w.includes("<AuthMenu")).length} مورد`,
+  );
+  check(
+    /<AuthMenu\s+open=\{authOpen\}/.test(builderSource),
+    "سازنده دیالوگ ورود را یک‌بار در سطح صفحه و کنترل‌شده رندر می‌کند",
+  );
+  const stacked = [...builderSource.matchAll(/<AuthMenu/g)].length;
+  check(stacked === 1, "فقط یک نمونه از دیالوگ ورود در سازنده mount می‌شود", `${stacked} مورد`);
+
+  // The card/step header icon box was squeezed to 13px by `flex-shrink: 1`.
+  check(
+    /size-9 shrink-0/.test(ui),
+    "جعبهٔ آیکن سرصفحه در برابر فشرده‌شدن flex مقاوم شده است",
+  );
 
   console.log(`\n  پوشه خروجی تصاویر: ${workdir}`);
 }

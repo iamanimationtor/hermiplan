@@ -163,7 +163,7 @@ export function StepBasics({ project, api }: { project: ProjectInput; api: Proje
             </Select>
           </div>
         </div>
-        <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((template) => {
             const active = project.meta.type === template.id;
             return (
@@ -215,7 +215,7 @@ export function StepBasics({ project, api }: { project: ProjectInput; api: Proje
 
       <Card>
         <CardHeader level={2} title="مشخصات پروژه" subtitle="این اطلاعات در سربرگ و صفحات گزارش حرفه‌ای شما استفاده می‌شود." icon={<span className="text-lg">📋</span>} />
-        <div className="grid gap-4 p-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
           <Field label="نام پروژه" className="md:col-span-2">
             <Input value={project.meta.name} onChange={(e) => api.setMeta({ name: e.target.value })} />
           </Field>
@@ -375,7 +375,7 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
         }
       />
       <div className="space-y-4 p-5">
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <Field label="مبنای دستمزد">
             <Select value={pricing.series} onChange={(e) => api.setPricing({ series: e.target.value as ProjectPricing["series"] })}>
               <option value="official-1405">مرجع ۱۴۰۵ (بدون سند)</option>
@@ -452,7 +452,7 @@ export function PricingPanel({ project, analysis, api }: { project: ProjectInput
           </Button>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           <StatTile label="هزینه‌های مستقیم" value={formatCompact(p.breakdown.direct)} />
           <StatTile label="بالاسری + سود + احتیاط" value={formatCompact(p.breakdown.overhead + p.breakdown.profit + p.breakdown.contingency)} />
           <StatTile label="تعدیل قیمت" value={formatCompact(p.breakdown.escalation)} tone={p.breakdown.escalation > 0 ? "warn" : "neutral"} hint={`${toPersianDigits(p.escalationRatePerMonth)}٪ ماهانه`} />
@@ -639,7 +639,7 @@ export function StepActivities({ project, analysis, api }: { project: ProjectInp
     <div className="space-y-5">
       <AnalysisAlerts analysis={analysis} />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <StatTile label="تعداد فعالیت" value={toPersianDigits(analysis.activities.length)} hint={`${toPersianDigits(analysis.schedule.phases.length)} فاز کاری`} />
         <StatTile label="مدت پروژه" value={`${toPersianDigits(analysis.schedule.workingDays)} روز کاری`} hint={`پایان: ${formatJalali(analysis.schedule.finishDate, { withMonthName: false })}`} />
         <StatTile
@@ -691,7 +691,7 @@ export function StepResources({ project, analysis, api }: { project: ProjectInpu
     <div className="space-y-5">
       <PricingPanel project={project} analysis={analysis} api={api} />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <StatTile label="منابع تعریف‌شده" value={toPersianDigits(project.resources.length)} />
         <StatTile label="هزینه منابع" value={formatCompact(analysis.resources.reduce((s, r) => s + r.cost, 0))} />
         <StatTile
@@ -706,7 +706,7 @@ export function StepResources({ project, analysis, api }: { project: ProjectInpu
       <Card>
         <CardHeader level={2} title="منابع پروژه" subtitle="نرخ روزانه و ظرفیت مجاز هر منبع را وارد کنید؛ هزینه‌ها و بار کاری به‌صورت خودکار محاسبه می‌شود." icon={<span className="text-lg">👷</span>} />
         <div className="p-5">
-          <div className="thin-scroll overflow-x-auto">
+          <div className="thin-scroll min-w-0 overflow-x-auto">
             <table className="w-full min-w-[760px] text-[12.5px]">
               <thead>
                 <tr className="bg-slate-50 text-slate-500">
@@ -796,8 +796,8 @@ export function StepResources({ project, analysis, api }: { project: ProjectInpu
 
       <Card>
         <CardHeader level={2} title="تحلیل هزینه فازها" subtitle="برآورد بودجه و هزینه واقعی هر فاز به‌صورت خودکار تجمیع شده است." icon={<span className="text-lg">💰</span>} />
-        <div className="p-5">
-          <table className="w-full text-[12.5px]">
+        <div className="min-w-0 overflow-x-auto p-5">
+          <table className="min-w-[560px] text-[12.5px]">
             <thead>
               <tr className="bg-slate-50 text-slate-500">
                 {["فاز", "تعداد فعالیت", "مدت", "پیشرفت", "بودجه", "هزینه واقعی"].map((h) => (
@@ -852,7 +852,7 @@ export function StepCalendar({ project, api }: { project: ProjectInput; api: Pro
     <div className="space-y-5">
       <Card>
         <CardHeader level={2} title="تقویم کاری پروژه" subtitle="روزهای کاری، ساعت کار و تعطیلات را تعیین کنید؛ همه محاسبات زمان‌بندی بر اساس این تقویم انجام می‌شود." icon={<span className="text-lg">🗓️</span>} />
-        <div className="grid gap-5 p-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2">
           <div className="md:col-span-2">
             <span className="mb-2 block text-[12.5px] font-semibold text-slate-700">روزهای کاری هفته</span>
             <div className="flex flex-wrap gap-2">
@@ -944,7 +944,7 @@ export function StepMilestonesRisks({ project, api }: { project: ProjectInput; a
         <CardHeader level={2} title="نقاط کنترل (Milestones)" subtitle="رویدادهای کلیدی پروژه؛ با اتصال به فعالیت، تاریخ آن به‌صورت خودکار محاسبه می‌شود." icon={<span className="text-lg">🚩</span>} />
         <div className="space-y-3 p-5">
           {project.milestones.map((milestone) => (
-            <div key={milestone.id} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_220px_auto]">
+            <div key={milestone.id} className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_220px_auto]">
               <Input value={milestone.name} onChange={(e) => api.updateMilestone(milestone.id, { name: e.target.value })} />
               <Select value={milestone.activityId ?? ""} onChange={(e) => api.updateMilestone(milestone.id, { activityId: e.target.value || undefined })}>
                 <option value="">— بدون اتصال به فعالیت —</option>
@@ -973,7 +973,7 @@ export function StepMilestonesRisks({ project, api }: { project: ProjectInput; a
 
       <Card>
         <CardHeader level={2} title="ریسک‌های پروژه" subtitle="احتمال و اثر را از ۱ تا ۵ انتخاب کنید؛ ماتریس ریسک و ارزش در معرض ریسک خودکار محاسبه می‌شود." icon={<span className="text-lg">⚠️</span>} />
-        <div className="thin-scroll overflow-x-auto p-5">
+        <div className="thin-scroll min-w-0 overflow-x-auto p-5">
           <table className="w-full min-w-[820px] text-[12.5px]">
             <thead>
               <tr className="bg-slate-50 text-slate-500">
@@ -1064,7 +1064,7 @@ export function StepOutput({
           {groups.map((group) => (
             <div key={group}>
               <h3 className="mb-2 text-[12px] font-bold text-slate-500">{group}</h3>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {REPORT_SECTIONS.filter((s) => s.group === group).map((section) => {
                   const active = reportSections.includes(section.key);
                   return (
@@ -1100,7 +1100,7 @@ export function StepOutput({
 
       <Card>
         <CardHeader level={2} title="پیش‌نمایش شاخص‌های کلیدی" subtitle="این مقادیر به‌صورت خودکار از موتور محاسباتی پروژه استخراج شده‌اند." icon={<span className="text-lg">📊</span>} />
-        <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 p-4 sm:gap-3 sm:p-5 lg:grid-cols-4">
           {analysis.kpis.slice(0, 8).map((kpi) => (
             <StatTile
               key={kpi.key}

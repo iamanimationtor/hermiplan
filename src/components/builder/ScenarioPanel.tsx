@@ -92,7 +92,7 @@ export function ScenarioPanel({
         action={<Badge tone={busy ? "warn" : "ok"}>{busy ? "در حال محاسبه…" : "به‌روز"}</Badge>}
       />
       <div className="space-y-5 p-5">
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           <div>
             <label className="mb-1.5 block text-[12.5px] font-semibold text-slate-700">
               تأخیر در فعالیت‌های بحرانی: {toPersianDigits(deferred.criticalSlip)} روز
@@ -149,13 +149,13 @@ export function ScenarioPanel({
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {rows.map((row) => (
             <StatTile key={row.label} label={row.label} value={row.what} hint={`مقدار فعلی: ${row.base} · تغییر: ${row.delta}`} tone={row.tone} />
           ))}
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-slate-200">
+        <div className="min-w-0 overflow-x-auto rounded-2xl border border-slate-200">
           <table className="w-full min-w-[560px] text-[12px]">
             <thead>
               <tr className="bg-slate-50 text-slate-500">

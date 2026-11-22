@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, Modal, ProgressBar, StatTile } from "@/components/ui";
 import { GanttChart } from "@/components/charts";
 import { loadDraft, useProject } from "./useProject";
-import { AuthMenu } from "./AuthMenu";
+import { AuthMenu, type AuthUser } from "./AuthMenu";
 import { HelpDialog } from "./HelpGlossary";
 import { ImportDialog } from "./QuickCapture";
 import { Logo, LogoMark, CREATOR_CREDIT_FULL } from "@/components/Logo";
@@ -84,6 +84,30 @@ export function BuilderApp({
    */
   const [serverProject, setServerProject] = useState<{ id: string; version: number; viewKey?: string } | null>(null);
   const [stepsOpen, setStepsOpen] = useState(false);
+  /**
+   * The welcome tour must never stack on top of a dialog the visitor asked for.
+   * «ورود / ثبت‌نام» on the landing page arrives as `/builder?account=1`, and
+   * `AuthMenu` opens itself from that parameter — a welcome panel in front of it
+   * would hide the sign-in form behind an unrelated overlay.
+   *
+   * Read during the first render and kept in a ref: child effects (the one that
+   * clears the spent `?account=1` from the address bar) run *before* this
+   * component's effects, so by mount time the parameter may already be gone.
+   */
+  const accountIntentRef = useRef(
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("account") === "1",
+  );
+  /**
+   * Sign-in state for the two triggers. The dialog itself is rendered once, at
+   * page level, at the bottom of this component — never inside a container that
+   * is `display:none` on some breakpoints (the header's `hidden sm:inline-flex`
+   * wrapper would paint the modal at 0×0 on a phone).
+   */
+  const [authOpen, setAuthOpen] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("account") === "1",
+  );
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const openAuth = useCallback(() => setAuthOpen(true), []);
   const [helpOpen, setHelpOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
@@ -113,8 +137,7 @@ export function BuilderApp({
     // disagree. This runs exactly once.
     const draft = loadDraft();
     if (draft) api.replace(draft);
-    if (typeof window !== "undefined" && !window.localStorage.getItem("hermiplan:welcomed")) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!accountIntentRef.current && !window.localStorage.getItem("hermiplan:welcomed")) {
       setWelcomeOpen(true);
       window.localStorage.setItem("hermiplan:welcomed", "1");
     }
@@ -349,15 +372,15 @@ export function BuilderApp({
         پرش به محتوای اصلی
       </a>
       <header className="no-print sticky top-0 z-30 border-b border-slate-200/70 glass">
-        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-[1400px] items-center gap-2 px-4 py-2.5 sm:gap-3 sm:px-6 sm:py-3">
           <Link href="/" aria-label="HERMIPLAN" className="shrink-0">
             <span className="hidden sm:inline-flex"><Logo tagline="Project Intelligence" /></span>
             <span className="sm:hidden"><LogoMark size="sm" /></span>
           </Link>
-          <span className="hidden h-6 w-px bg-slate-200 sm:block" />
+          <span className="hidden h-6 w-px shrink-0 bg-slate-200 sm:block" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-bold text-ink-900">{current.meta.name}</p>
-            <p className="text-[11px] text-slate-500">
+            <p className="truncate text-[12.5px] font-bold text-ink-900 sm:text-[13px]">{current.meta.name}</p>
+            <p className="truncate text-[10.5px] text-slate-500 sm:text-[11px]">
               {api.isStale ? "در حال محاسبه…" : "ذخیره خودکار فعال"} · برآورد {formatCompact(analysis.pricing.breakdown.total)}
             </p>
             {accessBadge ? (
@@ -367,8 +390,26 @@ export function BuilderApp({
               </p>
             ) : null}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex"><AuthMenu /></span>
+          {/*
+            Action cluster. Every secondary action carries its own visibility
+            breakpoint and they are listed *before* the primary action, so the
+            browser's flex algorithm shrinks/drops them first. The primary
+            «تولید گزارش» keeps a stable width at 320px instead of being squeezed
+            to 5px by buttons that are supposed to be hidden on phones.
+          */}
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+            <span className="hidden sm:inline-flex">
+              {authUser ? (
+                <Button variant="ghost" size="sm" onClick={openAuth} className="whitespace-nowrap">
+                  <span aria-hidden="true">👤</span>
+                  <span dir="auto" className="max-w-[8rem] truncate">{authUser.displayName?.trim() || authUser.username || "حساب من"}</span>
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={openAuth} className="whitespace-nowrap">
+                  ورود / ثبت‌نام
+                </Button>
+              )}
+            </span>
             <span className="hidden items-center gap-1 md:inline-flex">
               <button
                 type="button"
@@ -409,7 +450,7 @@ export function BuilderApp({
                 ؟
               </button>
             </span>
-            <Button variant="ghost" size="sm" onClick={openSaved} className="hidden sm:inline-flex">
+            <Button variant="ghost" size="sm" onClick={openSaved} className="hidden shrink-0 whitespace-nowrap sm:inline-flex">
               پروژه‌های من
             </Button>
             <Button variant="secondary" size="sm" onClick={() => downloadExport("xlsx")} disabled={busy} className="hidden xl:inline-flex">
@@ -418,24 +459,22 @@ export function BuilderApp({
             <Button variant="secondary" size="sm" onClick={() => downloadExport("package")} disabled={busy} className="hidden xl:inline-flex">
               بسته کامل
             </Button>
+            {/*
+              On phones the account entry moved to the bottom action bar (it is
+              the one thing a visitor may need *before* building anything), so
+              the header keeps only undo + report at <sm.
+            */}
             <button
               type="button"
               onClick={api.undo}
               disabled={!api.canUndo}
               aria-label="واگردانی"
-              className="flex size-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-[14px] text-brand-700 md:hidden disabled:opacity-40"
+              title="واگردانی (Undo)"
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-[14px] text-brand-700 transition hover:bg-brand-50 disabled:opacity-40 md:hidden"
             >
               ↺
             </button>
-            <button
-              type="button"
-              onClick={() => setHelpOpen(true)}
-              aria-label="راهنما"
-              className="flex size-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-[13px] text-brand-700 md:hidden"
-            >
-              ؟
-            </button>
-            <Button size="sm" onClick={saveAndOpenReport} disabled={busy}>
+            <Button size="sm" onClick={saveAndOpenReport} disabled={busy} className="shrink-0 whitespace-nowrap px-2.5 sm:px-3">
               {busy ? "…" : serverProject ? "به‌روزرسانی گزارش" : "تولید گزارش"}
             </Button>
           </div>
@@ -485,9 +524,9 @@ export function BuilderApp({
 
             <main
         id="builder-main"
-        className="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 pb-32 sm:px-6 lg:grid-cols-[1fr_320px] lg:pb-8"
+        className="hp-actionbar-offset mx-auto grid max-w-[1400px] min-w-0 grid-cols-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:pb-8"
       >
-        <div className="animate-fade-up space-y-5">
+        <div className="animate-fade-up min-w-0 space-y-5">
           {/* One h1 per page: the step wizard changes the visible heading level
               per step, so the document title lives here and is hidden visually
               only (still announced by screen readers). */}
@@ -529,7 +568,7 @@ export function BuilderApp({
           </div>
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-[124px] lg:h-fit">
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-[124px] lg:h-fit">
           <Card>
             <div className="border-b border-slate-100 px-4 py-3">
               <h3 className="text-[13.5px] font-bold text-ink-900">داشبورد زنده پروژه</h3>
@@ -540,7 +579,7 @@ export function BuilderApp({
                 <StatTile label="پیشرفت" value={formatPercent(analysis.progress.overall, 1)} tone={analysis.progress.overall >= analysis.progress.planned ? "ok" : "warn"} hint={`برنامه: ${formatPercent(analysis.progress.planned, 1)}`} />
                 <StatTile label="مدت" value={`${toPersianDigits(analysis.schedule.workingDays)} روز`} hint={`پایان ${formatJalali(analysis.schedule.finishDate, { withMonthName: false })}`} />
                 <StatTile label="SPI" value={String(analysis.progress.schedulePerformanceIndex || "—")} tone={analysis.progress.schedulePerformanceIndex >= 1 ? "ok" : "warn"} />
-                <StatTile label="بودجه" value={formatCompact(analysis.costs.budget)} tone="accent" />
+                <StatTile label="بودجه" value={formatCompact(analysis.costs.budget)} tone="accent" hint="برآورد نهایی" />
               </div>
               <div>
                 <div className="mb-1.5 flex items-center justify-between text-[11.5px] font-semibold text-slate-500">
@@ -617,45 +656,73 @@ export function BuilderApp({
         </aside>
       </main>
 
-      {/* --------------------- mobile bottom action bar --------------------- */}
-      <div className="hp-tabbar no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch gap-2 px-3 pt-2 lg:hidden">
+      {/*
+        --------------------- mobile bottom action bar ---------------------
+        Spacing rules:
+        • `hp-tabbar` owns the bottom padding, including `env(safe-area-inset-bottom)`
+          for phones with a home indicator, so buttons never sit under it.
+        • The bar stays inside the viewport because the app now has no horizontal
+          overflow and the bar itself is clipped with `overflow-hidden`; its side
+          padding uses `max()` so it can never collapse on narrow screens.
+        • <main> reserves the bar's real height via `.hp-actionbar-offset`.
+      */}
+      <div
+        data-hp-actionbar
+        className="hp-tabbar no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch gap-2 overflow-hidden pt-3 lg:hidden"
+      >
         <button
           type="button"
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0}
           className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[16px] text-brand-700 transition active:scale-95 disabled:opacity-40"
           aria-label="مرحله قبل"
+          title="مرحله قبل"
         >
           ›
         </button>
         <button
           type="button"
           onClick={() => setStepsOpen(true)}
-          className="flex min-w-0 flex-1 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white py-1.5 active:scale-[0.98]"
+          className="flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white px-2 py-1.5 active:scale-[0.98]"
+          aria-label={`مرحله ${toPersianDigits(step + 1)} از ${toPersianDigits(STEPS.length)}: ${STEPS[step].label} — تغییر مرحله`}
         >
-          <span className="text-[11px] font-bold text-ink-900">
-            {STEPS[step].icon} {STEPS[step].label}
+          <span className="flex w-full min-w-0 items-center justify-center gap-1 text-[11px] font-bold text-ink-900">
+            <span aria-hidden="true" className="shrink-0">{STEPS[step].icon}</span>
+            <span className="truncate">{STEPS[step].label}</span>
           </span>
-          <span className="mt-1 text-[10px] text-slate-500">تغییر مرحله</span>
+          <span className="mt-0.5 max-w-full truncate text-[10px] text-slate-500">
+            مرحله {toPersianDigits(step + 1)} از {toPersianDigits(STEPS.length)}
+            <span className="max-[360px]:hidden"> · تغییر مرحله</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={openAuth}
+          aria-label={authUser ? "حساب کاربری" : "ورود / ثبت‌نام"}
+          title={authUser ? "حساب کاربری" : "ورود / ثبت‌نام"}
+          className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[16px] text-brand-700 transition active:scale-95 sm:hidden"
+        >
+          👤
         </button>
         {step < STEPS.length - 1 ? (
           <button
             type="button"
             onClick={() => setStep((s) => s + 1)}
-            className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand-700 text-[16px] text-white transition active:scale-95"
+            className="flex min-w-[4.5rem] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-2xl bg-brand-700 px-3 text-[12.5px] font-bold text-white shadow-md shadow-brand-900/20 transition active:scale-95"
             aria-label="مرحله بعد"
           >
-            ‹
+            بعدی
+            <span aria-hidden="true">‹</span>
           </button>
         ) : (
           <button
             type="button"
             onClick={saveAndOpenReport}
             disabled={busy}
-            className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-accent-500 text-[16px] text-ink-950 transition active:scale-95 disabled:opacity-50"
-            aria-label="ساخت نهایی پروژه"
+            className="flex min-w-[4.5rem] shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-accent-500 px-3 text-[12px] font-bold text-ink-950 transition active:scale-95 disabled:opacity-50 min-[380px]:text-[12.5px]"
+            aria-label="ساخت نهایی پروژه و دریافت خروجی"
           >
-            ⤓
+            {busy ? "…" : "دریافت خروجی"}
           </button>
         )}
       </div>
@@ -707,7 +774,6 @@ export function BuilderApp({
           <Button variant="secondary" size="sm" onClick={() => setHelpOpen(true)}>
             ؟ راهنما
           </Button>
-          <AuthMenu />
           <Button variant="secondary" size="sm" onClick={() => downloadExport("xlsx")} disabled={busy}>
             Excel
           </Button>
@@ -727,6 +793,14 @@ export function BuilderApp({
       </Modal>
 
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
+      {/*
+        The one sign-in dialog. It lives at page level — not in the header —
+        because the header's account slot is `display:none` below `sm`; a modal
+        nested in there would exist in the DOM but paint at 0×0 on a phone.
+        Both triggers (header «ورود / ثبت‌نام» / account chip, and the action
+        bar's 👤) open this instance.
+      */}
+      <AuthMenu open={authOpen} onOpenChange={setAuthOpen} onUserChange={setAuthUser} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} project={current} api={api} />
 
       <Modal

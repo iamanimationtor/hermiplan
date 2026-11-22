@@ -78,9 +78,16 @@ export function SiteNav({ items = LANDING_ITEMS }: { items?: NavItem[] }) {
           scrolled ? "glass border-b border-brand-900/10" : "bg-transparent"
         }`}
       >
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-          <Link href="/" aria-label="HERMIPLAN">
-            <Logo tone="dark" tagline="Project Intelligence" />
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:gap-4 sm:px-6">
+          <Link href="/" aria-label="HERMIPLAN" className="shrink-0">
+            {/* The wordmark leaves ~130px on a 320px phone for sign-in + menu,
+                so below `sm` only the brand mark is drawn (it still links home). */}
+            <span className="hidden sm:inline-flex">
+              <Logo tone="dark" tagline="Project Intelligence" />
+            </span>
+            <span className="sm:hidden">
+              <LogoMark size="sm" />
+            </span>
           </Link>
 
           <nav className="hidden flex-1 items-center justify-center gap-1 lg:flex">
@@ -102,7 +109,7 @@ export function SiteNav({ items = LANDING_ITEMS }: { items?: NavItem[] }) {
               the `lg` breakpoint. */}
           <Link
             href="/builder?account=1"
-            className="ms-auto inline-flex rounded-xl border border-white/25 px-3 py-2 text-[12.5px] font-bold text-white transition hover:bg-white/10 lg:ms-0 lg:px-4 lg:text-[13px]"
+            className="ms-auto inline-flex shrink-0 whitespace-nowrap rounded-xl border border-white/25 px-2.5 py-2 text-[11.5px] font-bold text-white transition hover:bg-white/10 min-[380px]:px-3 min-[380px]:text-[12.5px] lg:ms-0 lg:px-4 lg:text-[13px]"
           >
             ورود / ثبت‌نام
           </Link>
@@ -118,7 +125,7 @@ export function SiteNav({ items = LANDING_ITEMS }: { items?: NavItem[] }) {
             type="button"
             onClick={() => setSheetOpen(true)}
             aria-label="منوی بیشتر"
-            className="ms-auto flex size-11 items-center justify-center rounded-xl border border-white/15 bg-white/8 text-white transition active:scale-95 lg:hidden"
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/8 text-white transition active:scale-95 sm:size-11 lg:hidden"
           >
             <span className="flex flex-col gap-[5px]">
               <span className="block h-[2px] w-5 rounded bg-current" />

@@ -24,6 +24,10 @@ const SUITES: { name: string; file: string }[] = [
   // No server required: the local half of the artifact checks runs here, and the
   // HTTP half activates by itself when BASE_URL is set.
   { name: "خروجی — صحت فایل‌های XLSX/CSV/HTML/بسته", file: "scripts/export-check.ts" },
+  // Browser half of the layout checks. Skips itself (exit 0) unless a server
+  // answers on BASE_URL and Chromium + puppeteer-core are available; run it
+  // explicitly against a production build with `npm run test:mobile`.
+  { name: "چیدمان موبایل — مرورگر واقعی (اختیاری)", file: "scripts/mobile-layout-check.ts" },
 ];
 
 let failed = 0;

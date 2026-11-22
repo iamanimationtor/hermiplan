@@ -182,6 +182,7 @@ export function ReportView({
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [busyFormat, setBusyFormat] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareLinks, setShareLinks] = useState<
     { id: string; createdAt: string; expiresAt: string | null; revokedAt: string | null; lastUsedAt: string | null; useCount: number; active: boolean }[]
@@ -464,7 +465,7 @@ export function ReportView({
         پرش به محتوای گزارش
       </a>
       <div className="no-print sticky top-0 z-30 border-b border-slate-200/70 glass">
-        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
+        <div className="mx-auto flex max-w-[1180px] items-center gap-2 px-3 py-2.5 sm:flex-wrap sm:px-4 sm:py-3">
           <Link href="/builder" aria-label="HERMIPLAN" className="shrink-0">
             <span className="hidden sm:inline-flex"><Logo tagline="Project Report" /></span>
             <span className="sm:hidden"><LogoMark size="sm" /></span>
@@ -476,6 +477,14 @@ export function ReportView({
               گزارش مدیریت پروژه · شناسه {projectId.slice(0, 8).toUpperCase()} · نرخ {a.pricing.asOfJalali}
             </p>
           </div>
+          {/*
+            Phone rule for this header: a 320px line fits the title plus two
+            controls, so only the two primary actions stay inline («خروجی» in its
+            short form and «چاپ / PDF»). Everything else — Excel, link copy,
+            sharing, history — is `hidden sm:inline-flex` here and is offered
+            again in the phone-only «⋯ بیشتر» sheet, so no action becomes
+            unreachable on a phone.
+          */}
           <Button variant="secondary" size="sm" onClick={() => download("xlsx")} disabled={busyFormat !== null} className="hidden sm:inline-flex">
             Excel
           </Button>
@@ -483,11 +492,12 @@ export function ReportView({
             {copied ? "✓ کپی شد" : "کپی لینک"}
           </Button>
           {canManage ? (
-              <Button
+            <Button
               variant="secondary"
               size="sm"
               onClick={toggleSharePanel}
               title={shareState.hint}
+              className="hidden shrink-0 whitespace-nowrap sm:inline-flex"
             >
               {shareState.badge}
             </Button>
@@ -498,15 +508,30 @@ export function ReportView({
               size="sm"
               onClick={toggleHistoryPanel}
               title="نسخه‌های ذخیره‌شده این پروژه؛ هر نسخه قابل بازگردانی است"
+              className="hidden shrink-0 whitespace-nowrap sm:inline-flex"
             >
               تاریخچه
             </Button>
           ) : null}
-          <Button variant="accent" size="sm" onClick={() => setDownloadOpen(true)}>
+          <Button variant="accent" size="sm" onClick={() => setDownloadOpen(true)} className="shrink-0 whitespace-nowrap">
             <span className="sm:hidden">خروجی</span>
             <span className="hidden sm:inline">دریافت خروجی (۷ فرمت)</span>
           </Button>
-          <Button size="sm" onClick={() => window.print()}>
+          {/*
+            Phone-only door to the header actions that do not fit. It lives next
+            to the title area rather than in the fixed bottom bar so the report
+            keeps its own (printable) layout; `sm`+ shows the real buttons above.
+          */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setMoreOpen(true)}
+            aria-label="کارهای بیشتر گزارش"
+            className="shrink-0 whitespace-nowrap px-2.5 sm:hidden"
+          >
+            ⋯
+          </Button>
+          <Button size="sm" onClick={() => window.print()} className="shrink-0 whitespace-nowrap">
             چاپ / PDF
           </Button>
         </div>
@@ -687,7 +712,7 @@ export function ReportView({
               <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-[11.5px] font-semibold text-emerald-800">{historyNotice}</p>
             ) : null}
 
-            <div className="thin-scroll mt-3 overflow-x-auto">
+            <div className="thin-scroll mt-3 min-w-0 overflow-x-auto">
               <table className="w-full min-w-[520px] text-right text-[11.5px]">
                 <thead>
                   <tr className="text-[10.5px] uppercase tracking-wide text-slate-400">
@@ -850,6 +875,63 @@ export function ReportView({
           </p>
         </div>
       ) : null}
+
+      {/* ------------------------ phone: more actions ------------------------ */}
+      {/*
+        The phone header can only afford the two primary buttons, so the rest of
+        its actions are collected here. They are the *same* handlers the header
+        uses on `sm`+ — this is a second door, not a second implementation.
+      */}
+      <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title="کارهای بیشتر گزارش">
+        <div className="space-y-2">
+          <Button
+            variant="secondary"
+            className="w-full justify-start"
+            onClick={() => {
+              setMoreOpen(false);
+              download("xlsx");
+            }}
+            disabled={busyFormat !== null}
+          >
+            ⬇ Excel — دریافت کارپوشه اکسل
+          </Button>
+          <Button
+            variant="secondary"
+            className="w-full justify-start"
+            onClick={() => {
+              setMoreOpen(false);
+              void copyLink();
+            }}
+          >
+            🔗 {copied ? "✓ کپی شد" : "کپی لینک گزارش"}
+          </Button>
+          {canManage ? (
+            <Button
+              variant="secondary"
+              className="w-full justify-start"
+              title={shareState.hint}
+              onClick={() => {
+                setMoreOpen(false);
+                toggleSharePanel();
+              }}
+            >
+              🤝 {shareState.badge}
+            </Button>
+          ) : null}
+          {canManage ? (
+            <Button
+              variant="secondary"
+              className="w-full justify-start"
+              onClick={() => {
+                setMoreOpen(false);
+                toggleHistoryPanel();
+              }}
+            >
+              🕘 تاریخچه نسخه‌ها
+            </Button>
+          ) : null}
+        </div>
+      </Modal>
 
       {/* -------------------------- download center -------------------------- */}
       <Modal open={downloadOpen} onClose={() => setDownloadOpen(false)} title="مرکز دریافت خروجی" wide>
@@ -1019,7 +1101,7 @@ export function ReportView({
                 </div>
               ) : null}
               <div className="flex flex-wrap items-start gap-6">
-                <div className="min-w-[260px] flex-1">
+                <div className="min-w-0 flex-1 basis-[260px]">
                   <div className="rpt-callout">
                     <p className="text-[12px] font-bold text-brand-900">{a.summary.headline}</p>
                   </div>

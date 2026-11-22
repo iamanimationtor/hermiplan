@@ -30,6 +30,24 @@ const buttonSizes: Record<ButtonSize, string> = {
   lg: "h-12 px-6 text-[15px] gap-2.5 rounded-xl",
 };
 
+/**
+ * The base layer deliberately does **not** set `display`.
+ *
+ * History: it used to hard-code `inline-flex`. Tailwind emits `.hidden` *before*
+ * `.inline-flex` inside the utilities layer, so `className="hidden sm:inline-flex"`
+ * placed after the base class could never win at phone widths: the button stayed
+ * visible everywhere. That single leak made the builder header ~403px wide on a
+ * 390px phone, widened the document to 419px, and the `fixed` bottom step bar
+ * (sized to the document) slid out of the visual viewport — taking the «مرحله
+ * بعد» button with it. Now the caller's display choice is detected and the
+ * `inline-flex` default is only added when the caller did not pick one.
+ */
+const buttonBase =
+  "items-center justify-center font-semibold transition-all duration-150 outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-50";
+
+const DISPLAY_UTILITY =
+  /(?:^|\s)(?:[a-z0-9-]+:)?(?:hidden|block|inline-block|inline|flex|inline-flex|grid|inline-grid|contents|flow-root|table|table-cell|list-item)\b/;
+
 export function Button({
   variant = "primary",
   size = "md",
@@ -37,10 +55,13 @@ export function Button({
   children,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: ButtonSize }) {
+  // A caller that passes `hidden sm:inline-flex` (or any display utility) is
+  // responsible for the display property; only a bare call gets `inline-flex`.
+  const display = DISPLAY_UTILITY.test(className) ? "" : "inline-flex";
   return (
     <button
       {...props}
-      className={`inline-flex items-center justify-center font-semibold transition-all duration-150 outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant]} ${buttonSizes[size]} ${className}`}
+      className={`${display} ${buttonBase} ${buttonVariants[variant]} ${buttonSizes[size]} ${className}`}
     >
       {children}
     </button>
@@ -60,7 +81,10 @@ export function Card({
 }) {
   return (
     <Tag
-      className={`rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgb(16_35_58_/_0.04),0_12px_28px_-18px_rgb(16_35_58_/_0.18)] ${className}`}
+      // `min-w-0` is not cosmetic: as a grid item, a card's default
+      // `min-width: auto` lets a wide child (a table or a chart inside a
+      // horizontal scroller) push the whole page wider than the phone.
+      className={`min-w-0 rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgb(16_35_58_/_0.04),0_12px_28px_-18px_rgb(16_35_58_/_0.18)] ${className}`}
     >
       {children}
     </Tag>
@@ -86,14 +110,18 @@ export function CardHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
-      <div className="flex items-start gap-3">
+    // Phone: title block first, the (short) action chip on the right of it.
+    // From `sm` up: icon, title and action share one row as before.
+    <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3.5 sm:gap-4 sm:px-5 sm:py-4">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
         {icon ? (
-          <span className="mt-0.5 flex size-9 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+          // `shrink-0`: without it the 36px icon box is squeezed to 13px on a
+          // phone and the emoji simply overflows the rounded background.
+          <span className="mt-0.5 hidden size-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 sm:flex">
             {icon}
           </span>
         ) : null}
-        <div>
+        <div className="min-w-0">
           {level === 2 ? (
             <h2 className="text-[15px] font-bold text-ink-900">{title}</h2>
           ) : level === 4 ? (
@@ -101,10 +129,10 @@ export function CardHeader({
           ) : (
             <h3 className="text-[15px] font-bold text-ink-900">{title}</h3>
           )}
-          {subtitle ? <p className="mt-1 text-[12.5px] leading-6 text-slate-500">{subtitle}</p> : null}
+          {subtitle ? <p className="mt-1 text-[12px] leading-6 text-slate-500 sm:text-[12.5px]">{subtitle}</p> : null}
         </div>
       </div>
-      {action}
+      {action ? <div className="shrink-0 [&>span]:whitespace-nowrap">{action}</div> : null}
     </div>
   );
 }
@@ -227,7 +255,10 @@ export function Modal({
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/50 p-4 backdrop-blur-sm sm:p-8"
+      // `p-[max(...)]` keeps the panel clear of notches and home indicators on
+      // phones; `dvh` (with a `vh` fallback) keeps it usable when the on-screen
+      // keyboard shrinks the visual viewport.
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/50 px-[max(0.75rem,env(safe-area-inset-left))] py-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-sm sm:p-8"
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -236,21 +267,25 @@ export function Modal({
       }}
     >
       <div
-        className={`animate-fade-up my-auto w-full ${wide ? "max-w-5xl" : "max-w-lg"} rounded-2xl border border-slate-200 bg-white shadow-2xl`}
+        className={`animate-fade-up my-auto flex max-h-[calc(100dvh-1.5rem)] w-full flex-col ${wide ? "max-w-5xl" : "max-w-lg"} rounded-2xl border border-slate-200 bg-white shadow-2xl`}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h3 className="text-[15px] font-bold text-ink-900">{title}</h3>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5 sm:py-4">
+          <h3 className="min-w-0 truncate text-[14.5px] font-bold text-ink-900 sm:text-[15px]">{title}</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="بستن"
-            className="flex size-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
           >
             ✕
           </button>
         </div>
-        <div className="thin-scroll max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
-        {footer ? <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3">{footer}</div> : null}
+        <div className="thin-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
+        {footer ? (
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -312,10 +347,11 @@ export function StatTile({
             ? "from-accent-500/15 text-accent-600"
             : "from-brand-600/10 text-brand-700";
   return (
-    <div className={`rounded-2xl border border-slate-200/80 bg-gradient-to-bl to-white p-4 ${ring}`}>
-      <div className="text-[11.5px] font-semibold text-slate-500">{label}</div>
-      <div className="mt-1.5 text-xl font-extrabold tracking-tight">{value}</div>
-      {hint ? <div className="mt-1 text-[11px] leading-5 text-slate-500">{hint}</div> : null}
+    // Compact on phones (these sit two-up there), roomy from `sm` upwards.
+    <div className={`min-w-0 rounded-2xl border border-slate-200/80 bg-gradient-to-bl to-white p-3 sm:p-4 ${ring}`}>
+      <div className="truncate text-[11px] font-semibold text-slate-500 sm:text-[11.5px]">{label}</div>
+      <div className="mt-1 truncate text-[17px] font-extrabold tracking-tight sm:mt-1.5 sm:text-xl">{value}</div>
+      {hint ? <div className="mt-0.5 line-clamp-2 text-[10.5px] leading-4 text-slate-500 sm:mt-1 sm:text-[11px] sm:leading-5">{hint}</div> : null}
     </div>
   );
 }

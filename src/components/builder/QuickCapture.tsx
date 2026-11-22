@@ -39,7 +39,7 @@ export function QuickAdd({
         compact ? "" : "sm:p-4"
       }`}
     >
-      <div className="min-w-[180px] flex-1">
+      <div className="min-w-[180px] flex-1 basis-[180px]">
         <Field label="افزودن سریع فعالیت">
           <Input
             value={name}
@@ -64,7 +64,7 @@ export function QuickAdd({
           />
         </Field>
       </div>
-      <div className="min-w-[150px]">
+      <div className="min-w-[150px] flex-1 basis-[150px] sm:flex-none">
         <Field label="فاز">
           <Select
             value={phases.includes(phase) ? phase : (phases[phases.length - 1] ?? phase)}
