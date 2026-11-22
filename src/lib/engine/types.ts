@@ -352,7 +352,40 @@ export interface ProjectInput {
 /* Analysis results                                                    */
 /* ------------------------------------------------------------------ */
 
-export type Status = "good" | "watch" | "critical";
+/**
+ * Verdict for a single indicator.
+ *
+ * `"na"` means *not applicable / not measured* — the indicator is undefined for
+ * this project, which is not a warning. Before it existed, "physical progress:
+ * no quantity has been recorded yet" was scored as `"watch"` and painted amber,
+ * so a project with no data looked like a project in trouble.
+ */
+export type Status = "good" | "watch" | "critical" | "na";
+
+/** Tone tokens shared by the UI badges and the printed report. */
+export type BadgeTone = "ok" | "warn" | "bad" | "neutral";
+
+/**
+ * The one place a status becomes words and colour.
+ *
+ * The app, the HTML report and the exported sheet previously each carried their
+ * own ternary chain, and they had drifted: `watch` was "قابل پایش" in one place
+ * and "نیازمند پایش" in another, while "not measured" fell through to the
+ * critical branch. Everything now reads `statusTone` / `statusLabel`.
+ */
+export function statusTone(status: Status): BadgeTone {
+  return status === "good" ? "ok" : status === "watch" ? "warn" : status === "critical" ? "bad" : "neutral";
+}
+
+export function statusLabel(status: Status): string {
+  return status === "good"
+    ? "مطلوب"
+    : status === "watch"
+      ? "نیازمند پایش"
+      : status === "critical"
+        ? "بحرانی"
+        : "ارزیابی‌نشده";
+}
 
 export interface ActivityResult {
   id: string;

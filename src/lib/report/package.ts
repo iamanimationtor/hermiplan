@@ -1,5 +1,5 @@
 import { createZip, type ZipEntry } from "./zip";
-import { buildCsv, buildExcelXml, buildSheets, type Sheet } from "./export";
+import { buildCsv, buildExcelXml, buildSheets, percentColumnsAsFractions, type Sheet } from "./export";
 import { buildXlsx } from "./xlsx";
 import { buildMsProjectXml } from "./msproject";
 import { buildReportHtml } from "./html";
@@ -74,7 +74,7 @@ export function buildDeliveryPackage(
     { name: "Report.html", content: buildReportHtml(project, analysis, options.ganttSvg) },
     {
       name: "Data.xlsx",
-      content: buildXlsx(sheets, options.modifiedAt),
+      content: buildXlsx(percentColumnsAsFractions(sheets), options.modifiedAt),
     },
     { name: "MSProject.xml", content: buildMsProjectXml(project, analysis) },
     { name: "Project.json", content: JSON.stringify({ project, analysis }, null, 2) },

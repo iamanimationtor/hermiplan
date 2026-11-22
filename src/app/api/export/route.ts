@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { analyzeProject } from "@/lib/engine/analysis";
 import { parseProjectInput, type ExportFormat } from "@/lib/validation";
-import { buildCsv, buildExcelXml, buildSheets } from "@/lib/report/export";
+import { buildCsv, buildExcelXml, buildSheets, percentColumnsAsFractions } from "@/lib/report/export";
 import { buildXlsx } from "@/lib/report/xlsx";
 import { buildMsProjectXml } from "@/lib/report/msproject";
 import { buildReportHtml } from "@/lib/report/html";
@@ -27,10 +27,25 @@ const CSV_SHEET_MAP: Record<string, string> = {
   escalation: "Escalation",
 };
 
+/**
+ * Content-Disposition for a name that may contain Persian.
+ *
+ * HTTP headers are ISO-8859-1, so a non-ASCII filename has to be encoded. The
+ * percent-encoded form was being put inside the plain `filename=` parameter,
+ * where clients are supposed to decode it only in the `filename*=` form — the
+ * result was files arriving as
+ * "HERMIPLAN-%D9%BE%D8%B1%D9%88%DA%98%D9%87…-Data.xlsx". RFC 6266 §4.3 asks for
+ * both: an ASCII `filename` fallback plus an RFC 5987 `filename*` carrying the
+ * real UTF-8 name, which browsers prefer when present.
+ */
 function fileHeaders(filename: string, type: string): HeadersInit {
+  const fallback = filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  const encoded = encodeURIComponent(filename).replace(/['()*]/g, (char) =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
   return {
     "Content-Type": `${type}; charset=utf-8`,
-    "Content-Disposition": `attachment; filename="${filename}"`,
+    "Content-Disposition": `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`,
     "Cache-Control": "no-store, max-age=0",
     "X-Content-Type-Options": "nosniff",
   };
@@ -72,7 +87,13 @@ export async function POST(request: Request) {
   }
   const analysis = analyzeProject(input);
   const format = (body.format ?? "xlsx") as ExportFormat;
-  const base = `HERMIPLAN-${encodeURIComponent((input.meta.name || "project").replace(/[^\w\u0600-\u06FF-]+/g, "-").slice(0, 36))}`;
+  // Keep the real name; `fileHeaders` is responsible for wire encoding.
+  const base = `HERMIPLAN-${(input.meta.name || "project")
+    .replace(/[^\w\u0600-\u06FF-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, 36)
+    .replace(/-+$/g, "")}`;
 
   const links: GanttLink[] = input.activities.flatMap((activity) =>
     activity.predecessors.map((dep) => ({ from: dep.predecessorId, to: activity.id })),
@@ -96,7 +117,7 @@ export async function POST(request: Request) {
       });
     }
     case "xlsx": {
-      const workbook = buildXlsx(buildSheets(analysis, input), exportStamp(input.meta.statusDate));
+      const workbook = buildXlsx(percentColumnsAsFractions(buildSheets(analysis, input)), exportStamp(input.meta.statusDate));
       return new NextResponse(workbook as unknown as BodyInit, {
         headers: fileHeaders(`${base}-Data.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
       });

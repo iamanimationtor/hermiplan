@@ -113,6 +113,11 @@ export const JALALI_MONTHS = [
 
 /** e.g. ۱۴ مرداد ۱۴۰۳ */
 export function formatJalali(iso: string, opts: { withMonthName?: boolean; persian?: boolean } = {}): string {
+  // Callers pass display values that may legitimately be a placeholder ("—")
+  // or empty. `toJalali` cannot parse those and produced the literal string
+  // "NaN/NaN/NaN", which then appeared in the exported report. A missing date
+  // renders as a dash; it never renders as NaN.
+  if (!/^\d{4}-\d{2}-\d{2}/.test(iso ?? "")) return iso?.trim() ? iso : "—";
   const [jy, jm, jd] = toJalali(iso);
   const withMonthName = opts.withMonthName ?? true;
   const persian = opts.persian ?? true;
