@@ -22,7 +22,7 @@ import { buildProjectFromTemplate } from "@/lib/templates";
 import { DEFAULT_REPORT_SECTIONS } from "@/lib/validation";
 import { buildProjectFile, parseProjectFile, serializeProjectFile } from "@/lib/project-file";
 import { formatCompact, formatJalali, formatPercent, toPersianDigits } from "@/lib/date-fa";
-import type { ProjectInput } from "@/lib/engine/types";
+import { statusTone, type BadgeTone, type ProjectInput } from "@/lib/engine/types";
 
 const STEPS = [
   { id: 0, label: "نوع پروژه و مشخصات", icon: "🧩" },
@@ -361,7 +361,7 @@ export function BuilderApp({
     }
   }
 
-  const healthTone = analysis.health.status === "good" ? "ok" : analysis.health.status === "watch" ? "warn" : "bad";
+  const healthTone: BadgeTone = statusTone(analysis.health.status);
 
   return (
     <div className="min-h-screen bg-[#f5f7fa]">
@@ -590,7 +590,7 @@ export function BuilderApp({
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {analysis.health.signals.map((signal) => (
-                  <Badge key={signal.label} tone={signal.status === "good" ? "ok" : signal.status === "watch" ? "warn" : "bad"}>
+                  <Badge key={signal.label} tone={statusTone(signal.status)}>
                     {signal.label}
                   </Badge>
                 ))}

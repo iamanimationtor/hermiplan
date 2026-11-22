@@ -194,12 +194,12 @@ export function BarChart({
   );
 }
 
-export function HealthGauge({ score, status }: { score: number; status: "good" | "watch" | "critical" }) {
+export function HealthGauge({ score, status }: { score: number; status: "good" | "watch" | "critical" | "na" }) {
   const size = 120;
   const radius = 48;
   const circumference = Math.PI * radius;
   const filled = (Math.max(0, Math.min(100, score)) / 100) * circumference;
-  const color = status === "good" ? "#16a34a" : status === "watch" ? "#d97706" : "#dc2626";
+  const color = status === "good" ? "#16a34a" : status === "watch" ? "#d97706" : status === "critical" ? "#dc2626" : "#94a3b8";
   return (
     <svg viewBox={`0 0 ${size} 70`} width={size} style={{ display: "block", direction: "ltr" }} role="img" aria-label="شاخص سلامت پروژه">
       <path d="M 12 62 A 48 48 0 0 1 108 62" fill="none" stroke="#e2e8f0" strokeWidth={10} strokeLinecap="round" />

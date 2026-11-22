@@ -1,4 +1,4 @@
-import { toJalali, JALALI_MONTHS } from "@/lib/date-fa";
+import { toJalali, JALALI_MONTHS, toPersianDigits } from "@/lib/date-fa";
 import { percentOfMoney, roundMoney, sumMoney } from "@/lib/engine/money";
 import { isIsoDate } from "@/lib/engine/calendar";
 import type {
@@ -156,7 +156,9 @@ function monthKey(iso: string): string {
 
 function monthLabel(key: string): string {
   const [jy, jm] = key.split("-");
-  return `${JALALI_MONTHS[Number(jm) - 1] ?? ""} ${jy}`;
+  // Persian digits everywhere: this label is printed in the report next to
+  // amounts that are already in Persian digits, and a latin year stood out.
+  return toPersianDigits(`${JALALI_MONTHS[Number(jm) - 1] ?? ""} ${jy}`);
 }
 
 /**

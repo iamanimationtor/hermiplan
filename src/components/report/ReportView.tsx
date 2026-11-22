@@ -8,7 +8,7 @@ import { EXPORT_FORMATS, REPORT_SECTIONS, type ReportOptions } from "@/lib/valid
 import { describeShareState } from "@/lib/share-status";
 import { Modal } from "@/components/ui";
 import { Logo, LogoMark, CREATOR_CREDIT_FULL } from "@/components/Logo";
-import type { ProjectAnalysis, ProjectInput } from "@/lib/engine/types";
+import { statusLabel, type ProjectAnalysis, type ProjectInput } from "@/lib/engine/types";
 import { diffHeadline, type ProjectDiff } from "@/lib/report/version-diff";
 import { formatCompact, formatCurrency, formatJalali, formatNumber, formatPercent, toPersianDigits } from "@/lib/date-fa";
 
@@ -453,7 +453,14 @@ export function ReportView({
 
   const totalSheets = 5;
 
-  const statusText = a.health.status === "good" ? "در وضعیت مطلوب" : a.health.status === "watch" ? "نیازمند پایش" : "در وضعیت بحرانی";
+  const statusText =
+    a.health.status === "good"
+      ? "در وضعیت مطلوب"
+      : a.health.status === "watch"
+        ? "نیازمند پایش"
+        : a.health.status === "critical"
+          ? "در وضعیت بحرانی"
+          : "ارزیابی‌نشده";
 
   return (
     <div>
@@ -1116,7 +1123,9 @@ export function ReportView({
                 </div>
                 <div className="text-center">
                   <HealthGauge score={a.health.score} status={a.health.status} />
-                  <p className="mt-1 text-[10.5px] font-semibold text-slate-500">امتیاز سلامت پروژه</p>
+                  <p className="mt-1 text-[10.5px] font-semibold text-slate-500">
+                    {a.health.status === "na" ? "ارزیابی‌نشده" : "امتیاز سلامت پروژه"}
+                  </p>
                   <p className="mt-3 text-[11px] font-bold text-slate-700">{statusText}</p>
                 </div>
               </div>
@@ -1177,8 +1186,10 @@ export function ReportView({
                     key={kpi.key}
                     className="rpt-avoid-break rounded-lg border p-3"
                     style={{
-                      borderColor: kpi.status === "good" ? "#a7f3d0" : kpi.status === "watch" ? "#fde68a" : "#fecaca",
-                      background: kpi.status === "good" ? "#f0fdf4" : kpi.status === "watch" ? "#fffbeb" : "#fef2f2",
+                      borderColor:
+                        kpi.status === "good" ? "#a7f3d0" : kpi.status === "watch" ? "#fde68a" : kpi.status === "critical" ? "#fecaca" : "#e2e8f0",
+                      background:
+                        kpi.status === "good" ? "#f0fdf4" : kpi.status === "watch" ? "#fffbeb" : kpi.status === "critical" ? "#fef2f2" : "#f8fafc",
                     }}
                   >
                     <p className="text-[9.5px] font-semibold text-slate-500">{kpi.label}</p>
@@ -1742,14 +1753,17 @@ export function ReportView({
                 headers={["حوزه", "وضعیت", "توضیح"]}
                 rows={a.health.signals.map((s) => [
                   s.label,
-                  s.status === "good" ? "✔ مطلوب" : s.status === "watch" ? "⚠ قابل پایش" : "✖ بحرانی",
+                  statusLabel(s.status),
                   s.detail,
                 ])}
               />
               <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <p className="text-[11px] font-bold text-brand-900">جمع‌بندی وضعیت</p>
                 <p className="mt-1 text-[10.5px] leading-6 text-slate-700">
-                  امتیاز کلی سلامت پروژه {toPersianDigits(a.health.score)} از ۱۰۰ ارزیابی شده و وضعیت کلی پروژه «{statusText}» است.
+                  {a.health.status === "na"
+                    ? "برای این پروژه سیگنالی برای ارزیابی سلامت تعریف نشده است"
+                    : `امتیاز کلی سلامت پروژه ${toPersianDigits(a.health.score)} از ۱۰۰ ارزیابی شده و وضعیت کلی پروژه «${statusText}»`}
+                  {" "}است.
                   {a.health.status !== "good"
                     ? " لازم است اقدامات اصلاحی بر روی حوزه‌های علامت‌گذاری‌شده انجام و در گزارش دوره بعدی پایش شود."
                     : " روند اجرا مطابق برنامه است و پایش دوره‌ای توصیه می‌شود."}

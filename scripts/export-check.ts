@@ -37,16 +37,19 @@ import { join } from "node:path";
 import { analyzeProject } from "../src/lib/engine/analysis";
 import { buildProjectFromTemplate } from "../src/lib/templates";
 import { parseProjectInput } from "../src/lib/validation";
-import { buildCsv, buildSheets } from "../src/lib/report/export";
+import { buildCsv, buildExcelXml, buildSheets, percentColumnsAsFractions } from "../src/lib/report/export";
 import { buildXlsx } from "../src/lib/report/xlsx";
 import { buildReportHtml } from "../src/lib/report/html";
 import { buildDeliveryPackage } from "../src/lib/report/package";
 import { buildMsProjectXml } from "../src/lib/report/msproject";
 import { renderGanttSvg } from "../src/lib/report/gantt-svg";
-import { toPersianDigits } from "../src/lib/date-fa";
+import { formatJalali, toPersianDigits } from "../src/lib/date-fa";
 import { roundMoney } from "../src/lib/engine/money";
 import { readZip } from "./lib/zip-read";
 import { xmlProblemText } from "./lib/xml-check";
+
+/** Elements that must appear at most once inside a task. */
+const SINGLE_VALUED = new Set(["UID", "ID", "Name", "Type", "Start", "Finish", "Duration", "Work", "Summary"]);
 
 let passed = 0;
 let failed = 0;
@@ -216,7 +219,10 @@ async function main(): Promise<void> {
   check(pkgEntries.every((entry) => entry.crcOk), "CRC همه فایل‌های بسته معتبر است");
   const pkgXlsx = pkgEntries.find((entry) => entry.name === "Data.xlsx");
   check(Boolean(pkgXlsx), "Data.xlsx در بسته هست");
-  check(pkgXlsx ? Buffer.compare(pkgXlsx.data, Buffer.from(xlsx)) === 0 : false, "XLSX داخل بسته با XLSX مستقل بایت‌به‌بایت یکی است");
+  check(
+    pkgXlsx ? Buffer.compare(pkgXlsx.data, Buffer.from(buildXlsx(percentColumnsAsFractions(sheets), stamp))) === 0 : false,
+    "XLSX داخل بسته با XLSX مستقل بایت‌به‌بایت یکی است",
+  );
   const pkgCsv = pkgEntries.find((entry) => entry.name === "Activities.csv")?.data.toString("utf8") ?? "";
   check(pkgCsv === csv, "CSV داخل بسته با CSV مستقل یکی است");
   const pkgHtml = pkgEntries.find((entry) => entry.name === "Report.html")?.data.toString("utf8") ?? "";
@@ -298,16 +304,28 @@ async function main(): Promise<void> {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ project: input, format: "pdf" }),
     });
-    const htmlText = await htmlResponse.text();
+    const html = await htmlResponse.text();
     const disposition = htmlResponse.headers.get("content-disposition") ?? "";
     const contentType = htmlResponse.headers.get("content-type") ?? "";
     check(htmlResponse.status === 200, "گزارش چاپی با کد ۲۰۰ برگشت", `status=${htmlResponse.status}`);
     check(/text\/html/.test(contentType), "نوع محتوا صادقانه text/html است (نه ادعای PDF)", contentType);
     check(/\.html"/.test(disposition), "نام فایل با .html تمام می‌شود", disposition);
-    check(/@page\s*\{\s*size:\s*A4/.test(htmlText), "قواعد چاپ A4 در سند هست");
-    check(!/<script|<link[^>]+href="http/.test(htmlText), "سند خودکفاست: اسکریپت/منبع بیرونی ندارد");
-    check(htmlText.includes("نوع داده") && htmlText.includes("سند ثبت نشده"), "جدول نرخ با نوع داده و وضعیت سند در سند چاپی هست");
-    check(htmlText.includes("viewport"), "متای viewport در سند سرویس‌شده هست");
+    // RFC 6266: non-ASCII names travel in filename*=UTF-8''…, with an ASCII
+    // fallback — a raw percent-encoded string inside `filename=` is shown
+    // literally by some clients.
+    const star = /filename\*=UTF-8''([^;]+)/.exec(disposition)?.[1];
+    check(Boolean(star) && !/%[0-9A-F]{2}/.test(/filename="([^"]*)"/.exec(disposition)?.[1] ?? ""),
+      "نام فایل فارسی طبق RFC 6266 کدگذاری شده (filename* + نام جایگزین اسکی)", disposition);
+    const decoded = star ? decodeURIComponent(star) : "";
+    check(
+      decoded.startsWith("HERMIPLAN-") && !decoded.includes("--"),
+      "نام فایل رمزگشایی‌شده خوانا و بدون خط تیره تکراری است",
+      decoded,
+    );
+    check(/@page\s*\{\s*size:\s*A4/.test(html), "قواعد چاپ A4 در سند هست");
+    check(!/<script|<link[^>]+href="http/.test(html), "سند خودکفاست: اسکریپت/منبع بیرونی ندارد");
+    check(html.includes("نوع داده") && html.includes("سند ثبت نشده"), "جدول نرخ با نوع داده و وضعیت سند در سند چاپی هست");
+    check(html.includes("viewport"), "متای viewport در سند سرویس‌شده هست");
 
     const msXml = await fetch(`${base}/api/export`, {
       method: "POST",
@@ -389,6 +407,7 @@ async function main(): Promise<void> {
   });
   check(monotonic, "شماره سطرها از ۱ پیوسته و بدون تکرار است");
 
+  const xml = buildExcelXml(sheets);
   const mspText = buildMsProjectXml(input, analysis);
   const mspProblem = xmlProblemText(mspText);
   check(mspText.startsWith("<?xml") && mspProblem === null, "XML پروژه (MSPDI) well-formed است", mspProblem ?? "");
@@ -413,6 +432,195 @@ async function main(): Promise<void> {
   check(
     uids.length > 0 && new Set(uids).size === uids.length && uids.every((uid) => Number.isFinite(uid)),
     "UID وظیفه‌ها یکتاست",
+  );
+
+  /* ------------------------------------------------------------------ *
+   * MSPDI — what Project actually requires to open the file cleanly
+   * ------------------------------------------------------------------ */
+
+  // MSPDI is an xsd:sequence. An element in the wrong slot is dropped silently
+  // by Project, which yields a clean open and a wrong schedule — the exact
+  // failure mode that is invisible until a planner notices the dates are off.
+  const TASK_ORDER = [
+    "UID", "ID", "Name", "Active", "Manual", "Type", "IsNull", "CreateDate", "WBS",
+    "OutlineNumber", "OutlineLevel", "Priority", "Start", "Finish", "Duration",
+    "DurationFormat", "Work", "Milestone", "Summary", "PercentComplete",
+    "ConstraintType", "CalendarUID", "ConstraintDate", "Deadline", "LevelingDelay",
+    "LevelingDelayFormat", "IgnoreResourceCalendar", "Notes", "PredecessorLink",
+  ];
+  const orderOf = (xml: string) => [...xml.matchAll(/<([A-Z][A-Za-z]*)[ >]/g)].map((match) => match[1]);
+  const outOfOrder = (xml: string, order: string[]) => {
+    const known = orderOf(xml).filter((tag) => order.includes(tag));
+    for (let i = 1; i < known.length; i += 1) {
+      if (order.indexOf(known[i]) < order.indexOf(known[i - 1])) return `${known[i - 1]} before ${known[i]}`;
+    }
+    return null;
+  };
+  // A duplicated element (e.g. two <Type>) is also schema-invalid. Only the
+  // task's *own* children count: `<Type>` inside `<PredecessorLink>` is a
+  // different element in a different scope, so the nested link markup is
+  // stripped before looking for repeats.
+  const taskChildren = (task: string) => task.replace(/<PredecessorLink>[\s\S]*?<\/PredecessorLink>/g, "");
+  const taskOrderProblems = tasks.map((task) => outOfOrder(taskChildren(task), TASK_ORDER)).filter(Boolean);
+  check(
+    taskOrderProblems.length === 0,
+    "ترتیب عناصر هر وظیفه با xsd:sequence مایکروسافت‌پروژه یکی است",
+    taskOrderProblems.slice(0, 3).join(" | "),
+  );
+
+  const duplicated = tasks
+    .map((task) => {
+      const tags = orderOf(taskChildren(task)).filter((tag) => SINGLE_VALUED.has(tag) || tag === "Type");
+      const counts = new Map<string, number>();
+      tags.forEach((tag) => counts.set(tag, (counts.get(tag) ?? 0) + 1));
+      const dupes = [...counts.entries()].filter(([, count]) => count > 1).map(([tag]) => tag);
+      return dupes.length ? dupes.join(",") : null;
+    })
+    .filter(Boolean);
+  check(duplicated.length === 0, "هیچ وظیفه‌ای عنصر تکراری ندارد", duplicated.slice(0, 3).join(" | "));
+
+  const taskIds = tasks.map((task) => Number(/<ID>(\d+)<\/ID>/.exec(task)?.[1] ?? "NaN"));
+  check(
+    taskIds.every((id, index) => id === index + 1),
+    "شناسه سطری وظیفه‌ها برابر موقعیت ۱..N است (UID ≠ ID)",
+    taskIds.slice(0, 5).join(","),
+  );
+
+  const summaryTasks = tasks.filter((task) => /<Summary>1<\/Summary>/.test(task));
+  check(summaryTasks.length > 0, "فازها به‌صورت Summary Task نوشته شده‌اند", `${summaryTasks.length} فاز`);
+  check(
+    summaryTasks.every((task) => /<Work>PT0H0M0S<\/Work>/.test(task)),
+    "کار جمع‌بندی‌شده (Summary) برابر مدت آن نوشته نشده و Work آن صفر/رول‌آپ است",
+  );
+  check(
+    tasks.filter((task) => /<Milestone>1<\/Milestone>/.test(task)).length > 0,
+    "نقاط کنترل به‌صورت Milestone وجود دارند",
+  );
+  check(
+    tasks
+      .filter((task) => /<Milestone>1<\/Milestone>/.test(task))
+      .every((task) => {
+        const start = /<Start>([^<]+)<\/Start>/.exec(task)?.[1];
+        const finish = /<Finish>([^<]+)<\/Finish>/.exec(task)?.[1];
+        return start === finish;
+      }),
+    "هر Milestone شروع و پایان یکسان دارد (میله یک‌روزه نمی‌شود)",
+  );
+  check(
+    /<MinutesPerDay>480<\/MinutesPerDay>/.test(mspText) && /<DefaultStartTime>08:00:00<\/DefaultStartTime>/.test(mspText),
+    "تقویم کاری (۸ ساعت، شروع ۰۸:۰۰) در سرصفحه اعلام شده است",
+  );
+
+  // Assignment cost must not repeat the whole task budget: that is what made the
+  // imported file double-count money in Project's cost views.
+  const assignments = [...mspText.matchAll(/<Assignment>([\s\S]*?)<\/Assignment>/g)].map((m) => m[1]);
+  const assignmentCosts = assignments
+    .map((a) => Number(/<Cost>([\d.]+)<\/Cost>/.exec(a)?.[1] ?? "0"))
+    .filter((value) => value > 0);
+  check(
+    assignmentCosts.length > 0 && assignmentCosts.every((value) => value < analysis.costs.budget),
+    "هزینه هر تخصیص از کل بودجه کوچک‌تر است (تخصیص دوباره‌شماری نمی‌شود)",
+  );
+
+  /* ------------------------------------------------------------------ *
+   * XLSX — numbers, formats and dates a spreadsheet user can trust
+   * ------------------------------------------------------------------ */
+
+  const workbookXml = xlsxZip.find((entry) => entry.name === "xl/workbook.xml")?.data.toString("utf8") ?? "";
+  check(!/rightToLeft="1"/.test(workbookXml), "RTL فقط روی sheetView است، نه workbookView (قاری سخت‌گیر را می‌شکست)");
+  check(/<numFmt numFmtId="164" formatCode="0\.0"\/>/.test(stylesXml), "قالب اعشاری سفارشی ۰.۰ تعریف شده است");
+  check(/formatCode="0\.0%"/.test(stylesXml), "قالب درصد اعشاری برای ستون‌های درصد تعریف شده است");
+
+  // Dates must be real Excel serials, not text that Excel left-aligns.
+  // The Activities sheet is the second worksheet part (workbook order): read it
+  // by index rather than by guessing its file name.
+  const activitiesXml = sheetXmls[1]?.xml ?? "";
+  const dateCell = /<c r="F2" s="12"><v>(\d+)<\/v><\/c>/.exec(activitiesXml);
+  check(
+    dateCell !== null && Number(dateCell[1]) > 40000,
+    "تاریخ‌های کاربرگ به‌صورت سریال عددی اکسل ذخیره شده‌اند (نه متن)",
+    dateCell?.[1] ?? "سلول F2 سریال عددی نیست",
+  );
+  const serialDate = new Date(Date.UTC(1899, 11, 30) + Number(dateCell?.[1] ?? 0) * 86400000).toISOString().slice(0, 10);
+  check(
+    serialDate === analysis.schedule.startDate,
+    "سریال تاریخ اکسل همان تاریخ شروع تحلیل را برمی‌گرداند",
+    `${serialDate} vs ${analysis.schedule.startDate}`,
+  );
+  check(
+    /<c r="[A-Z]+1"[^>]*>/.test(activitiesXml) && !/<c r="F2"[^>]*t="inlineStr"/.test(activitiesXml),
+    "ستون تاریخ متن نیست (تاریخ به‌صورت رشته درج نشده)",
+  );
+
+  // Percent must be a 0..1 fraction under a % format, never 100× the value.
+  const pctCells = [...(stylesXml.match(/<cellXfs[\s\S]*?<\/cellXfs>/) ?? [""])[0].matchAll(/numFmtId="165"/g)];
+  check(pctCells.length >= 1, "سبک‌های درصد با numFmt ۱۶۵ به cellXfs نگاشت شده‌اند", `${pctCells.length} سبک`);
+  const activityPercent = [...activitiesXml.matchAll(/<c r="M(\d+)"[^>]*>([^<]*)</g)]
+    .map((match) => Number(match[2]))
+    .filter((value) => Number.isFinite(value));
+  check(
+    activityPercent.length > 0 && activityPercent.every((value) => value >= 0 && value <= 1),
+    "مقادیر درصد در بازه ۰..۱ ذخیره شده‌اند (نمایش ۵۴٪ نه ۵۴۰۰٪)",
+    activityPercent.slice(0, 4).join(","),
+  );
+
+  // Workbook metadata: without docProps Excel's "Properties" dialog is empty and
+  // some SharePoint/Netlify pipelines treat the file as anonymous.
+  check(
+    xlsxZip.some((entry) => entry.name === "docProps/core.xml") && xlsxZip.some((entry) => entry.name === "docProps/app.xml"),
+    "فراداده سند (docProps/core و app) نوشته شده است",
+  );
+  const docProps = xlsxZip.find((entry) => entry.name === "docProps/core.xml")?.data.toString("utf8") ?? "";
+  check(/<dc:title>/.test(docProps) && /<dc:creator>/.test(docProps), "عنوان و پدیدآورنده در فراداده ثبت شده‌اند");
+
+  /* ------------------------------------------------------------------ *
+   * HTML report — no leaked markup, no NaN, consistent dates
+   * ------------------------------------------------------------------ */
+
+  check(!/&lt;bdi|&lt;\/bdi/.test(html) && !/&lt;span/.test(html), "هیچ مارک‌آپ escape‌شده‌ای در متن گزارش چاپ نشده است");
+  check(!/NaN|undefined|\[object Object\]/.test(html), "گزارش چاپی نان/آندیفایند/[object Object] ندارد");
+  check(
+    (html.match(/<bdi>/g) ?? []).length === (html.match(/<\/bdi>/g) ?? []).length,
+    "هر <bdi> بسته شده است",
+  );
+  check(
+    /<thead><tr><th>/.test(html) && /class="print-footer no-screen"/.test(html),
+    "گزارش چاپی سرستون تکرارشونده و پاصفحهٔ هویتی دارد",
+  );
+  check(
+    /break-before:page/.test(html) && /size:A4/.test(html) && /break-inside:avoid/.test(html),
+    "قواعد صفحه‌بندی چاپ (A4، شکست صفحه، جلوگیری از شکستن سطر) اعمال شده است",
+  );
+  check(
+    /فهرست مطالب/.test(html) && (html.match(/class="toc"/g) ?? []).length === 1,
+    "فهرست مطالب در گزارش چاپی هست",
+  );
+
+  // The status vocabulary must be one set of words across UI and print: the
+  // earlier split showed "قابل پایش" in the app and "نیازمند پایش" in the PDF.
+  check(
+    !html.includes("قابل پایش"),
+    "واژگان وضعیت یکدست است (بدون «قابل پایش» در کنار «نیازمند پایش»)",
+  );
+  check(
+    !/NaN\/NaN\/NaN/.test(html) && !/NaN\/NaN\/NaN/.test(JSON.stringify(buildSheets(analysis, input))),
+    "تاریخ نامعتبر به NaN/NaN/NaN تبدیل نمی‌شود",
+  );
+  check(
+    !/\bconstruction\b|\brenovation\b/.test(xml) && xml.includes("ساختمان"),
+    "خروجی .xls نوع پروژه را با برچسب فارسی می‌نویسد، نه کد داخلی",
+  );
+  check(
+    [...xml.matchAll(/<Data ss:Type="Number">([\d.]+)<\/Data>/g)]
+      .map((match) => Number(match[1]))
+      .filter((value) => value > 0 && value < 1).length > 0,
+    "خروجی .xls درصدها را در مقیاس ۰..۱ می‌نویسد (مثل .xlsx)",
+  );
+
+  check(
+    formatJalali("—") === "—" && formatJalali("") === "—" && formatJalali("2027-06-29") === "۸ تیر ۱۴۰۶",
+    "قالب‌بندی تاریخ مقدار جایگزین «—» را خراب نمی‌کند و تاریخ معتبر را می‌شناسد",
+    `${formatJalali("—")} | ${formatJalali("")} | ${formatJalali("2027-06-29")}`,
   );
 
   console.log(`\n${failed === 0 ? "✔" : "✗"} ${passed} موفق / ${failed} ناموفق`);

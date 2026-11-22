@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, CardHeader, Field, Input, ProgressBar, Select, StatTile, Textarea } from "@/components/ui";
 import { ActivityTable } from "./ActivityTable";
 import type { ProjectApi } from "./useProject";
-import type { ProjectAnalysis, ProjectInput } from "@/lib/engine/types";
+import { statusTone, type ProjectAnalysis, type ProjectInput } from "@/lib/engine/types";
 import { DEFAULT_REPORT_SECTIONS, REPORT_SECTIONS } from "@/lib/validation";
 import { TEMPLATES, type TemplateDomain } from "@/lib/templates";
 import { marketCatalog } from "./useProject";
@@ -1107,7 +1107,7 @@ export function StepOutput({
               label={kpi.label}
               value={kpi.key === "finish" ? formatJalali(kpi.value, { withMonthName: false }) : kpi.value}
               hint={kpi.hint}
-              tone={kpi.status === "good" ? "ok" : kpi.status === "watch" ? "warn" : "bad"}
+              tone={statusTone(kpi.status)}
             />
           ))}
         </div>

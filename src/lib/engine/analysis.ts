@@ -69,6 +69,21 @@ function plannedFraction(statusOffset: number, es: number, duration: number): nu
 }
 
 /**
+ * Verdict for the schedule signal.
+ *
+ * `SPI` is `null` when nothing has been planned up to the status date yet — the
+ * normal state on the project start date. That is *not* the same as a warning:
+ * with no planned value and no earned value the project is exactly on plan, so
+ * the earlier blanket `"watch"` wrongly scored a brand-new project 60/100 and
+ * told the reader it needed attention. The index is undefined; the project's
+ * position is not.
+ */
+function scheduleVerdict(spi: number | null, plannedToDate: number, earned: number): Status {
+  if (spi !== null) return spi >= 0.95 ? "good" : spi >= 0.85 ? "watch" : "critical";
+  return plannedToDate === 0 && earned === 0 ? "good" : "watch";
+}
+
+/**
  * Quantity-based progress for one activity: Actual / Planned, per the unit of
  * measure. Deliberately **not** clamped to 100 %: executing more than planned is
  * a real condition that must stay visible.
@@ -830,11 +845,13 @@ function analyzeProjectUnchecked(rawInput: ProjectInput): ProjectAnalysis {
       value: spi !== null ? spi.toFixed(2) : "—",
       hint:
         spi === null
-          ? "PV تا تاریخ وضعیت صفر است؛ شاخص قابل محاسبه نیست"
+          ? plannedToDate === 0 && earned === 0
+            ? "هنوز کاری تا تاریخ وضعیت برنامه‌ریزی نشده است؛ پروژه در نقطه شروع برنامه است"
+            : "PV تا تاریخ وضعیت صفر است؛ شاخص قابل محاسبه نیست"
           : spi >= 1
             ? "پیشرفت هم‌راستا یا جلوتر از برنامه"
             : "عقب‌ماندگی نسبت به برنامه",
-      status: spi === null ? "watch" : spi >= 0.95 ? "good" : spi >= 0.85 ? "watch" : "critical",
+      status: scheduleVerdict(spi, plannedToDate, earned),
     },
     {
       key: "cpi",
@@ -846,8 +863,16 @@ function analyzeProjectUnchecked(rawInput: ProjectInput): ProjectAnalysis {
           : cpi !== null && cpi >= 1
             ? "هزینه در محدوده بودجه"
             : "بیش‌هزینه نسبت به بودجه",
+      // With no recorded actual cost, CPI is a placeholder (EV/EV). It carries no
+      // information, so it is reported as undefined rather than amber.
       status:
-        costDataCoverage === 0 ? "watch" : cpi === null ? "watch" : cpi >= 0.95 ? "good" : cpi >= 0.85 ? "watch" : "critical",
+        costDataCoverage === 0 || cpi === null
+          ? "na"
+          : cpi >= 0.95
+            ? "good"
+            : cpi >= 0.85
+              ? "watch"
+              : "critical",
     },
     {
       key: "progress",
@@ -864,12 +889,13 @@ function analyzeProjectUnchecked(rawInput: ProjectInput): ProjectAnalysis {
         physical !== null
           ? `مبنای محاسبه: مقدار اجراشده / مقدار برنامه‌ریزی‌شده — پوشش ${toPersianDigits(physicalCoverage)}٪ بودجه`
           : "مقدار اجرایی برای فعالیت‌ها ثبت نشده است؛ پیشرفت مقداری قابل محاسبه نیست",
-      status: physical === null ? "watch" : physical >= 100 ? "good" : "watch",
+      // No quantity recorded means the indicator is *undefined*, not at risk.
+      status: physical === null ? "na" : physical >= 100 ? "good" : "watch",
     },
     {
       key: "deadline",
       label: "تاریخ هدف پایان",
-      value: deadline ? formatJalali(deadline, { withMonthName: false }) : "—",
+      value: deadline ? formatJalali(deadline) : "—",
       hint:
         deadline === null
           ? "تاریخ هدفی ثبت نشده است"
@@ -929,17 +955,19 @@ function analyzeProjectUnchecked(rawInput: ProjectInput): ProjectAnalysis {
   const signals: HealthSignal[] = [
     {
       label: "زمان‌بندی",
-      status: kpis.find((k) => k.key === "spi")?.status ?? "watch",
+      status: scheduleVerdict(spi, plannedToDate, earned),
       detail:
         spi === null
-          ? "شاخص SPI قابل محاسبه نیست (PV صفر است)."
+          ? plannedToDate === 0 && earned === 0
+            ? "تا تاریخ وضعیت هنوز کاری برنامه‌ریزی نشده است؛ انحرافی نسبت به برنامه وجود ندارد."
+            : "شاخص SPI قابل محاسبه نیست (PV صفر است)."
           : spi >= 1
             ? "پروژه طبق برنامه یا جلوتر از برنامه پیش می‌رود."
             : `پیشرفت زمان‌محور ${Math.abs(round(planned - overall, 1))} واحد از برنامه عقب‌تر است.`,
     },
     {
       label: "هزینه",
-      status: kpis.find((k) => k.key === "cpi")?.status ?? "watch",
+      status: kpis.find((k) => k.key === "cpi")?.status ?? "na",
       detail:
         cpi === null || costDataCoverage === 0
           ? "هزینه واقعی برای محاسبه CPI ثبت نشده است."
@@ -980,15 +1008,34 @@ function analyzeProjectUnchecked(rawInput: ProjectInput): ProjectAnalysis {
     },
   ];
 
-  const signalScore = signals.reduce((sum, s) => sum + (s.status === "good" ? 100 : s.status === "watch" ? 60 : 20), 0);
-  const healthScore = Math.round(signalScore / Math.max(signals.length, 1));
+  /*
+   * Weighted health score over the signals that actually carry information.
+   *
+   * An `"na"` signal (no cost data, no quantity data) is excluded from both the
+   * sum and the divisor: scoring it as 20 or 60 would let missing data drag the
+   * project's grade down, and calling it "good" would inflate it. If *no* signal
+   * is defined the score is 0 and the status is `"na"` — the report then says the
+   * project cannot be graded instead of inventing a number.
+   */
+  const graded = signals.filter((signal) => signal.status !== "na");
+  const signalScore = graded.reduce(
+    (sum, signal) => sum + (signal.status === "good" ? 100 : signal.status === "watch" ? 60 : 20),
+    0,
+  );
+  const healthScore = graded.length ? Math.round(signalScore / graded.length) : 0;
 
   /* ---------------------------- summary ------------------------------ */
-  const statusLabel = statusFromScore(healthScore);
+  const statusLabel = graded.length ? statusFromScore(healthScore) : "na";
   const statusText =
-    statusLabel === "good" ? "در وضعیت مطلوب" : statusLabel === "watch" ? "نیازمند پایش" : "در وضعیت بحرانی";
+    statusLabel === "good"
+      ? "در وضعیت مطلوب"
+      : statusLabel === "watch"
+        ? "نیازمند پایش"
+        : statusLabel === "critical"
+          ? "در وضعیت بحرانی"
+          : "داده کافی برای ارزیابی وجود ندارد";
   const bullets: string[] = [
-    `پروژه «${input.meta.name}» از ${schedule.start} آغاز می‌شود و پایان آن ${schedule.finish} برآورد شده است؛ مدت اجرا ${schedule.duration} روز کاری (${diffCalendarDays(schedule.start, schedule.finish) + 1} روز تقویمی) است.`,
+    `پروژه «${input.meta.name}» از ${formatJalali(schedule.start)} آغاز می‌شود و پایان آن ${formatJalali(schedule.finish)} برآورد شده است؛ مدت اجرا ${toPersianDigits(schedule.duration)} روز کاری (${toPersianDigits(diffCalendarDays(schedule.start, schedule.finish) + 1)} روز تقویمی) است.`,
     `پیشرفت زمان‌محور (مدت‌وزنی) ${overall.toFixed(1)}٪ در برابر ${planned.toFixed(1)}٪ برنامه، با ${activities.length} فعالیت در ${phases.length} فاز و ${milestones.length} نقطه کنترل (Milestone).`,
     `مسیر بحرانی شامل ${criticalActivities.length} فعالیت است و ${criticalPathRatio}٪ ماندهزمان پروژه را در بر می‌گیرد؛ هرگونه تأخیر در این فعالیت‌ها مستقیماً پایان پروژه را جابه‌جا می‌کند.`,
     `بودجه تجمیعی پروژه ${budget.toLocaleString("en-US")} ${currencyLabel(input.meta.currency)} و هزینه پیش‌بینی‌شده تا پایان (EAC) ${
@@ -1013,6 +1060,23 @@ function analyzeProjectUnchecked(rawInput: ProjectInput): ProjectAnalysis {
   if (risks.length > 0 && risks[0]) {
     bullets.push(`بزرگ‌ترین ریسک پروژه «${risks[0].title}» با امتیاز ${risks[0].score} از ۲۵ است.`);
   }
+  /**
+   * Readiness gap.
+   *
+   * A status date past the planned start with 0 % recorded progress is the one
+   * condition a PM must never have to infer from a table: the report otherwise
+   * says "planned 0.0 %" and "health: needs monitoring" while every activity
+   * still reads 0 %, and it is unclear whether the project is late or simply not
+   * started. Stated plainly, it is actionable in one sentence.
+   */
+  if (overall === 0 && planned > 0) {
+    bullets.push(
+      `تا تاریخ وضعیت ${formatJalali(input.meta.statusDate)} هیچ پیشرفت واقعی ثبت نشده است در حالی که ${toPersianDigits(
+        round(planned, 1),
+      )}٪ از برنامه زمان‌بندی‌شده سپری شده است؛ پیشرفت فعالیت‌ها باید به‌روزرسانی شود یا تاریخ وضعیت/شروع بازنگری گردد.`,
+    );
+  }
+
   bullets.push(`وضعیت کلان پروژه بر اساس شاخص‌های زمان‌بندی، هزینه، منابع و ریسک: ${statusText}.`);
 
   /* --------------------------- diagnostics --------------------------- */
@@ -1093,7 +1157,10 @@ function analyzeProjectUnchecked(rawInput: ProjectInput): ProjectAnalysis {
     standards: basis.standards,
     health: { score: healthScore, status: statusLabel, signals },
     summary: {
-      headline: `${input.meta.name} — ${statusText} (امتیاز سلامت ${healthScore} از ۱۰۰)`,
+      headline:
+        statusLabel === "na"
+          ? `${input.meta.name} — ${statusText}`
+          : `${input.meta.name} — ${statusText} (امتیاز سلامت ${toPersianDigits(healthScore)} از ۱۰۰)`,
       bullets,
     },
   };
