@@ -68,7 +68,8 @@
 :root {
   color-scheme: light;
   --hp-nav-h: 64px;
-  --hp-tab-h: 66px;
+  /* Measured height of the landing tab bar: 52px item + 6px floor padding. */
+  --hp-tab-h: 58px;
   --hp-focus: 0 0 0 3px rgb(53 111 192 / 0.22);
 }
 
@@ -320,13 +321,66 @@ input[inputmode="numeric"] {
 }
 
 /* ------------------------- mobile tab bar ------------------------- */
+
+/*
+ * The platform: a page must never be wider than the phone. Any accidental
+ * overflow (one long word, one table, one forgotten `min-w`) used to widen the
+ * document, and because `position: fixed` boxes are laid out against the
+ * document width, the bottom bar slid sideways and its "next step" button left
+ * the screen. `overflow-x: clip` (not `hidden`) stops horizontal panning without
+ * turning <body> into a scroll container — `position: sticky` headers and the
+ * `fixed` bars keep working exactly as before.
+ */
+html,
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+/* Media never gets to stretch a flex/grid track beyond its container. */
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+/*
+ * Height of the mobile action bar, shared by the bar and the page padding:
+ * 12px (top padding) + 48px (buttons) + safe-area + 6px floor (see .hp-tabbar).
+ * One token, so the reserved space can never drift from the real bar.
+ */
+:root {
+  --hp-actionbar-h: 66px;
+}
+
 .hp-tabbar {
   padding-bottom: max(env(safe-area-inset-bottom), 6px);
+  padding-right: max(0.75rem, env(safe-area-inset-right));
+  padding-left: max(0.75rem, env(safe-area-inset-left));
   background: rgb(255 255 255 / 0.92);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   border-top: 1px solid rgb(16 42 79 / 0.08);
   box-shadow: 0 -8px 32px -18px rgb(10 28 55 / 0.35);
+}
+
+/**
+ * Reserve room for a fixed bottom bar inside a normal-flow container.
+ *
+ * Used instead of the previous one-off `pb-32`: Tailwind sorts utilities by
+ * property, so a later `lg:pb-8` cannot be relied on to beat `pb-32`, and the
+ * reserved space was unrelated to the bar's real height anyway. This class owns
+ * the property outright and switches itself off at the bar's breakpoint.
+ */
+.hp-actionbar-offset {
+  padding-bottom: calc(var(--hp-actionbar-h) + env(safe-area-inset-bottom) + 20px);
+}
+
+@media (min-width: 1024px) {
+  .hp-actionbar-offset {
+    padding-bottom: 2rem;
+  }
 }
 
 .hp-tab-item {
@@ -380,7 +434,10 @@ input[inputmode="numeric"] {
 }
 
 .hp-bottom-safe {
-  padding-bottom: calc(var(--hp-tab-h) + 12px);
+  /* The bar grows by `env(safe-area-inset-bottom)` on phones with a home
+     indicator; the reserved space has to grow with it or the last row of the
+     footer ends up underneath the bar. */
+  padding-bottom: calc(var(--hp-tab-h) + env(safe-area-inset-bottom) + 16px);
 }
 @media (min-width: 1024px) {
   .hp-bottom-safe {

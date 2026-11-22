@@ -24,6 +24,7 @@
     "test:legacy-db": "tsx scripts/legacy-db-check.ts",
     "test:csp": "tsx scripts/csp-check.ts",
     "test:layout": "tsx scripts/layout-audit.ts",
+    "test:mobile": "tsx scripts/mobile-layout-check.ts",
     "test:a11y": "tsx scripts/a11y-check.ts",
     "test:bundle": "tsx scripts/bundle-budget.ts",
     "test:db:integrity": "tsx scripts/db-integrity-check.ts",

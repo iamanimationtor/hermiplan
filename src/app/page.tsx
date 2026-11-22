@@ -64,7 +64,7 @@ export default function HomePage() {
       {/* ------------------------------- hero ------------------------------- */}
       <section className="hp-mesh hp-grid-bg relative overflow-hidden pb-24 pt-28 text-white lg:pb-28 lg:pt-36">
         <div className="pointer-events-none absolute -top-32 left-1/2 size-[620px] -translate-x-1/2 rounded-full bg-brand-500/25 blur-[140px]" />
-        <div className="relative mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:items-center">
+        <div className="relative mx-auto grid max-w-6xl grid-cols-1 gap-12 px-4 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:items-center">
           <div className="animate-fade-up">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3.5 py-1.5 text-[11.5px] font-semibold text-accent-300">
               <span className="size-1.5 animate-pulse rounded-full bg-accent-400" />
@@ -128,15 +128,15 @@ export default function HomePage() {
                   پایان: {formatJalali(demo.schedule.finishDate, { withMonthName: false })}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-2 pb-3">
+              <div className="grid grid-cols-3 gap-1.5 pb-3 min-[380px]:gap-2">
                 {[
                   ["مدت پروژه", `${toPersianDigits(demo.schedule.workingDays)} روز`],
                   ["فعالیت بحرانی", toPersianDigits(demo.criticalPath.length)],
                   ["برآورد نهایی", formatCompact(demo.pricing.breakdown.total)],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl bg-slate-50 p-2.5 text-center">
+                  <div key={label} className="min-w-0 rounded-xl bg-slate-50 p-2 text-center min-[380px]:p-2.5">
                     <p className="text-[9.5px] text-slate-400">{label}</p>
-                    <p className="mt-0.5 text-[12.5px] font-extrabold text-brand-800">{value}</p>
+                    <p className="mt-0.5 break-words text-[11.5px] font-extrabold text-brand-800 min-[380px]:text-[12.5px]">{value}</p>
                   </div>
                 ))}
               </div>
@@ -161,14 +161,14 @@ export default function HomePage() {
       <section id="how" className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-24">
         <div className="mx-auto max-w-2xl text-center">
           <span className="text-[12px] font-bold tracking-widest text-brand-600">فرآیند کار</span>
-          <h2 className="mt-3 text-[26px] font-black leading-tight text-ink-900 sm:text-[32px]">
+          <h2 className="mt-3 text-[22px] font-black leading-tight text-ink-900 min-[380px]:text-[26px] sm:text-[32px]">
             سه مرحله، از ایده تا گزارش قابل ارائه
           </h2>
           <p className="mt-4 text-[14px] leading-8 text-slate-500">
             شما لازم نیست بدانید مسیر بحرانی چگونه محاسبه می‌شود یا Float چیست؛ HERMIPLAN این پیچیدگی‌ها را در پشت صحنه مدیریت می‌کند.
           </p>
         </div>
-        <div className="relative mt-14 grid gap-5 md:grid-cols-3">
+        <div className="relative mt-14 grid grid-cols-1 gap-5 md:grid-cols-3">
           <div className="pointer-events-none absolute inset-x-[16%] top-[52px] hidden h-px bg-gradient-to-l from-brand-200 via-brand-400 to-accent-300 md:block" />
           {STEPS.map((item) => (
             <div key={item.step} className="hp-card hp-card-hover relative p-6 text-center md:text-right">
@@ -189,7 +189,7 @@ export default function HomePage() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <span className="text-[12px] font-bold tracking-widest text-brand-600">موتور پروژه</span>
-              <h2 className="mt-3 text-[26px] font-black leading-tight text-ink-900 sm:text-[32px]">
+              <h2 className="mt-3 text-[22px] font-black leading-tight text-ink-900 min-[380px]:text-[26px] sm:text-[32px]">
                 قدرت ابزارهای تخصصی، پشت یک تجربه ساده
               </h2>
             </div>
@@ -197,7 +197,7 @@ export default function HomePage() {
               تمام محاسبات توسط موتور اختصاصی و مستقل سیستم انجام می‌شود؛ نه در دست کاربر و نه وابسته به هوش مصنوعی.
             </p>
           </div>
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {FEATURES.map((feature) => (
               <div key={feature.title} className="hp-card hp-card-hover p-5">
                 <span className="flex size-11 items-center justify-center rounded-2xl bg-brand-50 text-xl">{feature.icon}</span>
@@ -207,7 +207,7 @@ export default function HomePage() {
             ))}
           </div>
 
-          <div className="hp-card mt-8 grid gap-6 p-6 lg:grid-cols-[1fr_1.2fr] lg:items-center">
+          <div className="hp-card mt-8 grid grid-cols-1 gap-6 p-6 lg:grid-cols-[1fr_1.2fr] lg:items-center">
             <div>
               <h3 className="text-[17px] font-black text-ink-900">روش‌های محاسباتی استاندارد</h3>
               <p className="mt-2 text-[12.5px] leading-7 text-slate-500">
@@ -221,7 +221,7 @@ export default function HomePage() {
                 ))}
               </div>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {basis.standards.map((standard) => (
                 <div key={standard.code} className="rounded-2xl border border-slate-200 bg-white p-3.5">
                   <p className="text-[12px] font-bold text-ink-900">{standard.code}</p>
@@ -237,14 +237,14 @@ export default function HomePage() {
       <section id="types" className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-24">
         <div className="mx-auto max-w-2xl text-center">
           <span className="text-[12px] font-bold tracking-widest text-brand-600">انواع پروژه</span>
-          <h2 className="mt-3 text-[26px] font-black leading-tight text-ink-900 sm:text-[32px]">
+          <h2 className="mt-3 text-[22px] font-black leading-tight text-ink-900 min-[380px]:text-[26px] sm:text-[32px]">
             برای هر پروژه، یک ساختار آماده و استاندارد
           </h2>
           <p className="mt-4 text-[14px] leading-8 text-slate-500">
             در پنل ساخت پروژه می‌توانید قالب‌ها را بر اساس حوزه، سطح پیچیدگی و مدت فیلتر و مرتب کنید.
           </p>
         </div>
-        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {TYPES.map(([icon, title, body, domain]) => (
             <div key={title} className="hp-card hp-card-hover group p-5">
               <div className="flex items-start justify-between">
@@ -261,7 +261,7 @@ export default function HomePage() {
       {/* ------------------------------ market ------------------------------ */}
       <section id="market" className="hp-mesh relative overflow-hidden py-20 text-white lg:py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="grid gap-10 lg:grid-cols-[1fr_1.15fr] lg:items-start">
+          <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_1.15fr] lg:items-start">
             <div>
               <span className="text-[12px] font-bold tracking-widest text-accent-400">بازار ایران</span>
               <h2 className="mt-3 text-[26px] font-black leading-tight sm:text-[32px]">
@@ -273,7 +273,7 @@ export default function HomePage() {
                 و برای برآورد قراردادی باید با فهرست‌بهای سال مربوطه جایگزین شود. ضریب منطقه‌ای، بالاسری، سود،
                 ذخیره احتیاطی و سناریوی افزایش هزینه اعمال می‌شود.
               </p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {[
                   ["۳ سری نرخ", "مرجع ۱۴۰۵ / مرجع ۱۴۰۴ / بازار (تخمینی)"],
                   ["۳۷ ردیف نرخ", "نیروی انسانی، ماشین‌آلات و مصالح — بدون سند رسمی"],
@@ -353,10 +353,10 @@ export default function HomePage() {
 
       {/* ------------------------------ output ------------------------------ */}
       <section id="output" className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-24">
-        <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-start">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-start">
           <div>
             <span className="text-[12px] font-bold tracking-widest text-brand-600">خروجی گزارش</span>
-            <h2 className="mt-3 text-[26px] font-black leading-tight text-ink-900 sm:text-[32px]">
+            <h2 className="mt-3 text-[22px] font-black leading-tight text-ink-900 min-[380px]:text-[26px] sm:text-[32px]">
               یک گزارش واقعی، نه یک Print ساده از صفحه سایت
             </h2>
             <p className="mt-4 text-[13.5px] leading-8 text-slate-500">
@@ -364,7 +364,7 @@ export default function HomePage() {
               سرصفحه و پاورقی، شماره صفحه، جدول‌های حرفه‌ای با تکرار سرستون، نمودار گانت و شبکه‌ای، تحلیل ارزش کسب‌شده،
               تعدیل قیمت، ماتریس ریسک، مبنای استانداردها و صفحه امضا.
             </p>
-            <div className="mt-6 grid gap-2 sm:grid-cols-2">
+            <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {EXPORT_FORMATS.map((format) => (
                 <div key={format.id} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3">
                   <span className="flex size-9 items-center justify-center rounded-xl bg-brand-50 font-mono text-[10px] font-bold text-brand-700">
@@ -386,7 +386,7 @@ export default function HomePage() {
           </div>
           <div className="hp-card p-5">
             <p className="mb-3 text-[12.5px] font-bold text-ink-900">بخش‌های قابل انتخاب در گزارش ({toPersianDigits(REPORT_SECTIONS.length)} بخش)</p>
-            <div className="thin-scroll grid max-h-[520px] gap-2 overflow-y-auto sm:grid-cols-2">
+            <div className="thin-scroll grid max-h-[520px] grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
               {REPORT_SECTIONS.map((section) => (
                 <div key={section.key} className="rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5">
                   <p className="text-[12px] font-semibold text-ink-900">{section.label}</p>
@@ -401,7 +401,7 @@ export default function HomePage() {
       {/* ------------------------------- about ------------------------------ */}
       <section id="about" className="bg-slate-50 py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="hp-card grid gap-8 p-8 md:grid-cols-[1.4fr_1fr] md:items-center lg:p-10">
+          <div className="hp-card grid grid-cols-1 gap-8 p-6 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] md:items-center sm:p-8 lg:p-10">
             <div>
               <span className="text-[12px] font-bold tracking-widest text-brand-600">درباره HERMIPLAN</span>
               <h2 className="mt-3 text-[24px] font-black leading-tight text-ink-900 sm:text-[28px]">
@@ -412,7 +412,7 @@ export default function HomePage() {
                 استفاده از امکانات اصلی پلتفرم نیازمند ثبت‌نام نیست؛ ثبت‌نام تنها برای قابلیت‌هایی مانند ذخیره دائمی پروژه،
                 Workspace و دسترسی از دستگاه‌های مختلف طراحی شده است.
               </p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {[
                   ["Simplicity", "ورودی ساده و قابل فهم برای مهندس"],
                   ["Engineering Accuracy", "محاسبات دقیق و قابل تست"],

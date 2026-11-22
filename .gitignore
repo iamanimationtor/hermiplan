@@ -51,3 +51,6 @@ scripts/.it-generator.ts
 
 # TypeScript incremental build info (generated)
 tsconfig.tsbuildinfo
+
+# scratch browser harness for visual/layout verification
+.arena/
